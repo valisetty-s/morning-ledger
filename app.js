@@ -90,6 +90,7 @@ const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 let currentFilter = 'all';
 let currentSentiment = 'all';
 let newsData = null; // { fetchedAt: ISOstring, results: [{ticker,company,tier,articles:[...]}] }
+let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 
 // ---------- DOM refs ----------
 const $ = (sel) => document.querySelector(sel);
@@ -226,7 +227,16 @@ function updateStatusBar() {
     return;
   }
   const fresh = isToday(newsData.fetchedAt);
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}`;
+  const d = lastFetchDiagnostics;
+  let diagSuffix = '';
+  if (d && d.totalCount > 0 && d.errorCount > 0) {
+    if (d.errorCount === d.totalCount) {
+      diagSuffix = ` — ⚠ backend could not be reached for any stock (${escapeHtml(d.lastError || 'unknown error')}). Check your backend URL in Settings and that it's running.`;
+    } else if (d.errorCount > d.totalCount * 0.3) {
+      diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
+    }
+  }
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 }
@@ -278,44 +288,100 @@ function ensureSheetJS() {
   });
 }
 
+// A real NSE/BSE ticker is letters/digits/&/- only, 1-20 chars, and critically
+// is NOT a sentence, a label, or a plain number. This single check is what
+// was missing before — without it, statement text like "Client ID" or
+// "585017.85" or "Equity Holdings Statement as on..." got accepted as if
+// it were a stock ticker, because the old fallback parser trusted column 0
+// blindly with no validation at all.
+// ISINs are a distinct, checkable format that should never be treated as a
+// ticker: exactly 12 characters, starting with a 2-letter country code (e.g.
+// "IN" for India) followed by a security-type letter (commonly "E" for
+// equity), 9 alphanumeric characters total after the country code, ending
+// in 1 check digit. Real tickers don't follow this shape. Without this
+// check, an ISIN like INE918Z01012 structurally passes a generic
+// "looks like a short alphanumeric code" test, but Google News has no
+// listing for an ISIN — only for the company name or trading symbol.
+function looksLikeISIN(value) {
+  return /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(String(value || '').trim().toUpperCase());
+}
+
+// Common section labels and words that appear in Kite statements/reports
+// and happen to be short, space-free, and alphanumeric enough to pass the
+// shape checks above — but are never real tickers. This list was built
+// directly from the exact garbage that showed up in testing (e.g.
+// "Summary", "Total", "Client ID" minus its space). It's not exhaustive —
+// shape-based validation fundamentally cannot catch every possible label
+// with certainty — but it closes the specific gaps already seen in practice.
+const KNOWN_NON_TICKER_LABELS = new Set([
+  'SUMMARY', 'TOTAL', 'GRAND', 'SUBTOTAL', 'NOTES', 'DISCLAIMER', 'PAGE',
+  'DATE', 'NAME', 'ADDRESS', 'PAN', 'EMAIL', 'PHONE', 'STATEMENT', 'REPORT',
+  'HOLDINGS', 'PORTFOLIO', 'EQUITY', 'QUANTITY', 'VALUE', 'AMOUNT', 'BALANCE',
+  'OPENING', 'CLOSING', 'PERIOD', 'YEAR', 'FINANCIAL', 'ANNUAL', 'TAX',
+  'GUIDE', 'FILING', 'CLIENT', 'SEGMENT', 'CATEGORY', 'TYPE', 'STATUS',
+]);
+
+function looksLikeRealTicker(value) {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (v.length > 20) return false; // tickers aren't sentences
+  if (/\s/.test(v)) return false; // tickers never contain spaces; labels/sentences do
+  if (/^-?\d+(\.\d+)?$/.test(v)) return false; // pure numbers are amounts, not tickers
+  if (!/^[A-Z0-9&\-]+$/i.test(v)) return false; // only letters, digits, & and - allowed
+  if (!/[A-Z]/i.test(v)) return false; // must contain at least one letter
+  if (looksLikeISIN(v)) return false; // ISINs are identifiers, not searchable tickers
+  if (KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false; // known statement label, not a stock
+  return true;
+}
+
 function parseRowsFromSheet(rows) {
   if (!rows || rows.length === 0) return [];
-  // Detect header row
   const firstRow = rows[0].map(c => String(c || '').toLowerCase().trim());
   const hasHeader = firstRow.some(c => c.includes('ticker') || c.includes('symbol') || c.includes('instrument'));
   const startIdx = hasHeader ? 1 : 0;
 
   const result = [];
+  let skippedCount = 0;
   for (let i = startIdx; i < rows.length; i++) {
     const row = rows[i];
     if (!row || !row[0]) continue;
 
-    // Kite Holdings format: instrument_token, exchange_token, tradingsymbol, exchange, ...
-    // Detect by checking if header had 'tradingsymbol'
     const ticker = String(row[0]).trim().toUpperCase();
+    if (!looksLikeRealTicker(ticker)) {
+      skippedCount++;
+      continue; // refuse to accept statement text, labels, or numbers as a "ticker"
+    }
     const company = String(row[1] || row[0]).trim();
     let tier = String(row[2] || '').trim();
     if (!VALID_TIERS.includes(tier)) tier = 'Watch';
-    if (!ticker) continue;
     result.push([ticker, company, tier]);
+  }
+  if (skippedCount > 0) {
+    console.warn(`Skipped ${skippedCount} row(s) that didn't look like real tickers (likely statement text, not a stock list).`);
   }
   return result;
 }
 
-// Detect Kite Holdings export format and remap columns
+// Detect Kite Holdings export format and remap columns.
+// Broadened beyond exact column-name matches: Kite has multiple export
+// formats (Holdings CSV, tax P&L statement, equity holdings statement) with
+// different headers. We now also try matching on ISIN columns and a wider
+// set of header name variants, since a statement export's headers don't
+// always say exactly "instrument" or "tradingsymbol".
 function parseKiteHoldingsRows(rows) {
   if (!rows || rows.length === 0) return null;
   const header = rows[0].map(c => String(c || '').toLowerCase().trim());
-  // Kite CSV headers: Instrument, Qty., Avg. cost, LTP, ...
-  const instrIdx = header.findIndex(h => h === 'instrument' || h === 'tradingsymbol');
-  if (instrIdx === -1) return null; // not a Kite format
+
+  const instrIdx = header.findIndex(h =>
+    h === 'instrument' || h === 'tradingsymbol' || h === 'symbol' || h.includes('trading symbol'));
+
+  if (instrIdx === -1) return null; // genuinely not a recognizable Kite holdings format
 
   const result = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const ticker = String(row[instrIdx] || '').trim().toUpperCase();
-    if (!ticker) continue;
-    // Company name = ticker (Kite doesn't export company name in holdings CSV)
+    if (!looksLikeRealTicker(ticker)) continue; // same validation, even on the Kite-format path
     result.push([ticker, ticker, 'Watch']);
   }
   return result.length > 0 ? result : null;
@@ -352,7 +418,7 @@ async function handleSpreadsheetUpload(event) {
       if (!parsed) parsed = parseRowsFromSheet(rows);
 
       if (!parsed || parsed.length === 0) {
-        filenameEl.textContent = 'Could not read any rows — check the format.';
+        filenameEl.textContent = 'Could not find any real stock tickers in this file — it may be a tax/contract statement rather than a holdings list. Try Console → Portfolio → Holdings → Export instead.';
         filenameEl.style.color = 'var(--clay)';
         return;
       }
@@ -486,10 +552,31 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
 
   const userName = (data.user && data.user.user_name) || 'your account';
   showKiteStatus(
-    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account.\n` +
-    `Review the list below, adjust tiers if you want, then tap Save.`,
+    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account. Closing settings and fetching today's news now…`,
     'success'
   );
+
+  // Show the freshly imported holdings immediately on the main page (as a
+  // plain list, before news has loaded) so there's instant visible feedback
+  // that the import worked — then close settings and auto-trigger the full
+  // news fetch, so the user doesn't have to do anything else manually.
+  renderImportedHoldingsPreview(merged, userName);
+
+  setTimeout(() => {
+    closeSettings();
+    fetchAllNews();
+  }, 900);
+}
+
+function renderImportedHoldingsPreview(stocksList, userName) {
+  const rows = stocksList.map(([ticker, company, tier]) =>
+    `<div class="entry"><div class="entry-head"><div><span class="entry-name">${escapeHtml(company)}</span><span class="entry-ticker">${escapeHtml(ticker)}</span></div><span class="entry-badge fresh">${escapeHtml(tier)}</span></div></div>`
+  ).join('');
+  contentEl.innerHTML = `<div class="section">
+    <div class="section-head"><span class="section-label">✓ Imported from ${escapeHtml(userName)}'s Kite account</span><div class="rule"></div></div>
+    <div class="quiet" style="margin-bottom:8px">Fetching today's news for these now…</div>
+    ${rows}
+  </div>`;
 }
 
 function showKiteStatus(msg, type) {
@@ -552,85 +639,78 @@ function classifyStockOverallSentiment(articles) {
   return 'neutral';
 }
 
-// ---------- Fetching: shared RSS + proxy helpers ----------
-const CORS_PROXIES = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
-];
+// ---------- Fetching: via your own backend ----------
+// Both free anonymous CORS proxies this app relied on stopped working:
+// CodeTabs is currently rejecting requests with 400s for many users
+// (a reported, ongoing issue with their free service, not specific to
+// this app), and r.jina.ai explicitly blocks anonymous access to
+// news.google.com due to abuse from other users of their shared service.
+//
+// News fetching now goes through your own backend instead (the same one
+// used for Kite login) — it makes the request to Google directly, with
+// no CORS restriction at all (CORS is purely a browser-side rule) and no
+// shared anonymous-abuse exposure. This requires the backend URL to be
+// set in Settings — the same field used for Kite login.
 
-function buildGoogleNewsRssUrl(company) {
-  const q = encodeURIComponent(`"${company}" when:3d`);
-  return `https://news.google.com/rss/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en`;
+function getBackendUrl() {
+  return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
 }
 
-function parseGoogleNewsXml(xmlText, maxArticles) {
-  const articles = [];
-  try {
-    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
-    const items = doc.querySelectorAll('item');
-    for (let i = 0; i < items.length && articles.length < maxArticles; i++) {
-      const item = items[i];
-      const rawTitle = (item.querySelector('title')?.textContent || '').trim();
-      const link = (item.querySelector('link')?.textContent || '').trim();
-      const pubDate = (item.querySelector('pubDate')?.textContent || '').trim();
-
-      let title = rawTitle;
-      let source = 'Google News';
-      const sepIdx = rawTitle.lastIndexOf(' - ');
-      if (sepIdx > 0) {
-        title = rawTitle.slice(0, sepIdx).trim();
-        source = rawTitle.slice(sepIdx + 3).trim();
-      }
-
-      articles.push({
-        title,
-        source,
-        url: link,
-        published: pubDate ? new Date(pubDate).toISOString() : '',
-      });
-    }
-  } catch (e) {}
-  return articles;
-}
-
-// Try proxies with a per-proxy timeout so a slow proxy doesn't block the queue
-async function fetchViaProxyWithFallback(targetUrl) {
-  for (const buildProxyUrl of CORS_PROXIES) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000); // 8s per proxy
-      const resp = await fetch(buildProxyUrl(targetUrl), { signal: controller.signal });
-      clearTimeout(timer);
-      if (resp.ok) {
-        const text = await resp.text();
-        if (text && text.length > 50) return text;
-      }
-    } catch (e) {
-      // AbortError or network error — try next proxy
-    }
+async function fetchNewsViaBackend(company, maxArticles) {
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) {
+    return { articles: [], error: 'no-backend-configured' };
   }
-  return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    const resp = await fetch(`${backendUrl}/api/news?company=${encodeURIComponent(company)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+    if (!resp.ok || data.status !== 'success') {
+      return { articles: [], error: data.error || `backend returned HTTP ${resp.status}` };
+    }
+    return { articles: (data.articles || []).slice(0, maxArticles), error: null };
+  } catch (e) {
+    return { articles: [], error: e.message || String(e) };
+  }
 }
 
 // ---------- Parallel batch fetcher ----------
-// Fetches up to BATCH_SIZE stocks concurrently, then moves to the next batch.
-// This is the main speed improvement: instead of one-at-a-time (100 stocks × ~2s = 200s)
-// we do 8 at a time (100 stocks / 8 × ~2s ≈ 25s).
-const BATCH_SIZE = 8;
+// Fetches up to BATCH_SIZE stocks concurrently, then moves to the next batch,
+// with a short pause between batches.
+//
+// Lowered from 8 to 4, with a 400ms gap added between batches. Free,
+// unauthenticated proxy services (CodeTabs, r.jina.ai) are shared
+// infrastructure with no published guarantee for sustained bursts —
+// 8-at-a-time, 12 batches back-to-back from one device is the kind of
+// pattern that gets silently throttled even without a documented limit.
+// This trades some speed for reliability: roughly 96 stocks ÷ 4 × (fetch
+// time + 400ms pause) — slower than the original aggressive batching, but
+// much less likely to get rate-limited mid-run, which is the actual
+// failure mode worth avoiding.
+const BATCH_SIZE = 6;
+const BATCH_PAUSE_MS = 200;
+
+// Tracks which proxy actually served each successful response, and how
+// many stocks got zero articles from every proxy. Surfaced in the status
+// bar after a fetch completes, so "nothing showing up" becomes diagnosable
+// instead of a silent mystery. (Declared at top of file with other state.)
 
 async function fetchStockNews(ticker, company) {
-  try {
-    const rssUrl = buildGoogleNewsRssUrl(company);
-    const xmlText = await fetchViaProxyWithFallback(rssUrl);
-    if (xmlText) return { ticker, company, articles: parseGoogleNewsXml(xmlText, 3) };
-  } catch (e) {}
-  return { ticker, company, articles: [] };
+  const { articles, error } = await fetchNewsViaBackend(company, 3);
+  return { ticker, company, articles, error };
 }
 
 async function fetchAllNews() {
   const stocks = Store.getStocks();
   if (!stocks || stocks.length === 0) {
     openSettings();
+    return;
+  }
+  if (!getBackendUrl()) {
+    openSettings();
+    showKiteStatus('News fetching needs your backend URL set below (the same one used for Kite login) — paste it in and try again.', 'error');
     return;
   }
 
@@ -640,22 +720,35 @@ async function fetchAllNews() {
 
   const results = new Array(stocks.length);
   let completed = 0;
+  const diagnostics = { errorCount: 0, emptyCount: 0, totalCount: stocks.length, lastError: null };
 
-  // Process in parallel batches
+  // Your own backend has no anonymous-abuse exposure and no CORS
+  // restriction, so a higher batch size than the old proxy-based approach
+  // is safe here — Render's own connection limits are the real ceiling,
+  // and 8 concurrent requests to your own server is comfortably under that.
   for (let batchStart = 0; batchStart < stocks.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, stocks.length);
     const batch = stocks.slice(batchStart, batchEnd);
 
     const batchPromises = batch.map(async ([ticker, company, tier], batchIdx) => {
-      const { articles } = await fetchStockNews(ticker, company);
+      const { articles, error } = await fetchStockNews(ticker, company);
       results[batchStart + batchIdx] = { ticker, company, tier, articles };
+      if (articles.length === 0) {
+        diagnostics.emptyCount++;
+        if (error) { diagnostics.errorCount++; diagnostics.lastError = error; }
+      }
       completed++;
       refreshLabel.textContent = `Fetching… ${completed}/${stocks.length}`;
     });
 
     await Promise.all(batchPromises);
+
+    if (batchEnd < stocks.length) {
+      await new Promise(r => setTimeout(r, BATCH_PAUSE_MS));
+    }
   }
 
+  lastFetchDiagnostics = diagnostics;
   newsData = { fetchedAt: new Date().toISOString(), results };
   Store.setCache(newsData);
 
@@ -724,27 +817,96 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
 
   let articles = [];
+  let lookupError = null;
   try {
-    const rssUrl = buildGoogleNewsRssUrl(searchTerm);
-    const xmlText = await fetchViaProxyWithFallback(rssUrl);
-    if (xmlText) articles = parseGoogleNewsXml(xmlText, 5);
-  } catch (e) {}
+    const result = await fetchNewsViaBackend(searchTerm, 5);
+    articles = result.articles;
+    lookupError = result.error;
+  } catch (e) { lookupError = e.message || String(e); }
 
   const stockObj = { ticker: displayTicker, company: searchTerm, tier: known ? known[2] : 'Watch', articles };
+  const diagnoseLink = articles.length === 0
+    ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
+    : '';
+  const errorNote = lookupError
+    ? `<div class="quiet" style="color:var(--clay)">Backend error: ${escapeHtml(lookupError)}</div>`
+    : '';
   lookupResult.innerHTML = `<div class="lookup-result-card">
     <div class="lookup-result-head">
       <span class="lookup-result-title">${escapeHtml(searchTerm)} <span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--ink-soft)">${escapeHtml(displayTicker)}</span></span>
       <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
     </div>
     ${renderEntry(stockObj)}
+    ${errorNote}
+    ${diagnoseLink}
   </div>`;
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
+  const diagBtn = document.getElementById('diagnose-btn');
+  if (diagBtn) diagBtn.addEventListener('click', () => runDiagnosticCheck(searchTerm));
 }
 
 function clearLookupResult() {
   lookupResult.innerHTML = '';
   lookupInput.value = '';
   lookupSuggestions.classList.remove('open');
+}
+
+// ---------- Raw diagnostic viewer ----------
+// Shows exactly what each proxy returns for one stock, unparsed — so a
+// "no news found" report can be turned into something concrete to debug
+// rather than a guess. Reachable via a small "diagnose" link that appears
+// next to a stock once it shows "No recent news found".
+async function runDiagnosticCheck(company) {
+  lookupResult.innerHTML = `<div class="lookup-result-card">
+    <div class="lookup-result-head">
+      <span class="lookup-result-title">Diagnostic: ${escapeHtml(company)}</span>
+      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
+    </div>
+    <div class="lookup-loading">Checking your backend directly…</div>
+  </div>`;
+  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
+
+  const backendUrl = getBackendUrl();
+  let statusLine, snippet, requestUrl;
+
+  if (!backendUrl) {
+    statusLine = 'No backend URL configured';
+    snippet = 'Set your backend URL in Settings (the same one used for Kite login) before fetching news.';
+    requestUrl = '(none — backend URL is empty)';
+  } else {
+    requestUrl = `${backendUrl}/api/news?company=${encodeURIComponent(company)}`;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const resp = await fetch(requestUrl, { signal: controller.signal });
+      clearTimeout(timer);
+      const text = await resp.text();
+      let articleCount = 'n/a';
+      try {
+        const json = JSON.parse(text);
+        articleCount = (json.articles || []).length;
+      } catch (e) {}
+      statusLine = `HTTP ${resp.status} · ${text.length} chars received · ${articleCount} articles parsed`;
+      snippet = text.slice(0, 600);
+    } catch (e) {
+      statusLine = `Failed: ${e.message || e}`;
+      snippet = '(no response — check the backend URL is correct and the server is running. Try opening ' +
+                 (backendUrl ? `${backendUrl}/healthz` : '(no backend URL set)') + ' directly in a browser tab.)';
+    }
+  }
+
+  lookupResult.innerHTML = `<div class="lookup-result-card">
+    <div class="lookup-result-head">
+      <span class="lookup-result-title">Diagnostic: ${escapeHtml(company)}</span>
+      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px">Request: ${escapeHtml(requestUrl)}</div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">${escapeHtml(statusLine)}</div>
+      <pre style="font-size:10px;background:var(--paper-dim);padding:8px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto">${escapeHtml(snippet)}</pre>
+    </div>
+  </div>`;
+  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
 }
 
 // ---------- Rendering ----------

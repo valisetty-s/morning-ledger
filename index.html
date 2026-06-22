@@ -557,7 +557,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE</div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v9</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -642,21 +642,28 @@
 SHRIRAMFIN,Shriram Finance,Top30
 AARTIIND,Aarti Industries,Top31-50"></textarea>
 
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
+      <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
+      <div class="hint" style="margin-bottom:12px">
+        News fetching and Kite login both go through a small backend you host for free
+        (Render or Railway) — this avoids the free anonymous proxies this app used before,
+        which started failing for everyone (rate-limits and anti-abuse blocks on the
+        underlying services, not specific to this app). See <code>kite_backend/README.md</code>
+        in the project files for a 10-minute setup if you haven't done this yet.
+      </div>
+      <label class="field-label">Your backend URL</label>
+      <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
+    </div>
 
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
-      <div class="field-label" style="margin-top:0">Import from Kite (Zerodha)</div>
+      <div class="field-label" style="margin-top:0">Import from Kite (Zerodha) — optional</div>
       <div class="hint" style="margin-bottom:12px">
-        Direct login: enter your Kite Connect API key and your backend URL below, then tap the button.
-        After you log in on Zerodha's site, you'll be redirected back here and your holdings will be
-        fetched automatically.<br><br>
-        Don't have a backend yet? See <code>kite_backend/README.md</code> in the project files for a
-        free 10-minute setup (Render or Railway). The backend is required because Kite's security
-        rules forbid putting your API secret in a phone app.
+        Enter your Kite Connect API key and tap the button. After you log in on Zerodha's
+        site, you'll be redirected back here and your holdings will be fetched automatically.
+        Uses the backend URL set above.
       </div>
       <label class="field-label">Kite Connect API Key</label>
       <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="off" style="margin-bottom:10px">
-      <label class="field-label">Your backend URL</label>
-      <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
       <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
         Log in to Kite &amp; import holdings
