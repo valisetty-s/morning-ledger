@@ -83,6 +83,20 @@ const Store = {
   setCache: (obj) => localStorage.setItem('ml_news_cache', JSON.stringify(obj)),
   getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || '',
   setKiteApiKey: (v) => localStorage.setItem('ml_kite_api_key', v),
+  // Kite access tokens expire daily (Kite's own rule, not ours) — store
+  // the date alongside the token so we know to treat it as stale even if
+  // it's technically still sitting in localStorage from a previous day.
+  getKiteAccessToken: () => {
+    const stored = localStorage.getItem('ml_kite_access_token');
+    const storedDate = localStorage.getItem('ml_kite_access_token_date');
+    const today = new Date().toDateString();
+    if (!stored || storedDate !== today) return '';
+    return stored;
+  },
+  setKiteAccessToken: (token) => {
+    localStorage.setItem('ml_kite_access_token', token);
+    localStorage.setItem('ml_kite_access_token_date', new Date().toDateString());
+  },
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 
@@ -545,6 +559,15 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     return;
   }
 
+  // Store the access_token the backend just returned, so /api/quotes can
+  // use it later today without depending on the backend's own process
+  // memory surviving between requests (Render can recycle that process
+  // between this call and the next one — localStorage on the phone has
+  // no such problem).
+  if (data.access_token) {
+    Store.setKiteAccessToken(data.access_token);
+  }
+
   // Merge fetched tickers into the stock list, preserving tiers for any
   // ticker we already know about; new tickers default to "Watch".
   const existing = Store.getStocks();
@@ -767,6 +790,14 @@ async function fetchQuotes(stocks) {
   const backendUrl = getBackendUrl();
   if (!backendUrl) return { quotes: {}, error: 'no-backend-configured' };
 
+  const accessToken = Store.getKiteAccessToken();
+  if (!accessToken) {
+    // No point calling the backend at all — we already know we have no
+    // valid token for today. Fails the same way the backend would, just
+    // without the round trip.
+    return { quotes: {}, error: 'no-active-kite-session', errorMessage: 'Log in via Kite first (Settings) — prices need today\'s access token.' };
+  }
+
   // Default to NSE — the vast majority of a typical portfolio trades there.
   // BSE-only or BE-series symbols will simply come back absent from Kite's
   // response (its own documented behavior for unmatched symbols), which
@@ -777,10 +808,17 @@ async function fetchQuotes(stocks) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
-    const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
+    const url = `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}&access_token=${encodeURIComponent(accessToken)}`;
+    const resp = await fetch(url, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
     if (!resp.ok || data.status !== 'success') {
+      // If the backend says our token is actually expired, clear it locally
+      // too so the next attempt shows the right message immediately rather
+      // than retrying a token we now know is dead.
+      if (data.error === 'kite-session-expired') {
+        Store.setKiteAccessToken('');
+      }
       return { quotes: {}, error: data.error || `backend returned HTTP ${resp.status}`, errorMessage: data.message };
     }
     return { quotes: data.quotes || {}, error: null };
