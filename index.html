@@ -1,911 +1,682 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Morning Ledger — Client-side portfolio news briefing" />
-  <meta name="theme-color" content="#121a26" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="icons/icon-192.png" />
-  <title>Morning Ledger</title>
-
-  <style>
-    :root {
-      --paper: #f5f5f5;
-      --paper-dim: #efefef;
-      --ink: #1a1a1a;
-      --ink-soft: #666;
-      --ink-softer: #999;
-      --rule: #ddd;
-      --rule-strong: #bbb;
-      --clay: #c85a54;
-      --sage: #4a8159;
-      --blue: #2563eb;
-      --yellow: #f59e0b;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --paper: #0f1419;
-        --paper-dim: #1a2332;
-        --ink: #f5f5f5;
-        --ink-soft: #999;
-        --ink-softer: #666;
-        --rule: #333;
-        --rule-strong: #444;
-      }
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      max-width: 100%;
-    }
-
-    #header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--rule);
-      background: var(--paper);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    #dateline {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    #dateline-date {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    #refresh-btn {
-      background: var(--blue);
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-    }
-
-    #dateline-status {
-      font-size: 12px;
-      color: var(--ink-soft);
-    }
-
-    #dateline-status.fresh {
-      color: var(--sage);
-    }
-
-    #refresh-status {
-      font-size: 12px;
-      color: var(--ink-soft);
-      margin-top: 8px;
-    }
-
-    .filters {
-      display: flex;
-      gap: 8px;
-      padding: 0 20px;
-      overflow-x: auto;
-      border-bottom: 1px solid var(--rule);
-    }
-
-    .chip {
-      padding: 8px 12px;
-      border: 1px solid var(--rule-strong);
-      border-radius: 20px;
-      background: transparent;
-      color: var(--ink-soft);
-      cursor: pointer;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .chip.active {
-      background: var(--blue);
-      color: white;
-      border-color: var(--blue);
-    }
-
-    #content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-
-    .section {
-      margin-bottom: 24px;
-    }
-
-    .section-head {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .section-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--ink-soft);
-      white-space: nowrap;
-    }
-
-    .rule {
-      flex: 1;
-      height: 1px;
-      background: var(--rule);
-    }
-
-    .entry {
-      background: var(--paper-dim);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      border-left: 4px solid transparent;
-    }
-
-    .entry.has-negative {
-      border-left-color: var(--clay);
-    }
-
-    .entry-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 8px;
-    }
-
-    .entry-name {
-      font-weight: 500;
-      color: var(--ink);
-    }
-
-    .entry-ticker {
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: var(--ink-soft);
-      margin-left: 8px;
-    }
-
-    .entry-price {
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ink);
-    }
-
-    .entry-badge {
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      background: var(--blue);
-      color: white;
-    }
-
-    .sent-badge-positive {
-      background: var(--sage) !important;
-    }
-
-    .sent-badge-negative {
-      background: var(--clay) !important;
-    }
-
-    .headline {
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    .headline a {
-      color: var(--blue);
-      text-decoration: none;
-    }
-
-    .headline a:hover {
-      text-decoration: underline;
-    }
-
-    .sentiment-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 4px;
-      background: var(--ink-softer);
-    }
-
-    .sentiment-dot.positive {
-      background: var(--sage);
-    }
-
-    .sentiment-dot.negative {
-      background: var(--clay);
-    }
-
-    .article-meta {
-      font-size: 11px;
-      color: var(--ink-softer);
-      margin-bottom: 8px;
-    }
-
-    .more-articles {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--rule);
-    }
-
-    .sub-headline {
-      font-size: 12px;
-      margin-bottom: 4px;
-      display: flex;
-      gap: 6px;
-      align-items: flex-start;
-    }
-
-    .sub-headline a {
-      color: var(--blue);
-      text-decoration: none;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--ink-soft);
-    }
-
-    .empty-state .glyph {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-    }
-
-    .empty-state h3 {
-      font-size: 18px;
-      margin-bottom: 8px;
-      color: var(--ink);
-    }
-
-    .empty-state p {
-      font-size: 13px;
-    }
-
-    #lookup-input {
-      flex: 1;
-      padding: 8px 12px;
-      border: 1px solid var(--rule-strong);
-      border-radius: 6px;
-      background: var(--paper-dim);
-      color: var(--ink);
-      font-size: 13px;
-    }
-
-    #lookup-input:focus {
-      outline: none;
-      border-color: var(--blue);
-    }
-
-    #lookup-suggestions {
-      position: absolute;
-      top: 100%;
-      left: 20px;
-      right: 20px;
-      background: var(--paper-dim);
-      border: 1px solid var(--rule-strong);
-      border-radius: 0 0 6px 6px;
-      display: none;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 200;
-    }
-
-    #lookup-suggestions.open {
-      display: block;
-    }
-
-    .suggestion-item {
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: 12px;
-      display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--rule);
-    }
-
-    .suggestion-item:hover {
-      background: var(--paper);
-    }
-
-    #lookup-result {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 300;
-      padding: 20px;
-    }
-
-    #lookup-result:empty {
-      display: none;
-    }
-
-    .lookup-result-card {
-      background: var(--paper);
-      border-radius: 8px;
-      padding: 20px;
-      max-width: 500px;
-      max-height: 80vh;
-      overflow-y: auto;
-      width: 100%;
-    }
-
-    .lookup-result-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--rule);
-      padding-bottom: 12px;
-    }
-
-    .lookup-close {
-      background: none;
-      border: none;
-      color: var(--ink-soft);
-      cursor: pointer;
-      font-size: 16px;
-    }
-
-    .lookup-loading {
-      text-align: center;
-      padding: 20px;
-      color: var(--ink-soft);
-    }
-
-    #settings-fab {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: var(--blue);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 24px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 150;
-    }
-
-    #settings-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 400;
-      padding: 20px;
-    }
-
-    #settings-overlay.open {
-      display: flex;
-    }
-
-    .settings-panel {
-      background: var(--paper);
-      border-radius: 8px;
-      padding: 20px;
-      max-width: 500px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-
-    .settings-panel h2 {
-      font-size: 16px;
-      margin-bottom: 16px;
-    }
-
-    .settings-group {
-      margin-bottom: 16px;
-    }
-
-    .settings-group label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--ink-soft);
-    }
-
-    .settings-group textarea,
-    .settings-group input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid var(--rule-strong);
-      border-radius: 4px;
-      background: var(--paper-dim);
-      color: var(--ink);
-      font-size: 12px;
-      font-family: monospace;
-    }
-
-    .settings-group textarea {
-      min-height: 100px;
-      resize: vertical;
-    }
-
-    .settings-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 20px;
-    }
-
-    .settings-actions button {
-      flex: 1;
-      padding: 8px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-    }
-
-    #settings-save {
-      background: var(--blue);
-      color: white;
-    }
-
-    #settings-cancel {
-      background: var(--rule);
-      color: var(--ink);
-    }
-
-    .quiet {
-      color: var(--ink-soft);
-      font-size: 12px;
-    }
-
-    .skeleton-entry {
-      background: var(--paper-dim);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .skel-line {
-      height: 10px;
-      background: linear-gradient(90deg, var(--rule) 0%, var(--rule-strong) 50%, var(--rule) 100%);
-      border-radius: 4px;
-      margin-bottom: 8px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FBF6EE">
+<title>The Morning Ledger</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  @font-face {
+    font-family: 'Newsreader';
+    src: local('Newsreader');
+  }
+
+  :root {
+    --paper: #FBF6EE;
+    --paper-dim: #F3ECDD;
+    --ink: #1C1B19;
+    --ink-soft: #5C5852;
+    --rule: #E2D8C3;
+    --rule-strong: #C9BCA0;
+    --sunrise: #C45A3E;
+    --sunrise-dim: #F1DFD6;
+    --sage: #5B7553;
+    --sage-dim: #E3E9DE;
+    --clay: #A4453A;
+    --clay-dim: #F0DEDB;
+    --gold: #B8923F;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Georgia', 'Newsreader', serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+  }
+
+  body {
+    padding-bottom: 90px;
+    min-height: 100vh;
+  }
+
+  /* ---------- MASTHEAD ---------- */
+  .masthead {
+    padding: 28px 20px 16px;
+    text-align: center;
+    border-bottom: 3px double var(--ink);
+    position: sticky;
+    top: 0;
+    background: var(--paper);
+    z-index: 20;
+  }
+  .masthead .eyebrow {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .masthead h1 {
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+  }
+  .masthead .dateline {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    align-items: center;
+  }
+  .dateline .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--rule-strong); }
+  .dateline .fresh { color: var(--sunrise); font-weight: 600; }
+
+  /* ---------- TOOLBAR ---------- */
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .chip {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+    padding: 6px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--rule-strong);
+    background: transparent;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+  .chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .sentiment-toolbar {
+    border-bottom: 1px solid var(--rule);
+  }
+  .sent-chip.sent-negative.active { background: var(--clay); border-color: var(--clay); color: var(--paper); }
+  .sent-chip.sent-neutral.active { background: var(--ink-soft); border-color: var(--ink-soft); color: var(--paper); }
+  .sent-chip.sent-positive.active { background: var(--sage); border-color: var(--sage); color: var(--paper); }
+
+  .sentiment-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+    position: relative;
+    top: -1px;
+  }
+  .sentiment-dot.negative { background: var(--clay); }
+  .sentiment-dot.neutral { background: var(--rule-strong); }
+  .sentiment-dot.positive { background: var(--sage); }
+
+  .entry.has-negative { border-left: 2px solid var(--clay); padding-left: 10px; margin-left: -12px; }
+
+  /* ---------- REFRESH BAR ---------- */
+  .refresh-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .refresh-bar .status {
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .refresh-btn {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sunrise);
+    background: none;
+    border: none;
+    padding: 6px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .refresh-btn svg { width: 13px; height: 13px; }
+  .refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- SECTIONS ---------- */
+  .section {
+    padding: 6px 20px 22px;
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 18px 0 10px;
+  }
+  .section-head .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--rule-strong);
+  }
+  .section-label {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .section-label.tier-top30 { color: var(--sage); }
+  .section-label.tier-top31-50 { color: var(--gold); }
+  .section-label.tier-top51-75 { color: var(--sunrise); }
+  .section-label.tier-watch { color: var(--clay); }
+
+  /* ---------- ENTRY (single stock dispatch) ---------- */
+  .entry {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .entry:last-child { border-bottom: none; }
+  .entry-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+  .entry-name {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .entry-ticker {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    letter-spacing: 0.3px;
+    margin-left: 6px;
+  }
+  .entry-badge {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .entry-badge.fresh { background: var(--sunrise-dim); color: var(--sunrise); }
+  .entry-badge.sent-badge-negative { background: var(--clay-dim); color: var(--clay); }
+  .entry-badge.sent-badge-positive { background: var(--sage-dim); color: var(--sage); }
+
+  .headline {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin-top: 6px;
+  }
+  .headline a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
+
+  .article-meta {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  .more-articles {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+    padding-left: 0;
+  }
+  .more-articles .sub-headline {
+    font-family: 'Georgia', serif;
+    font-size: 13px;
+    color: var(--ink);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  .quiet {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 6px;
+  }
+
+  /* ---------- EMPTY / LOADING ---------- */
+  .empty-state {
+    text-align: center;
+    padding: 70px 30px;
+    color: var(--ink-soft);
+  }
+  .empty-state .glyph { font-size: 32px; margin-bottom: 14px; opacity: 0.5; }
+  .empty-state h3 { font-family: -apple-system, system-ui, sans-serif; font-size: 15px; color: var(--ink); margin-bottom: 6px; font-weight: 600; }
+  .empty-state p { font-family: -apple-system, system-ui, sans-serif; font-size: 12.5px; line-height: 1.6; max-width: 280px; margin: 0 auto; }
+
+  .skeleton-entry {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .skel-line {
+    height: 12px;
+    background: linear-gradient(90deg, var(--rule) 0%, var(--paper-dim) 50%, var(--rule) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ---------- SINGLE-STOCK LOOKUP ---------- */
+  .lookup-bar {
+    padding: 4px 20px 14px;
+    position: relative;
+  }
+  .lookup-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: var(--paper-dim);
+  }
+  .lookup-icon { width: 16px; height: 16px; color: var(--ink-soft); flex-shrink: 0; }
+  .lookup-input {
+    border: none;
+    background: none;
+    outline: none;
+    width: 100%;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .lookup-input::placeholder { color: var(--ink-soft); }
+
+  .lookup-suggestions {
+    position: absolute;
+    left: 20px; right: 20px;
+    top: 100%;
+    background: var(--paper);
+    border: 1px solid var(--rule-strong);
+    border-radius: 10px;
+    margin-top: 4px;
+    box-shadow: 0 6px 18px rgba(28,27,25,0.12);
+    z-index: 25;
+    overflow: hidden;
+    display: none;
+  }
+  .lookup-suggestions.open { display: block; }
+  .suggestion-item {
+    padding: 11px 14px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13.5px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:active { background: var(--paper-dim); }
+  .suggestion-name { color: var(--ink); }
+  .suggestion-ticker { color: var(--ink-soft); font-family: 'SF Mono', monospace; font-size: 11px; }
+  .suggestion-empty { padding: 14px; font-family: -apple-system, system-ui, sans-serif; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+
+  .lookup-result-card {
+    margin: 0 20px 18px;
+    padding: 16px 18px;
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 12px;
+  }
+  .lookup-result-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 4px;
+  }
+  .lookup-result-title { font-size: 16px; font-weight: 600; }
+  .lookup-close {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    padding: 4px 8px;
+  }
+  .lookup-loading {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    padding: 10px 0 2px;
+  }
+
+  /* ---------- SETTINGS PANEL ---------- */
+  .settings-overlay {
+    position: fixed; inset: 0;
+    background: rgba(28,27,25,0.4);
+    z-index: 50;
+    display: none;
+  }
+  .settings-overlay.open { display: block; }
+  .settings-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--paper);
+    border-radius: 18px 18px 0 0;
+    padding: 20px 22px 36px;
+    z-index: 51;
+    font-family: -apple-system, system-ui, sans-serif;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+  }
+  .settings-overlay.open .settings-panel { transform: translateY(0); }
+  .settings-panel h2 {
+    font-family: 'Georgia', serif;
+    font-size: 19px;
+    margin-bottom: 4px;
+  }
+  .settings-panel .hint {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .field-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+    margin-top: 16px;
+    display: block;
+  }
+  .field-input, .field-textarea {
+    width: 100%;
+    border: 1px solid var(--rule-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--paper-dim);
+    color: var(--ink);
+  }
+  .field-textarea { min-height: 90px; resize: vertical; }
+  .field-input:focus, .field-textarea:focus { outline: 2px solid var(--sunrise); outline-offset: 1px; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-secondary { background: var(--paper-dim); color: var(--ink); border: 1px solid var(--rule-strong); }
+
+  .close-x {
+    position: absolute;
+    top: 16px; right: 18px;
+    font-size: 22px;
+    color: var(--ink-soft);
+    line-height: 1;
+    background: none;
+    border: none;
+  }
+
+  .csv-upload-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .btn-upload {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 8px;
+    padding: 9px 14px;
+  }
+  .btn-upload svg { width: 15px; height: 15px; }
+  .csv-filename {
+    font-size: 11.5px;
+    color: var(--sage);
+    font-weight: 600;
+  }
+  .csv-hint {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  /* ---------- BOTTOM NAV / FAB ---------- */
+  .fab {
+    position: fixed;
+    bottom: 22px; right: 20px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(28,27,25,0.25);
+    border: none;
+    z-index: 30;
+  }
+  .fab svg { width: 22px; height: 22px; }
+
+  .install-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px 20px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12.5px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    z-index: 40;
+  }
+  .install-banner.show { display: flex; }
+  .install-banner button {
+    background: var(--sunrise);
+    color: var(--paper);
+    border: none;
+    padding: 8px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .install-banner .dismiss {
+    background: none;
+    color: var(--paper);
+    opacity: 0.6;
+    padding: 8px;
+    font-size: 16px;
+  }
+
+  .kite-status {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .kite-status-info { background: var(--paper-dim); color: var(--ink-soft); border: 1px solid var(--rule); }
+  .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
+  .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
+</style>
 </head>
 <body>
-  <div id="app">
-    <div id="header">
-      <div id="dateline">
-        <div>
-          <div id="dateline-date"></div>
-          <div id="dateline-status"></div>
-        </div>
-        <button id="refresh-btn">
-          <span id="refresh-label">Fetch today's news</span>
-        </button>
-      </div>
-      <div id="refresh-status"></div>
-      <div style="display: flex; gap: 8px; margin-top: 12px;">
-        <input type="text" id="lookup-input" placeholder="Search a stock..." style="flex: 1; padding: 8px 12px; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--paper-dim); color: var(--ink); font-size: 13px;" />
-      </div>
-      <div id="lookup-suggestions"></div>
-    </div>
 
-    <div class="filters">
-      <button class="chip active" data-filter="all">All</button>
-      <button class="chip" data-filter="fresh">Fresh news</button>
-      <button class="chip" data-filter="Top30">⭐ Top 30</button>
-      <button class="chip" data-filter="Top31-50">Ranks 31–50</button>
-      <button class="chip" data-filter="Top51-75">Ranks 51–75</button>
-      <button class="chip" data-filter="Watch">Watch list</button>
-      <button class="chip" data-sentiment="all">All sentiment</button>
-      <button class="chip" data-sentiment="positive">✓ Positive</button>
-      <button class="chip" data-sentiment="negative">⚠ Negative</button>
-    </div>
-
-    <div id="content">
-      <div class="empty-state">
-        <div class="glyph">☀︎</div>
-        <h3>Good morning.</h3>
-        <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
-      </div>
-    </div>
-
-    <div id="lookup-result"></div>
+<div class="masthead">
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v10</span></div>
+  <h1>The Morning Ledger</h1>
+  <div class="dateline">
+    <span id="dateline-date">—</span>
+    <span class="dot"></span>
+    <span id="dateline-status">Tap refresh to fetch today's news</span>
   </div>
+</div>
 
-  <button id="settings-fab">⚙</button>
+<div class="toolbar" id="toolbar">
+  <button class="chip active" data-filter="all">All holdings</button>
+  <button class="chip" data-filter="fresh">Fresh news only</button>
+  <button class="chip" data-filter="Top30">⭐ Top 30</button>
+  <button class="chip" data-filter="Top31-50">Ranks 31–50</button>
+  <button class="chip" data-filter="Top51-75">Ranks 51–75</button>
+  <button class="chip" data-filter="Watch">Watch list</button>
+</div>
 
-  <div id="settings-overlay">
-    <div class="settings-panel">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h2>Settings</h2>
-        <button id="settings-close" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
-      </div>
+<div class="toolbar sentiment-toolbar" id="sentiment-toolbar">
+  <button class="chip sent-chip active" data-sentiment="all">All tone</button>
+  <button class="chip sent-chip sent-negative" data-sentiment="negative">⚠ Negative</button>
+  <button class="chip sent-chip sent-neutral" data-sentiment="neutral">Neutral</button>
+  <button class="chip sent-chip sent-positive" data-sentiment="positive">✓ Positive</button>
+</div>
 
-      <div class="settings-group">
-        <label>Stock List (ticker, company, tier)</label>
-        <textarea id="stocklist-input"></textarea>
-      </div>
+<div class="refresh-bar">
+  <span class="status" id="refresh-status">Not yet fetched today</span>
+  <button class="refresh-btn" id="refresh-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+    <span id="refresh-label">Fetch today's news</span>
+  </button>
+</div>
 
-      <div class="settings-group">
-        <label>Backend URL (for news fetching)</label>
-        <input type="text" id="kite-backend-url-input" placeholder="https://your-backend.com" />
-      </div>
+<div class="lookup-bar">
+  <div class="lookup-input-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" id="lookup-input" class="lookup-input" placeholder="Look up one stock — e.g. AARTIIND or Aarti Industries" autocomplete="off">
+  </div>
+  <div id="lookup-suggestions" class="lookup-suggestions"></div>
+</div>
 
-      <div class="settings-group">
-        <label>Kite API Key</label>
-        <input type="text" id="kite-api-key-input" placeholder="your_api_key" />
-      </div>
+<div id="lookup-result"></div>
 
-      <button id="kite-import-btn" style="width: 100%; padding: 8px; margin: 12px 0; border: 1px solid var(--rule-strong); background: transparent; border-radius: 4px; cursor: pointer;">
-        📤 Log in to Kite
+<div id="content">
+  <div class="empty-state">
+    <div class="glyph">☀︎</div>
+    <h3>Good morning.</h3>
+    <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
+  </div>
+</div>
+
+<button class="fab" id="settings-fab" aria-label="Settings">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<div class="install-banner" id="install-banner">
+  <span>Add The Morning Ledger to your home screen for one-tap access.</span>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button id="install-btn">Add</button>
+    <button class="dismiss" id="install-dismiss">✕</button>
+  </div>
+</div>
+
+<div class="settings-overlay" id="settings-overlay">
+  <div class="settings-panel">
+    <button class="close-x" id="settings-close">✕</button>
+    <h2>Settings</h2>
+    <div class="hint">News comes from Google News (Moneycontrol, Economic Times, LiveMint, Business Standard and others) — no account or API key needed. Your stock list is stored only on this device.</div>
+
+    <label class="field-label">Your stock list</label>
+    <div class="csv-upload-row">
+      <button class="btn-upload" id="csv-upload-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload XLSX / XLS / CSV
       </button>
+      <input type="file" id="csv-file-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none">
+      <span class="csv-filename" id="csv-filename"></span>
+    </div>
+    <div class="csv-hint">Accepts .xlsx, .xls, or .csv. Needs 3 columns: ticker, company name, tier (Top30 / Top31-50 / Top51-75 / Watch). Header row optional. Also auto-detects Kite Holdings export — sets all to Watch tier.</div>
 
-      <div id="kite-status"></div>
+    <label class="field-label" style="margin-top:18px">Or edit as text (one per line)</label>
+    <textarea class="field-textarea" id="stocklist-input" placeholder="VBL,Varun Beverages,Top30
+SHRIRAMFIN,Shriram Finance,Top30
+AARTIIND,Aarti Industries,Top31-50"></textarea>
 
-      <div class="settings-group">
-        <label>Import from spreadsheet</label>
-        <button id="csv-upload-btn" style="width: 100%; padding: 8px; background: var(--paper-dim); border: 1px solid var(--rule-strong); border-radius: 4px; cursor: pointer;">
-          📁 Upload CSV/XLSX
-        </button>
-        <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls" style="display: none;" />
-        <div id="csv-filename" style="font-size: 11px; margin-top: 8px; color: var(--ink-soft);"></div>
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
+      <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
+      <div class="hint" style="margin-bottom:12px">
+        News fetching and Kite login both go through a small backend you host for free
+        (Render or Railway) — this avoids the free anonymous proxies this app used before,
+        which started failing for everyone (rate-limits and anti-abuse blocks on the
+        underlying services, not specific to this app). See <code>kite_backend/README.md</code>
+        in the project files for a 10-minute setup if you haven't done this yet.
       </div>
+      <label class="field-label">Your backend URL</label>
+      <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
+    </div>
 
-      <div class="settings-actions">
-        <button id="settings-save">Save</button>
-        <button id="settings-cancel">Cancel</button>
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
+      <div class="field-label" style="margin-top:0">Import from Kite (Zerodha) — optional</div>
+      <div class="hint" style="margin-bottom:12px">
+        Enter your Kite Connect API key and tap the button. After you log in on Zerodha's
+        site, you'll be redirected back here and your holdings will be fetched automatically.
+        Uses the backend URL set above.
       </div>
+      <label class="field-label">Kite Connect API Key</label>
+      <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="off" style="margin-bottom:10px">
+      <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Log in to Kite &amp; import holdings
+      </button>
+      <div id="kite-status" class="kite-status" style="display:none"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
+      <button class="btn btn-primary" id="settings-save">Save</button>
     </div>
   </div>
+</div>
 
-  <script>
-const DEFAULT_STOCKS = [["VBL","Varun Beverages","Top30"],["SHRIRAMFIN","Shriram Finance","Top30"],["MAXHEALTH","Max Healthcare","Top30"],["CGPOWER","CG Power & Industrial","Top30"],["MTARTECH","MTAR Technologies","Top30"],["CAMS","CAMS","Top30"],["BSE","BSE Ltd","Top30"],["LAURUSLABS","Laurus Labs","Top30"],["DATAPATTNS","Data Patterns","Top30"],["RAINBOW","Rainbow Children's Medicare","Top30"],["KFINTECH","KFin Technologies","Top30"],["THYROCARE","Thyrocare Technologies","Top30"],["BEL","Bharat Electronics","Top30"],["VINATIORGA","Vinati Organics","Top30"],["SRF","SRF Ltd","Top30"],["PARAS","Paras Defence","Top30"],["YATHARTH","Yatharth Hospital","Top30"],["AFFLE","Affle India","Top30"],["SONACOMS","Sona BLW Precision","Top30"],["UNIMECH","Unimech Aerospace","Top30"],["KAYNES","Kaynes Technology","Top30"],["IZMO","izmo Ltd","Top30"],["SYRMA","Syrma SGS Technology","Top30"],["ZENTEC","Zen Technologies","Top30"],["M&M","Mahindra & Mahindra","Top30"],["ZYDUSLIFE","Zydus Lifesciences","Top30"],["NETWEB","Netweb Technologies","Top30"],["SUZLON","Suzlon Energy","Top30"],["CYIENTDLM","Cyient DLM","Top30"],["SYNGENE","Syngene International","Top30"]];
-
-const TIER_LABELS = {"Top30": "⭐ Top 30", "Top31-50": "Ranks 31–50", "Top51-75": "Ranks 51–75", "Watch": "Watch list"};
-const TIER_ORDER = ["Top30", "Top31-50", "Top51-75", "Watch"];
-
-const Store = {
-  getStocks: () => { const raw = localStorage.getItem('ml_stocks'); if (!raw) return DEFAULT_STOCKS; try { return JSON.parse(raw); } catch { return DEFAULT_STOCKS; } },
-  setStocks: (arr) => localStorage.setItem('ml_stocks', JSON.stringify(arr)),
-  getCache: () => { const raw = localStorage.getItem('ml_news_cache'); if (!raw) return null; try { return JSON.parse(raw); } catch { return null; } },
-  setCache: (obj) => localStorage.setItem('ml_news_cache', JSON.stringify(obj)),
-  getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || '',
-  setKiteApiKey: (v) => localStorage.setItem('ml_kite_api_key', v),
-};
-const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
-
-let currentFilter = 'all';
-let currentSentiment = 'all';
-let newsData = null;
-let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
-
-const $ = (sel) => document.querySelector(sel);
-const contentEl = $('#content');
-const refreshBtn = $('#refresh-btn');
-const refreshLabel = $('#refresh-label');
-const refreshStatus = $('#refresh-status');
-const datelineDate = $('#dateline-date');
-const datelineStatus = $('#dateline-status');
-const lookupInput = $('#lookup-input');
-const lookupSuggestions = $('#lookup-suggestions');
-const lookupResult = $('#lookup-result');
-
-function todayLabel() { return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }); }
-function isToday(isoString) { if (!isoString) return false; const d = new Date(isoString); const now = new Date(); return d.toDateString() === now.toDateString(); }
-function timeLabel(isoString) { return new Date(isoString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
-
-function init() {
-  datelineDate.textContent = todayLabel();
-  const cached = Store.getCache();
-  if (cached && cached.results) { newsData = cached; renderContent(); updateStatusBar(); }
-
-  document.querySelectorAll('.chip[data-filter]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      currentFilter = chip.dataset.filter;
-      renderContent();
-    });
-  });
-
-  document.querySelectorAll('.chip[data-sentiment]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-sentiment]').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      currentSentiment = chip.dataset.sentiment;
-      renderContent();
-    });
-  });
-
-  refreshBtn.addEventListener('click', fetchAllNews);
-
-  let lookupDebounceTimer = null;
-  lookupInput.addEventListener('input', () => {
-    clearTimeout(lookupDebounceTimer);
-    lookupDebounceTimer = setTimeout(() => renderSuggestions(lookupInput.value), 150);
-  });
-
-  $('#settings-fab').addEventListener('click', openSettings);
-  $('#settings-close').addEventListener('click', closeSettings);
-  $('#settings-cancel').addEventListener('click', closeSettings);
-  $('#settings-save').addEventListener('click', saveSettings);
-
-  $('#csv-upload-btn').addEventListener('click', () => $('#csv-file-input').click());
-  $('#kite-import-btn').addEventListener('click', () => showKiteStatus('Kite integration requires backend configuration in Settings.', 'error'));
-
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
-}
-
-function updateStatusBar() {
-  if (!newsData) {
-    refreshStatus.textContent = 'Not yet fetched today';
-    datelineStatus.textContent = "Tap refresh to fetch today's news";
-    return;
-  }
-  const fresh = isToday(newsData.fetchedAt);
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}`;
-  datelineStatus.textContent = fresh ? 'Updated today' : 'Stale — tap refresh';
-  datelineStatus.classList.toggle('fresh', fresh);
-}
-
-function openSettings() {
-  const stocks = Store.getStocks();
-  $('#stocklist-input').value = stocks.map(s => s.join(',')).join('\n');
-  const savedKey = Store.getKiteApiKey();
-  if (savedKey) $('#kite-api-key-input').value = savedKey;
-  const savedBackend = localStorage.getItem(KITE_BACKEND_URL_KEY);
-  if (savedBackend) $('#kite-backend-url-input').value = savedBackend;
-  $('#settings-overlay').classList.add('open');
-}
-
-function closeSettings() { $('#settings-overlay').classList.remove('open'); }
-
-function saveSettings() {
-  const kiteKey = $('#kite-api-key-input').value.trim();
-  if (kiteKey) Store.setKiteApiKey(kiteKey);
-  const backendUrl = $('#kite-backend-url-input').value.trim();
-  if (backendUrl) localStorage.setItem(KITE_BACKEND_URL_KEY, backendUrl.replace(/\/$/, ''));
-  const lines = $('#stocklist-input').value.split('\n').map(l => l.trim()).filter(Boolean);
-  const parsed = lines.map(l => { const parts = l.split(',').map(p => p.trim()); return [parts[0] || '', parts[1] || parts[0] || '', parts[2] || 'Watch']; }).filter(p => p[0]);
-  if (parsed.length) Store.setStocks(parsed);
-  closeSettings();
-}
-
-function handleSpreadsheetUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  $('#csv-filename').textContent = '✓ ' + file.name;
-  $('#csv-filename').style.color = 'var(--sage)';
-}
-
-function showKiteStatus(msg, type) {
-  const el = $('#kite-status');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.display = 'block';
-  el.className = 'kite-status kite-status-' + type;
-}
-
-const NEGATIVE_WORDS = ['fraud', 'scam', 'probe', 'investigat', 'downgrade', 'default', 'loss', 'decline', 'fall', 'drop', 'risk'];
-const POSITIVE_WORDS = ['profit', 'growth', 'gain', 'surge', 'jump', 'rise', 'strong', 'beat', 'upgrade'];
-
-function classifySentiment(title) {
-  if (!title) return 'neutral';
-  const lower = title.toLowerCase();
-  const hasNeg = NEGATIVE_WORDS.some(w => lower.includes(w));
-  const hasPos = POSITIVE_WORDS.some(w => lower.includes(w));
-  if (hasNeg && !hasPos) return 'negative';
-  if (hasPos && !hasNeg) return 'positive';
-  return 'neutral';
-}
-
-function classifyStockOverallSentiment(articles) {
-  if (!articles || articles.length === 0) return null;
-  const sentiments = articles.map(a => classifySentiment(a.title));
-  if (sentiments.includes('negative')) return 'negative';
-  if (sentiments.includes('positive')) return 'positive';
-  return 'neutral';
-}
-
-function getBackendUrl() { return localStorage.getItem(KITE_BACKEND_URL_KEY) || ''; }
-
-async function fetchNewsViaBackend(company) {
-  const backendUrl = getBackendUrl();
-  if (!backendUrl) return { articles: [], error: 'no-backend-configured' };
-  try {
-    const resp = await fetch(`${backendUrl}/api/news?company=${encodeURIComponent(company)}`);
-    const data = await resp.json();
-    if (!resp.ok || data.status !== 'success') return { articles: [], error: data.error || 'error' };
-    return { articles: (data.articles || []).slice(0, 3), error: null };
-  } catch (e) {
-    return { articles: [], error: e.message };
-  }
-}
-
-async function fetchStockNews(ticker, company) {
-  const { articles } = await fetchNewsViaBackend(company);
-  return { ticker, company, articles };
-}
-
-async function fetchAllNews() {
-  const stocks = Store.getStocks();
-  if (!stocks || stocks.length === 0) { openSettings(); return; }
-  if (!getBackendUrl()) { openSettings(); showKiteStatus('Set backend URL in Settings first.', 'error'); return; }
-
-  refreshBtn.classList.add('spinning');
-  refreshLabel.textContent = 'Fetching…';
-  renderLoadingSkeleton(stocks.length);
-
-  const results = [];
-  for (const [ticker, company, tier] of stocks) {
-    const { articles } = await fetchStockNews(ticker, company);
-    results.push({ ticker, company, tier, articles });
-  }
-
-  newsData = { fetchedAt: new Date().toISOString(), results };
-  Store.setCache(newsData);
-  refreshBtn.classList.remove('spinning');
-  refreshLabel.textContent = "Fetch today's news";
-  updateStatusBar();
-  renderContent();
-}
-
-function getStockSuggestions(query) {
-  const stocks = Store.getStocks();
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return stocks.filter(([ticker, company]) => ticker.toLowerCase().includes(q) || company.toLowerCase().includes(q)).slice(0, 6);
-}
-
-function renderSuggestions(query) {
-  const matches = getStockSuggestions(query);
-  if (!query.trim()) { lookupSuggestions.classList.remove('open'); lookupSuggestions.innerHTML = ''; return; }
-  if (matches.length === 0) { lookupSuggestions.innerHTML = `<div class="suggestion-empty">No match — press Enter to search directly.</div>`; lookupSuggestions.classList.add('open'); return; }
-  lookupSuggestions.innerHTML = matches.map(([ticker, company]) => `<div class="suggestion-item" data-ticker="${ticker}" data-company="${company}"><span>${company}</span><span>${ticker}</span></div>`).join('');
-  lookupSuggestions.classList.add('open');
-  lookupSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
-    item.addEventListener('click', () => {
-      lookupInput.value = item.dataset.company;
-      lookupSuggestions.classList.remove('open');
-      runSingleStockLookup(item.dataset.ticker, item.dataset.company);
-    });
-  });
-}
-
-async function runSingleStockLookup(ticker, company) {
-  lookupResult.innerHTML = `<div class="lookup-result-card"><div class="lookup-result-head"><span>${company}</span><button class="lookup-close" id="lookup-close-btn">✕</button></div><div class="lookup-loading">Fetching…</div></div>`;
-  const { articles } = await fetchNewsViaBackend(company);
-  const stockObj = { ticker, company, tier: 'Watch', articles };
-  lookupResult.innerHTML = `<div class="lookup-result-card"><div class="lookup-result-head"><span>${company} ${ticker}</span><button class="lookup-close" id="lookup-close-btn">✕</button></div>${renderEntry(stockObj)}</div>`;
-  $('#lookup-close-btn').addEventListener('click', () => { lookupResult.innerHTML = ''; });
-}
-
-function renderLoadingSkeleton(count) {
-  let html = '<div class="section">';
-  for (let i = 0; i < Math.min(count, 6); i++) html += `<div class="skeleton-entry"><div class="skel-line" style="width:45%"></div><div class="skel-line" style="width:85%"></div></div>`;
-  contentEl.innerHTML = html + '</div>';
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
-}
-
-function formatPublished(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
-
-function renderContent() {
-  if (!newsData) { contentEl.innerHTML = `<div class="empty-state"><div class="glyph">☀︎</div><h3>Good morning.</h3><p>Tap "Fetch today's news" to get started.</p></div>`; return; }
-
-  let filtered = newsData.results;
-  if (currentFilter === 'fresh') filtered = filtered.filter(s => s.articles && s.articles.length > 0);
-  else if (currentFilter !== 'all') filtered = filtered.filter(s => s.tier === currentFilter);
-
-  if (currentSentiment !== 'all') {
-    filtered = filtered.filter(s => {
-      const overall = classifyStockOverallSentiment(s.articles);
-      return overall === currentSentiment;
-    });
-  }
-
-  if (filtered.length === 0) { contentEl.innerHTML = `<div class="empty-state"><div class="glyph">—</div><h3>Nothing here</h3></div>`; return; }
-
-  if (currentFilter === 'all' || currentFilter === 'fresh') {
-    let html = '';
-    for (const tier of TIER_ORDER) {
-      const group = filtered.filter(s => s.tier === tier);
-      if (!group.length) continue;
-      html += `<div class="section"><div class="section-head"><span class="section-label">${TIER_LABELS[tier]}</span><div class="rule"></div></div>${group.map(renderEntry).join('')}</div>`;
-    }
-    contentEl.innerHTML = html;
-  } else {
-    contentEl.innerHTML = `<div class="section">${filtered.map(renderEntry).join('')}</div>`;
-  }
-}
-
-function renderEntry(stock) {
-  const hasNews = stock.articles && stock.articles.length > 0;
-  const lead = hasNews ? stock.articles[0] : null;
-  const rest = hasNews ? stock.articles.slice(1) : [];
-  const overallSentiment = hasNews ? classifyStockOverallSentiment(stock.articles) : null;
-
-  let body = '';
-  if (hasNews) {
-    const leadSentiment = classifySentiment(lead.title);
-    body = `<div class="headline"><span class="sentiment-dot ${leadSentiment}"></span><a href="${lead.url || '#'}" target="_blank">${escapeHtml(lead.title)}</a></div><div class="article-meta">${escapeHtml(lead.source || 'News')} · ${formatPublished(lead.published)}</div>`;
-    if (rest.length) {
-      body += rest.map(a => {
-        const s = classifySentiment(a.title);
-        return `<div class="more-articles"><div class="sub-headline"><span class="sentiment-dot ${s}"></span><a href="${a.url || '#'}" target="_blank">${escapeHtml(a.title)}</a></div><div class="article-meta">${escapeHtml(a.source || 'News')}</div></div>`;
-      }).join('');
-    }
-  } else {
-    body = `<div class="quiet">No recent news found</div>`;
-  }
-
-  const badgeHtml = hasNews ? (overallSentiment === 'negative' ? '<span class="entry-badge sent-badge-negative">⚠ Watch</span>' : overallSentiment === 'positive' ? '<span class="entry-badge sent-badge-positive">✓ Positive</span>' : '<span class="entry-badge">News</span>') : '';
-
-  return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}"><div class="entry-head"><div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>${badgeHtml}</div>${body}</div>`;
-}
-
-init();
-  </script>
+<script src="app.js"></script>
 </body>
 </html>
-
