@@ -91,6 +91,7 @@ let currentFilter = 'all';
 let currentSentiment = 'all';
 let newsData = null; // { fetchedAt: ISOstring, results: [{ticker,company,tier,articles:[...]}] }
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
+let lastQuotesError = null;
 
 // ---------- DOM refs ----------
 const $ = (sel) => document.querySelector(sel);
@@ -239,6 +240,14 @@ function updateStatusBar() {
   refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
+
+  // Separate, lower-priority note about prices — never overwrites the
+  // news diagnostic above, since news is the primary feature.
+  if (lastQuotesError === 'no-active-kite-session' || (lastQuotesError && lastQuotesError.includes('Log in via Kite'))) {
+    refreshStatus.textContent += ' · Prices need a Kite login (Settings) — news loaded fine without it.';
+  } else if (lastQuotesError) {
+    refreshStatus.textContent += ` · Prices unavailable (${escapeHtml(lastQuotesError)})`;
+  }
 }
 
 // ---------- Settings panel ----------
@@ -747,6 +756,39 @@ async function fetchStockNews(ticker, company) {
   return { ticker, company, articles, error };
 }
 
+// ---------- Live price + day change, via Kite quotes ----------
+// Unlike news (one request per stock, since each needs its own Google
+// search), quotes can fetch ALL stocks in a single request — Kite's
+// /quote/ohlc endpoint accepts a batch of symbols at once. Requires a
+// Kite login to have happened this session (access tokens expire daily;
+// this app doesn't and can't work around that). If no session is active,
+// this fails soft — the rest of the app (news) still works normally.
+async function fetchQuotes(stocks) {
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) return { quotes: {}, error: 'no-backend-configured' };
+
+  // Default to NSE — the vast majority of a typical portfolio trades there.
+  // BSE-only or BE-series symbols will simply come back absent from Kite's
+  // response (its own documented behavior for unmatched symbols), which
+  // the rendering code below already treats as "no price available"
+  // rather than an error.
+  const symbols = stocks.map(([ticker]) => `NSE:${ticker}`).join(',');
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+    if (!resp.ok || data.status !== 'success') {
+      return { quotes: {}, error: data.error || `backend returned HTTP ${resp.status}`, errorMessage: data.message };
+    }
+    return { quotes: data.quotes || {}, error: null };
+  } catch (e) {
+    return { quotes: {}, error: e.message || String(e) };
+  }
+}
+
 async function fetchAllNews() {
   const stocks = Store.getStocks();
   if (!stocks || stocks.length === 0) {
@@ -762,6 +804,11 @@ async function fetchAllNews() {
   refreshBtn.classList.add('spinning');
   refreshLabel.textContent = 'Fetching…';
   renderLoadingSkeleton(stocks.length);
+
+  // Quotes (one batched request for all stocks) run in parallel with the
+  // news fetch loop below — independent of each other, so a quotes
+  // failure (e.g. no active Kite session) never blocks news from loading.
+  const quotesPromise = fetchQuotes(stocks);
 
   const results = new Array(stocks.length);
   let completed = 0;
@@ -792,6 +839,16 @@ async function fetchAllNews() {
       await new Promise(r => setTimeout(r, BATCH_PAUSE_MS));
     }
   }
+
+  // Attach price/change to each result, if quotes succeeded. Failing soft
+  // here (no quotes available) is deliberate — news is the primary feature
+  // and must never be blocked or degraded by a price-fetch problem.
+  const { quotes, error: quotesError, errorMessage: quotesErrorMessage } = await quotesPromise;
+  for (const r of results) {
+    const q = quotes[`NSE:${r.ticker}`];
+    r.quote = q || null;
+  }
+  lastQuotesError = quotesError ? (quotesErrorMessage || quotesError) : null;
 
   lastFetchDiagnostics = diagnostics;
   newsData = { fetchedAt: new Date().toISOString(), results };
@@ -1064,9 +1121,21 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
+  // Price/change only renders if a quote came back for this stock — fails
+  // silently and shows nothing if there's no active Kite session, rather
+  // than an error inline on every single entry (the one status-bar note
+  // from updateStatusBar is enough to explain that once, not 96 times).
+  let priceHtml = '';
+  if (stock.quote && stock.quote.last_price != null) {
+    const chg = stock.quote.change_pct;
+    const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
+    const chgSign = chg != null && chg > 0 ? '+' : '';
+    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span></div>`;
+  }
+
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>
+      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span>${priceHtml}</div>
       ${badgeHtml}
     </div>
     ${body}
