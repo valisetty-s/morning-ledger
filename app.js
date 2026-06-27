@@ -487,6 +487,11 @@ async function importFromKite() {
   Store.setKiteApiKey(apiKey);
   localStorage.setItem(KITE_BACKEND_URL_KEY, backendUrl.replace(/\/$/, ''));
 
+  // Clear the double-callback guard from any previous login attempt — this
+  // is a genuinely NEW login starting, so the next callback should be
+  // allowed to process normally.
+  sessionStorage.removeItem('ml_kite_callback_handled');
+
   showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
   localStorage.setItem('ml_kite_pending_key', apiKey);
 
@@ -499,11 +504,25 @@ function checkKiteOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') !== 'login' || params.get('status') !== 'success') return;
 
+  // Guard against this running twice for the same login. Real-world testing
+  // showed the exchange call sometimes fires twice — once correctly, then a
+  // second time that Kite rejects (request_tokens are single-use, Kite's own
+  // rule). The most likely cause is some combination of how mobile Chrome
+  // handles back/forward navigation and this function re-running before the
+  // URL cleanup below had fully taken effect. A session-scoped flag, checked
+  // and set BEFORE any async work starts, closes that race entirely.
+  if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') {
+    return;
+  }
+  sessionStorage.setItem('ml_kite_callback_handled', 'true');
+
   const requestToken = params.get('request_token');
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
   const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
 
-  // Clean the URL so refreshing doesn't re-trigger this
+  // Clean the URL immediately, synchronously, before anything else — so
+  // there's no window where a re-render or navigation could re-read the
+  // same request_token from the address bar.
   history.replaceState({}, '', window.location.pathname);
 
   if (!requestToken || !apiKey) {
