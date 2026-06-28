@@ -164,6 +164,8 @@ function init() {
   });
 
   refreshBtn.addEventListener('click', fetchAllNews);
+  const priceBtn = $('#price-refresh-btn');
+  if (priceBtn) priceBtn.addEventListener('click', fetchLatestPrices);
 
   // Single-stock lookup
   let lookupDebounceTimer = null;
@@ -239,6 +241,7 @@ function updateStatusBar() {
     refreshStatus.textContent = 'Not yet fetched today';
     datelineStatus.textContent = "Tap refresh to fetch today's news";
     datelineStatus.classList.remove('fresh');
+    updatePriceStatus();
     return;
   }
   const fresh = isToday(newsData.fetchedAt);
@@ -255,12 +258,25 @@ function updateStatusBar() {
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
-  // Separate, lower-priority note about prices — never overwrites the
-  // news diagnostic above, since news is the primary feature.
+  updatePriceStatus();
+}
+
+function updatePriceStatus() {
+  const priceStatusEl = $('#price-status');
+  if (!priceStatusEl) return;
+
+  const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
+
   if (lastQuotesError === 'no-active-kite-session' || (lastQuotesError && lastQuotesError.includes('Log in via Kite'))) {
-    refreshStatus.textContent += ' · Prices need a Kite login (Settings) — news loaded fine without it.';
+    priceStatusEl.textContent = 'Prices need a Kite login (Settings) first';
+  } else if (lastQuotesError === 'kite-session-expired' || (lastQuotesError && lastQuotesError.includes('expired'))) {
+    priceStatusEl.textContent = 'Kite session expired — log in again (Settings)';
   } else if (lastQuotesError) {
-    refreshStatus.textContent += ` · Prices unavailable (${escapeHtml(lastQuotesError)})`;
+    priceStatusEl.textContent = `Prices unavailable (${lastQuotesError})`;
+  } else if (hasAnyQuote) {
+    priceStatusEl.textContent = 'Prices updated';
+  } else {
+    priceStatusEl.textContent = 'Prices: tap to fetch (needs Kite login)';
   }
 }
 
@@ -862,11 +878,6 @@ async function fetchAllNews() {
   refreshLabel.textContent = 'Fetching…';
   renderLoadingSkeleton(stocks.length);
 
-  // Quotes (one batched request for all stocks) run in parallel with the
-  // news fetch loop below — independent of each other, so a quotes
-  // failure (e.g. no active Kite session) never blocks news from loading.
-  const quotesPromise = fetchQuotes(stocks);
-
   const results = new Array(stocks.length);
   let completed = 0;
   const diagnostics = { errorCount: 0, emptyCount: 0, totalCount: stocks.length, lastError: null };
@@ -881,7 +892,13 @@ async function fetchAllNews() {
 
     const batchPromises = batch.map(async ([ticker, company, tier], batchIdx) => {
       const { articles, error } = await fetchStockNews(ticker, company);
-      results[batchStart + batchIdx] = { ticker, company, tier, articles };
+      // Preserve any quote data already attached from a previous "Fetch
+      // latest prices" tap, since news and prices are now fetched
+      // independently and shouldn't wipe each other out.
+      const existingQuote = newsData && newsData.results && newsData.results[batchStart + batchIdx]
+        ? newsData.results[batchStart + batchIdx].quote
+        : null;
+      results[batchStart + batchIdx] = { ticker, company, tier, articles, quote: existingQuote || null };
       if (articles.length === 0) {
         diagnostics.emptyCount++;
         if (error) { diagnostics.errorCount++; diagnostics.lastError = error; }
@@ -897,22 +914,53 @@ async function fetchAllNews() {
     }
   }
 
-  // Attach price/change to each result, if quotes succeeded. Failing soft
-  // here (no quotes available) is deliberate — news is the primary feature
-  // and must never be blocked or degraded by a price-fetch problem.
-  const { quotes, error: quotesError, errorMessage: quotesErrorMessage } = await quotesPromise;
-  for (const r of results) {
-    const q = quotes[`NSE:${r.ticker}`];
-    r.quote = q || null;
-  }
-  lastQuotesError = quotesError ? (quotesErrorMessage || quotesError) : null;
-
   lastFetchDiagnostics = diagnostics;
   newsData = { fetchedAt: new Date().toISOString(), results };
   Store.setCache(newsData);
 
   refreshBtn.classList.remove('spinning');
   refreshLabel.textContent = "Fetch today's news";
+  updateStatusBar();
+  renderContent();
+}
+
+// ---------- Dedicated "Fetch latest prices" — separate, on-demand ----------
+// Split out from the news fetch entirely. Originally prices were bundled
+// into every news fetch automatically, but that coupling made a real bug
+// (a duplicated /api/kite/exchange call caused by an unrelated service-
+// worker issue) much harder to isolate and diagnose. A dedicated button
+// is also just a better fit for how prices are actually used — checked
+// on demand, not necessarily every single time news is refreshed.
+async function fetchLatestPrices() {
+  const stocks = Store.getStocks();
+  if (!stocks || stocks.length === 0) return;
+
+  const priceBtn = $('#price-refresh-btn');
+  const priceLabel = $('#price-refresh-label');
+  if (priceBtn) priceBtn.classList.add('spinning');
+  if (priceLabel) priceLabel.textContent = 'Fetching prices…';
+
+  const { quotes, error: quotesError, errorMessage: quotesErrorMessage } = await fetchQuotes(stocks);
+  lastQuotesError = quotesError ? (quotesErrorMessage || quotesError) : null;
+
+  if (newsData && newsData.results) {
+    for (const r of newsData.results) {
+      const q = quotes[`NSE:${r.ticker}`];
+      if (q) r.quote = q;
+    }
+    Store.setCache(newsData);
+  } else {
+    // No news fetched yet this session — still show prices on their own,
+    // just without any headlines attached yet.
+    const results = stocks.map(([ticker, company, tier]) => ({
+      ticker, company, tier, articles: [], quote: quotes[`NSE:${ticker}`] || null,
+    }));
+    newsData = { fetchedAt: new Date().toISOString(), results };
+    Store.setCache(newsData);
+  }
+
+  if (priceBtn) priceBtn.classList.remove('spinning');
+  if (priceLabel) priceLabel.textContent = 'Fetch latest prices';
   updateStatusBar();
   renderContent();
 }
@@ -1187,7 +1235,13 @@ function renderEntry(stock) {
     const chg = stock.quote.change_pct;
     const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
-    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span></div>`;
+    let pressureHtml = '';
+    if (stock.quote.pressure_flag === 'buy-heavy') {
+      pressureHtml = '<span class="pressure-flag pressure-buy" title="Buy quantity is at least 65% of today\'s order volume">▲ buy-heavy</span>';
+    } else if (stock.quote.pressure_flag === 'sell-heavy') {
+      pressureHtml = '<span class="pressure-flag pressure-sell" title="Sell quantity is at least 65% of today\'s order volume">▼ sell-heavy</span>';
+    }
+    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${pressureHtml}</div>`;
   }
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
