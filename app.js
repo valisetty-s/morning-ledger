@@ -492,17 +492,32 @@ async function fetchLatestPrices() {
 }
 
 async function startKiteLogin(intent) {
-  const apiKey = $('#kite-api-key-input').value.trim() || Store.getKiteApiKey();
-  const backendUrl = $('#kite-backend-url-input').value.trim() || localStorage.getItem(KITE_BACKEND_URL_KEY);
+  // Always read from storage first — the Settings panel DOM inputs are only
+  // populated when the panel is open. The price button calls this with the
+  // panel closed, so reading .value from those inputs returns "" every time,
+  // which was exactly the bug that forced users to open Settings manually
+  // before the price button would work. Storage → DOM fallback is the right
+  // order here: storage is the source of truth; DOM is only useful if the
+  // user is mid-edit in the Settings panel right now.
+  const apiKey = Store.getKiteApiKey() || $('#kite-api-key-input').value.trim();
+  const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY) || $('#kite-backend-url-input').value.trim();
 
   if (!apiKey) {
-    openSettings();
-    showKiteStatus('Enter your Kite API key first (see instructions below).', 'error');
+    if (intent === 'prices') {
+      priceStatusUpdate('⚠ Kite API key not set — open Settings (⚙) to add it.');
+    } else {
+      openSettings();
+      showKiteStatus('Enter your Kite API key first (see instructions below).', 'error');
+    }
     return;
   }
   if (!backendUrl) {
-    openSettings();
-    showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login (see instructions below).', 'error');
+    if (intent === 'prices') {
+      priceStatusUpdate('⚠ Backend URL not set — open Settings (⚙) to add it.');
+    } else {
+      openSettings();
+      showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login (see instructions below).', 'error');
+    }
     return;
   }
   Store.setKiteApiKey(apiKey);
