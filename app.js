@@ -92,7 +92,7 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
-const APP_VERSION = 'v18';  // bump on every release
+const APP_VERSION = 'v19';  // bump on every release
 
 // Access token stored with today's date as key — automatically "expires"
 // at midnight because tomorrow the key name is different and won't be found.
@@ -1354,13 +1354,15 @@ function renderEntry(stock) {
     const chg = stock.quote.change_pct;
     const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
-    let pressureHtml = '';
-    if (stock.quote.pressure_flag === 'buy-heavy') {
-      pressureHtml = '<span class="pressure-flag pressure-buy" title="Buy quantity is at least 65% of today\'s order volume">▲ buy-heavy</span>';
-    } else if (stock.quote.pressure_flag === 'sell-heavy') {
-      pressureHtml = '<span class="pressure-flag pressure-sell" title="Sell quantity is at least 65% of today\'s order volume">▼ sell-heavy</span>';
+    const rp = stock.quote.range_pct;
+    let rangeHtml = '';
+    if (rp != null) {
+      const rangeClass = rp >= 70 ? 'range-high' : (rp <= 30 ? 'range-low' : 'range-mid');
+      const lo = stock.quote.day_low != null ? stock.quote.day_low.toFixed(0) : '?';
+      const hi = stock.quote.day_high != null ? stock.quote.day_high.toFixed(0) : '?';
+      rangeHtml = `<span class="range-pct ${rangeClass}" title="Today: L ₹${lo} / H ₹${hi}">${rp}% of range</span>`;
     }
-    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${pressureHtml}</div>`;
+    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${rangeHtml}</div>`;
   }
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
