@@ -92,27 +92,9 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
-const APP_VERSION = 'v19';  // bump on every release
+const APP_VERSION = 'v20';  // bump on every release
 
-// Access token stored with today's date as key — automatically "expires"
-// at midnight because tomorrow the key name is different and won't be found.
-// This is safe: the token is already invalidated by Kite at ~6am IST the next
-// day regardless, and localStorage on github.io is scoped to your origin only.
-function todayKey() {
-  return 'ml_kite_token_' + new Date().toISOString().slice(0, 10); // e.g. ml_kite_token_2026-06-28
-}
-function saveAccessToken(token) {
-  // Clear any tokens from previous days first
-  Object.keys(localStorage).filter(k => k.startsWith('ml_kite_token_') && k !== todayKey())
-    .forEach(k => localStorage.removeItem(k));
-  localStorage.setItem(todayKey(), token);
-}
-function loadAccessToken() {
-  return localStorage.getItem(todayKey()) || '';
-}
-function clearAccessToken() {
-  localStorage.removeItem(todayKey());
-}  // bump this on every release so you can confirm the new file is live
+// Kite token storage removed — prices now use Yahoo Finance (no auth needed)  // bump this on every release so you can confirm the new file is live
 
 // ---------- State ----------
 let currentFilter = 'all';
@@ -287,14 +269,9 @@ function updatePriceStatus() {
   if (!priceStatusEl) return;
 
   const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
-  const hasToken = !!loadAccessToken();
-  if (hasAnyQuote) {
-    priceStatusEl.textContent = 'Prices shown · tap to refresh';
-  } else if (hasToken) {
-    priceStatusEl.textContent = 'Tap ₹ to fetch prices (token ready)';
-  } else {
-    priceStatusEl.textContent = 'Tap ₹ to fetch prices (needs Kite login)';
-  }
+  priceStatusEl.textContent = hasAnyQuote
+    ? 'Prices shown · tap to refresh'
+    : 'Tap to fetch prices (Yahoo Finance, free — no login)'
 }
 
 // ---------- Settings panel ----------
@@ -509,35 +486,30 @@ async function importFromKite() {
   return startKiteLogin('holdings');
 }
 
-// Entry point for the price button.
-// If we already have today's access token saved (from a login earlier today),
-// use it directly — no Kite login needed. If it's stale or missing, do a
-// fresh login. This means: first tap of the day → login → prices shown.
-// Every subsequent tap that day → prices shown immediately, no login.
+// Fetch latest prices from Yahoo Finance via the backend.
+// No Kite login required — Yahoo Finance is completely free, no API key needed.
 async function fetchLatestPrices() {
-  const existingToken = loadAccessToken();
-  if (existingToken) {
-    priceStatusUpdate('Fetching prices…');
-    const priceBtn = $('#price-refresh-btn');
-    if (priceBtn) priceBtn.classList.add('spinning');
-    const stocks = Store.getStocks();
-    const { quotes, error: quotesError, errorMessage } = await fetchQuotes(stocks, existingToken);
-    if (priceBtn) priceBtn.classList.remove('spinning');
-    if (quotesError) {
-      // Token rejected by Kite (expired or invalid) — clear it and ask for login
-      if (quotesError === 'kite-session-expired' || quotesError === 'no-access-token-provided') {
-        clearAccessToken();
-        priceStatusUpdate('Session expired — logging in to Kite again…');
-        setTimeout(() => startKiteLogin('prices'), 800);
-      } else {
-        priceStatusUpdate(`Prices unavailable: ${errorMessage || quotesError}`);
-      }
-      return;
-    }
-    applyFetchedQuotes(quotes);
-    priceStatusUpdate('Prices updated ✓');
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) {
+    priceStatusUpdate('⚠ Backend URL not set — open Settings (⚙️) and add it.');
     return;
   }
+  const priceBtn = $('#price-refresh-btn');
+  if (priceBtn) priceBtn.classList.add('spinning');
+  priceStatusUpdate('Fetching prices from Yahoo Finance…');
+
+  const stocks = Store.getStocks();
+  const { quotes, error, errorMessage } = await fetchQuotes(stocks);
+
+  if (priceBtn) priceBtn.classList.remove('spinning');
+  if (error) {
+    priceStatusUpdate(`Prices unavailable: ${errorMessage || error}`);
+    return;
+  }
+  applyFetchedQuotes(quotes);
+  const count = Object.values(quotes).filter(q => q && q.last_price != null).length;
+  priceStatusUpdate(`Prices updated ✓ (${count}/${stocks.length} stocks)`);
+}
   // No token for today — need a fresh login
   return startKiteLogin('prices');
 }
@@ -694,10 +666,6 @@ async function completeKiteLoginForPrices(requestToken, backendUrl) {
     priceStatusUpdate(`Login succeeded but couldn't get a token: ${data.error || 'unknown error'}`);
     return;
   }
-
-  // Save for same-day reuse — eliminates the need to log in again for every
-  // price refresh within the same calendar day.
-  saveAccessToken(data.access_token);
   priceStatusUpdate('Fetching prices…');
   const priceBtn = $('#price-refresh-btn');
   if (priceBtn) priceBtn.classList.add('spinning');
@@ -745,7 +713,7 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
 
   // Save the token for same-day price fetches — so after importing holdings
   // the price button works immediately without another login today.
-  if (data.access_token) saveAccessToken(data.access_token);
+  if (data.access_token)
 
   // Merge fetched tickers into the stock list, preserving tiers for any
   // ticker we already know about; new tickers default to "Watch".
@@ -965,34 +933,29 @@ async function fetchStockNews(ticker, company) {
 // Kite login to have happened this session (access tokens expire daily;
 // this app doesn't and can't work around that). If no session is active,
 // this fails soft — the rest of the app (news) still works normally.
-async function fetchQuotes(stocks, accessToken) {
+async function fetchQuotes(stocks) {
   const backendUrl = getBackendUrl();
-  if (!backendUrl) return { quotes: {}, error: 'no-backend-configured' };
-  if (!accessToken) return { quotes: {}, error: 'no-access-token-provided' };
+  if (!backendUrl) return { quotes: {}, error: 'no-backend-configured', errorMessage: 'Backend URL not set' };
 
-  // Default to NSE — the vast majority of a typical portfolio trades there.
-  // BSE-only or BE-series symbols will simply come back absent from Kite's
-  // response (its own documented behavior for unmatched symbols), which
-  // the rendering code below already treats as "no price available"
-  // rather than an error.
-  const symbols = stocks.map(([ticker]) => `NSE:${ticker}`).join(',');
+  // Plain ticker list — backend converts to Yahoo Finance .NS/.BO format
+  const symbols = stocks.map(([ticker]) => ticker).join(',');
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
-    const url = `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}&access_token=${encodeURIComponent(accessToken)}`;
-    const resp = await fetch(url, { signal: controller.signal });
+    // Yahoo downloads 1 year of data for all stocks in one call; allow 45s
+    const timer = setTimeout(() => controller.abort(), 45000);
+    const resp = await fetch(
+      `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`,
+      { signal: controller.signal }
+    );
     clearTimeout(timer);
     const data = await resp.json();
     if (!resp.ok || data.status !== 'success') {
-      return {
-        quotes: {},
-        error: data.error || `backend returned HTTP ${resp.status}`,
-        errorMessage: data.message
-      };
+      return { quotes: {}, error: data.error || `backend HTTP ${resp.status}`, errorMessage: data.message };
     }
     return { quotes: data.quotes || {}, error: null };
   } catch (e) {
+    if (e.name === 'AbortError') return { quotes: {}, error: 'timeout', errorMessage: 'Timed out after 45s — try again' };
     return { quotes: {}, error: e.message || String(e) };
   }
 }
@@ -1351,18 +1314,35 @@ function renderEntry(stock) {
   // from updateStatusBar is enough to explain that once, not 96 times).
   let priceHtml = '';
   if (stock.quote && stock.quote.last_price != null) {
-    const chg = stock.quote.change_pct;
+    const q = stock.quote;
+    const chg = q.change_pct;
     const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
-    const rp = stock.quote.range_pct;
-    let rangeHtml = '';
-    if (rp != null) {
-      const rangeClass = rp >= 70 ? 'range-high' : (rp <= 30 ? 'range-low' : 'range-mid');
-      const lo = stock.quote.day_low != null ? stock.quote.day_low.toFixed(0) : '?';
-      const hi = stock.quote.day_high != null ? stock.quote.day_high.toFixed(0) : '?';
-      rangeHtml = `<span class="range-pct ${rangeClass}" title="Today: L ₹${lo} / H ₹${hi}">${rp}% of range</span>`;
+
+    // RVOL badge — only show when volume is notably high or low
+    let volHtml = '';
+    if (q.rvol != null) {
+      if (q.rvol >= 2.0) {
+        volHtml = `<span class="vol-badge vol-surge" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u26a1 ${q.rvol}\xd7 vol</span>`;
+      } else if (q.rvol >= 1.5) {
+        volHtml = `<span class="vol-badge vol-high" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u2191 High Vol</span>`;
+      } else if (q.rvol <= 0.4) {
+        volHtml = `<span class="vol-badge vol-low" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u2193 Low Vol</span>`;
+      }
     }
-    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${rangeHtml}</div>`;
+
+    // 52-week position — only flag if near extremes
+    let wkHtml = '';
+    if (q.week52_high != null && q.week52_low != null && q.week52_high !== q.week52_low) {
+      const wkPct = ((q.last_price - q.week52_low) / (q.week52_high - q.week52_low)) * 100;
+      if (wkPct >= 90) {
+        wkHtml = `<span class="wk52-badge wk52-near-high" title="Near 52-week high \u20b9${q.week52_high}">52W High</span>`;
+      } else if (wkPct <= 15) {
+        wkHtml = `<span class="wk52-badge wk52-near-low" title="Near 52-week low \u20b9${q.week52_low}">52W Low</span>`;
+      }
+    }
+
+    priceHtml = `<div class="entry-price">\u20b9${q.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${volHtml}${wkHtml}</div>`;
   }
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
