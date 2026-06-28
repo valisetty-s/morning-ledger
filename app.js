@@ -92,6 +92,27 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
+const APP_VERSION = 'v18';  // bump on every release
+
+// Access token stored with today's date as key — automatically "expires"
+// at midnight because tomorrow the key name is different and won't be found.
+// This is safe: the token is already invalidated by Kite at ~6am IST the next
+// day regardless, and localStorage on github.io is scoped to your origin only.
+function todayKey() {
+  return 'ml_kite_token_' + new Date().toISOString().slice(0, 10); // e.g. ml_kite_token_2026-06-28
+}
+function saveAccessToken(token) {
+  // Clear any tokens from previous days first
+  Object.keys(localStorage).filter(k => k.startsWith('ml_kite_token_') && k !== todayKey())
+    .forEach(k => localStorage.removeItem(k));
+  localStorage.setItem(todayKey(), token);
+}
+function loadAccessToken() {
+  return localStorage.getItem(todayKey()) || '';
+}
+function clearAccessToken() {
+  localStorage.removeItem(todayKey());
+}  // bump this on every release so you can confirm the new file is live
 
 // ---------- State ----------
 let currentFilter = 'all';
@@ -233,7 +254,7 @@ function init() {
 
 function updateStatusBar() {
   if (!newsData) {
-    refreshStatus.textContent = 'Not yet fetched today';
+    refreshStatus.textContent = `Not yet fetched today · ${APP_VERSION}`;
     datelineStatus.textContent = "Tap refresh to fetch today's news";
     datelineStatus.classList.remove('fresh');
     updatePriceStatus();
@@ -249,7 +270,7 @@ function updateStatusBar() {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix} · ${APP_VERSION}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
@@ -266,7 +287,14 @@ function updatePriceStatus() {
   if (!priceStatusEl) return;
 
   const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
-  priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
+  const hasToken = !!loadAccessToken();
+  if (hasAnyQuote) {
+    priceStatusEl.textContent = 'Prices shown · tap to refresh';
+  } else if (hasToken) {
+    priceStatusEl.textContent = 'Tap ₹ to fetch prices (token ready)';
+  } else {
+    priceStatusEl.textContent = 'Tap ₹ to fetch prices (needs Kite login)';
+  }
 }
 
 // ---------- Settings panel ----------
@@ -481,13 +509,36 @@ async function importFromKite() {
   return startKiteLogin('holdings');
 }
 
-// Dedicated entry point for the price button — always does a full, fresh
-// Kite login, every single time. No access_token is ever stored in
-// localStorage for this path. This deliberately trades convenience (an
-// extra login step on every price check) for completely eliminating the
-// "saved token turns out to be stale/missing/mismatched" category of bug
-// that kept recurring across v12–v15.
+// Entry point for the price button.
+// If we already have today's access token saved (from a login earlier today),
+// use it directly — no Kite login needed. If it's stale or missing, do a
+// fresh login. This means: first tap of the day → login → prices shown.
+// Every subsequent tap that day → prices shown immediately, no login.
 async function fetchLatestPrices() {
+  const existingToken = loadAccessToken();
+  if (existingToken) {
+    priceStatusUpdate('Fetching prices…');
+    const priceBtn = $('#price-refresh-btn');
+    if (priceBtn) priceBtn.classList.add('spinning');
+    const stocks = Store.getStocks();
+    const { quotes, error: quotesError, errorMessage } = await fetchQuotes(stocks, existingToken);
+    if (priceBtn) priceBtn.classList.remove('spinning');
+    if (quotesError) {
+      // Token rejected by Kite (expired or invalid) — clear it and ask for login
+      if (quotesError === 'kite-session-expired' || quotesError === 'no-access-token-provided') {
+        clearAccessToken();
+        priceStatusUpdate('Session expired — logging in to Kite again…');
+        setTimeout(() => startKiteLogin('prices'), 800);
+      } else {
+        priceStatusUpdate(`Prices unavailable: ${errorMessage || quotesError}`);
+      }
+      return;
+    }
+    applyFetchedQuotes(quotes);
+    priceStatusUpdate('Prices updated ✓');
+    return;
+  }
+  // No token for today — need a fresh login
   return startKiteLogin('prices');
 }
 
@@ -526,12 +577,15 @@ async function startKiteLogin(intent) {
   // Clear the double-callback guard from any previous login attempt — this
   // is a genuinely NEW login starting, so the next callback should be
   // allowed to process normally.
-  sessionStorage.removeItem('ml_kite_callback_handled');
+  // NOTE: localStorage not sessionStorage — Android Chrome clears
+  // sessionStorage during cross-origin redirect chains (app → kite.zerodha.com
+  // → app), so the intent value was being lost before we could read it back.
+  localStorage.removeItem('ml_kite_callback_handled');
 
-  // Remember what the user was actually trying to do, so the redirect-back
-  // handler knows whether to import holdings or just fetch prices. Session-
-  // scoped deliberately — this should never survive past this one attempt.
-  sessionStorage.setItem('ml_kite_login_intent', intent);
+  // Remember what the user was trying to do so the redirect-back handler
+  // knows whether to import holdings or just fetch prices.
+  // localStorage survives the cross-origin redirect; sessionStorage does not.
+  localStorage.setItem('ml_kite_login_intent', intent);
 
   if (intent === 'prices') {
     if (priceStatusUpdate) priceStatusUpdate('Opening Kite login…');
@@ -561,16 +615,22 @@ function checkKiteOAuthCallback() {
   // handles back/forward navigation and this function re-running before the
   // URL cleanup below had fully taken effect. A session-scoped flag, checked
   // and set BEFORE any async work starts, closes that race entirely.
-  if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') {
+  // Use localStorage (not sessionStorage) for both the guard and the intent.
+  // Android Chrome wipes sessionStorage during cross-origin redirect chains,
+  // so ml_kite_login_intent was always missing on return, defaulting to
+  // 'holdings' even when the price button triggered the login — meaning the
+  // exchange response was going to completeKiteLogin (which doesn't pass the
+  // access_token to fetchQuotes) instead of completeKiteLoginForPrices.
+  if (localStorage.getItem('ml_kite_callback_handled') === 'true') {
     return;
   }
-  sessionStorage.setItem('ml_kite_callback_handled', 'true');
+  localStorage.setItem('ml_kite_callback_handled', 'true');
 
   const requestToken = params.get('request_token');
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
   const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
-  const intent = sessionStorage.getItem('ml_kite_login_intent') || 'holdings';
-  sessionStorage.removeItem('ml_kite_login_intent');
+  const intent = localStorage.getItem('ml_kite_login_intent') || 'holdings';
+  localStorage.removeItem('ml_kite_login_intent');
 
   // Clean the URL immediately, synchronously, before anything else — so
   // there's no window where a re-render or navigation could re-read the
@@ -635,6 +695,9 @@ async function completeKiteLoginForPrices(requestToken, backendUrl) {
     return;
   }
 
+  // Save for same-day reuse — eliminates the need to log in again for every
+  // price refresh within the same calendar day.
+  saveAccessToken(data.access_token);
   priceStatusUpdate('Fetching prices…');
   const priceBtn = $('#price-refresh-btn');
   if (priceBtn) priceBtn.classList.add('spinning');
@@ -680,10 +743,9 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     return;
   }
 
-  // Note: this path (holdings import) no longer stores the access_token
-  // anywhere — the price button now does its own fresh login + immediate
-  // one-time use of the token, never persisting it. See
-  // completeKiteLoginForPrices for that flow.
+  // Save the token for same-day price fetches — so after importing holdings
+  // the price button works immediately without another login today.
+  if (data.access_token) saveAccessToken(data.access_token);
 
   // Merge fetched tickers into the stock list, preserving tiers for any
   // ticker we already know about; new tickers default to "Watch".
@@ -923,7 +985,11 @@ async function fetchQuotes(stocks, accessToken) {
     clearTimeout(timer);
     const data = await resp.json();
     if (!resp.ok || data.status !== 'success') {
-      return { quotes: {}, error: data.error || `backend returned HTTP ${resp.status}`, errorMessage: data.message };
+      return {
+        quotes: {},
+        error: data.error || `backend returned HTTP ${resp.status}`,
+        errorMessage: data.message
+      };
     }
     return { quotes: data.quotes || {}, error: null };
   } catch (e) {
