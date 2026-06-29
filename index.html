@@ -573,29 +573,12 @@
   .kite-status-info { background: var(--paper-dim); color: var(--ink-soft); border: 1px solid var(--rule); }
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
-
-    /* ── Volume & 52-week badges ── */
-    .vol-badge {
-      display: inline-block; margin-left: 6px; padding: 2px 6px;
-      border-radius: 8px; font-size: 9px; font-weight: 800;
-      letter-spacing: 0.05em; vertical-align: middle; white-space: nowrap;
-    }
-    .vol-surge { background: #FFF3CD; color: #856404; border: 1px solid #FFDA6A; }
-    .vol-high  { background: #D1E7DD; color: #0A3622; border: 1px solid #A3CFBB; }
-    .vol-low   { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB; }
-    .wk52-badge {
-      display: inline-block; margin-left: 5px; padding: 2px 6px;
-      border-radius: 8px; font-size: 9px; font-weight: 800;
-      letter-spacing: 0.05em; vertical-align: middle;
-    }
-    .wk52-near-high { background: #E8F5E9; color: #1B5E20; border: 1px solid #A5D6A7; }
-    .wk52-near-low  { background: #FBE9E7; color: #BF360C; border: 1px solid #FFAB91; }
-  </style>
+</style>
 </head>
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v16</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v17</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -629,7 +612,7 @@
 </div>
 
 <div class="refresh-bar" style="padding-top:0">
-  <span class="status" id="price-status">Prices: tap to fetch (needs Kite login)</span>
+  <span class="status" id="price-status">Prices: tap to fetch (via Yahoo Finance, no login needed)</span>
   <button class="refresh-btn" id="price-refresh-btn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
     <span id="price-refresh-label">Fetch latest prices</span>

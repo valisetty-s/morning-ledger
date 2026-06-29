@@ -92,9 +92,6 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
-const APP_VERSION = 'v20';  // bump on every release
-
-// Kite token storage removed — prices now use Yahoo Finance (no auth needed)  // bump this on every release so you can confirm the new file is live
 
 // ---------- State ----------
 let currentFilter = 'all';
@@ -236,7 +233,7 @@ function init() {
 
 function updateStatusBar() {
   if (!newsData) {
-    refreshStatus.textContent = `Not yet fetched today · ${APP_VERSION}`;
+    refreshStatus.textContent = 'Not yet fetched today';
     datelineStatus.textContent = "Tap refresh to fetch today's news";
     datelineStatus.classList.remove('fresh');
     updatePriceStatus();
@@ -252,7 +249,7 @@ function updateStatusBar() {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix} · ${APP_VERSION}`;
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
@@ -269,9 +266,7 @@ function updatePriceStatus() {
   if (!priceStatusEl) return;
 
   const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
-  priceStatusEl.textContent = hasAnyQuote
-    ? 'Prices shown · tap to refresh'
-    : 'Tap to fetch prices (Yahoo Finance, free — no login)'
+  priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
 }
 
 // ---------- Settings panel ----------
@@ -486,61 +481,66 @@ async function importFromKite() {
   return startKiteLogin('holdings');
 }
 
-// Fetch latest prices from Yahoo Finance via the backend.
-// No Kite login required — Yahoo Finance is completely free, no API key needed.
+// Prices no longer need Kite login at all — they come from Yahoo Finance
+// via the backend's /api/quotes endpoint, which needs no authentication.
+// This replaced an earlier design that tried to use Kite's own quote API,
+// which turned out to require a paid market-data subscription Kite never
+// actually grants through the free Personal API — confirmed directly by
+// testing (a permissions error), not assumed. Yahoo Finance is free and,
+// as a side benefit, also provides 52-week high/low and a real volume
+// average, neither of which Kite's API exposes at all regardless of plan.
 async function fetchLatestPrices() {
   const backendUrl = getBackendUrl();
   if (!backendUrl) {
-    priceStatusUpdate('⚠ Backend URL not set — open Settings (⚙️) and add it.');
+    openSettings();
+    showKiteStatus('Enter your backend URL first (see instructions below) before fetching prices.', 'error');
     return;
   }
-  const priceBtn = $('#price-refresh-btn');
-  if (priceBtn) priceBtn.classList.add('spinning');
-  priceStatusUpdate('Fetching prices from Yahoo Finance…');
 
   const stocks = Store.getStocks();
-  const { quotes, error, errorMessage } = await fetchQuotes(stocks);
+  if (!stocks || stocks.length === 0) return;
 
-  if (priceBtn) priceBtn.classList.remove('spinning');
-  if (error) {
-    priceStatusUpdate(`Prices unavailable: ${errorMessage || error}`);
-    return;
+  const priceBtn = $('#price-refresh-btn');
+  if (priceBtn) priceBtn.classList.add('spinning');
+  priceStatusUpdate('Fetching prices…');
+
+  const symbols = stocks.map(([ticker]) => ticker).join(',');
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000); // a full 96-symbol batch can take a little while
+    const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+
+    if (priceBtn) priceBtn.classList.remove('spinning');
+
+    if (!resp.ok || data.status !== 'success') {
+      priceStatusUpdate(`Prices unavailable: ${data.error || `HTTP ${resp.status}`}`);
+      return;
+    }
+
+    applyFetchedQuotes(data.quotes || {});
+    const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
+    priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
+  } catch (e) {
+    if (priceBtn) priceBtn.classList.remove('spinning');
+    priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
   }
-  applyFetchedQuotes(quotes);
-  const count = Object.values(quotes).filter(q => q && q.last_price != null).length;
-  priceStatusUpdate(`Prices updated ✓ (${count}/${stocks.length} stocks)`);
-}
-  // No token for today — need a fresh login
-  return startKiteLogin('prices');
 }
 
 async function startKiteLogin(intent) {
-  // Always read from storage first — the Settings panel DOM inputs are only
-  // populated when the panel is open. The price button calls this with the
-  // panel closed, so reading .value from those inputs returns "" every time,
-  // which was exactly the bug that forced users to open Settings manually
-  // before the price button would work. Storage → DOM fallback is the right
-  // order here: storage is the source of truth; DOM is only useful if the
-  // user is mid-edit in the Settings panel right now.
-  const apiKey = Store.getKiteApiKey() || $('#kite-api-key-input').value.trim();
-  const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY) || $('#kite-backend-url-input').value.trim();
+  const apiKey = $('#kite-api-key-input').value.trim() || Store.getKiteApiKey();
+  const backendUrl = $('#kite-backend-url-input').value.trim() || localStorage.getItem(KITE_BACKEND_URL_KEY);
 
   if (!apiKey) {
-    if (intent === 'prices') {
-      priceStatusUpdate('⚠ Kite API key not set — open Settings (⚙) to add it.');
-    } else {
-      openSettings();
-      showKiteStatus('Enter your Kite API key first (see instructions below).', 'error');
-    }
+    openSettings();
+    showKiteStatus('Enter your Kite API key first (see instructions below).', 'error');
     return;
   }
   if (!backendUrl) {
-    if (intent === 'prices') {
-      priceStatusUpdate('⚠ Backend URL not set — open Settings (⚙) to add it.');
-    } else {
-      openSettings();
-      showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login (see instructions below).', 'error');
-    }
+    openSettings();
+    showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login (see instructions below).', 'error');
     return;
   }
   Store.setKiteApiKey(apiKey);
@@ -549,21 +549,9 @@ async function startKiteLogin(intent) {
   // Clear the double-callback guard from any previous login attempt — this
   // is a genuinely NEW login starting, so the next callback should be
   // allowed to process normally.
-  // NOTE: localStorage not sessionStorage — Android Chrome clears
-  // sessionStorage during cross-origin redirect chains (app → kite.zerodha.com
-  // → app), so the intent value was being lost before we could read it back.
-  localStorage.removeItem('ml_kite_callback_handled');
+  sessionStorage.removeItem('ml_kite_callback_handled');
 
-  // Remember what the user was trying to do so the redirect-back handler
-  // knows whether to import holdings or just fetch prices.
-  // localStorage survives the cross-origin redirect; sessionStorage does not.
-  localStorage.setItem('ml_kite_login_intent', intent);
-
-  if (intent === 'prices') {
-    if (priceStatusUpdate) priceStatusUpdate('Opening Kite login…');
-  } else {
-    showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
-  }
+  showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
   localStorage.setItem('ml_kite_pending_key', apiKey);
 
   const loginUrl = `https://kite.zerodha.com/connect/login?api_key=${encodeURIComponent(apiKey)}&v=3`;
@@ -575,7 +563,9 @@ function priceStatusUpdate(text) {
   if (el) el.textContent = text;
 }
 
-// Called on page load to check if we've just returned from Kite OAuth
+// Called on page load to check if we've just returned from Kite OAuth.
+// Only the holdings-import flow uses this now — prices no longer go
+// through Kite at all, so there's no "intent" branching needed anymore.
 function checkKiteOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') !== 'login' || params.get('status') !== 'success') return;
@@ -587,22 +577,14 @@ function checkKiteOAuthCallback() {
   // handles back/forward navigation and this function re-running before the
   // URL cleanup below had fully taken effect. A session-scoped flag, checked
   // and set BEFORE any async work starts, closes that race entirely.
-  // Use localStorage (not sessionStorage) for both the guard and the intent.
-  // Android Chrome wipes sessionStorage during cross-origin redirect chains,
-  // so ml_kite_login_intent was always missing on return, defaulting to
-  // 'holdings' even when the price button triggered the login — meaning the
-  // exchange response was going to completeKiteLogin (which doesn't pass the
-  // access_token to fetchQuotes) instead of completeKiteLoginForPrices.
-  if (localStorage.getItem('ml_kite_callback_handled') === 'true') {
+  if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') {
     return;
   }
-  localStorage.setItem('ml_kite_callback_handled', 'true');
+  sessionStorage.setItem('ml_kite_callback_handled', 'true');
 
   const requestToken = params.get('request_token');
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
   const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
-  const intent = localStorage.getItem('ml_kite_login_intent') || 'holdings';
-  localStorage.removeItem('ml_kite_login_intent');
 
   // Clean the URL immediately, synchronously, before anything else — so
   // there's no window where a re-render or navigation could re-read the
@@ -610,14 +592,10 @@ function checkKiteOAuthCallback() {
   history.replaceState({}, '', window.location.pathname);
 
   if (!requestToken || !apiKey) {
-    if (intent === 'prices') {
-      priceStatusUpdate('Login returned but something went wrong — try again.');
-    } else {
-      setTimeout(() => {
-        openSettings();
-        showKiteStatus('Login returned but request token or API key is missing. Try again.', 'error');
-      }, 300);
-    }
+    setTimeout(() => {
+      openSettings();
+      showKiteStatus('Login returned but request token or API key is missing. Try again.', 'error');
+    }, 300);
     return;
   }
   if (!backendUrl) {
@@ -633,55 +611,10 @@ function checkKiteOAuthCallback() {
     return;
   }
 
-  if (intent === 'prices') {
-    completeKiteLoginForPrices(requestToken, backendUrl);
-  } else {
-    setTimeout(() => {
-      openSettings();
-      completeKiteLogin(requestToken, apiKey, backendUrl);
-    }, 300);
-  }
-}
-
-// Login completion path used by the price button. Gets the access_token
-// from the exchange response and uses it ONCE, immediately, to fetch
-// quotes — then discards it. Nothing is written to localStorage here.
-async function completeKiteLoginForPrices(requestToken, backendUrl) {
-  priceStatusUpdate('Completing login…');
-
-  let resp, data;
-  try {
-    resp = await fetch(`${backendUrl}/api/kite/exchange`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request_token: requestToken }),
-    });
-    data = await resp.json();
-  } catch (e) {
-    priceStatusUpdate(`Could not reach backend: ${e.message || e}`);
-    return;
-  }
-
-  if (!resp.ok || data.status !== 'success' || !data.access_token) {
-    priceStatusUpdate(`Login succeeded but couldn't get a token: ${data.error || 'unknown error'}`);
-    return;
-  }
-  priceStatusUpdate('Fetching prices…');
-  const priceBtn = $('#price-refresh-btn');
-  if (priceBtn) priceBtn.classList.add('spinning');
-
-  const stocks = Store.getStocks();
-  const { quotes, error: quotesError, errorMessage } = await fetchQuotes(stocks, data.access_token);
-
-  if (priceBtn) priceBtn.classList.remove('spinning');
-
-  if (quotesError) {
-    priceStatusUpdate(`Prices unavailable: ${errorMessage || quotesError}`);
-    return;
-  }
-
-  applyFetchedQuotes(quotes);
-  priceStatusUpdate('Prices updated');
+  setTimeout(() => {
+    openSettings();
+    completeKiteLogin(requestToken, apiKey, backendUrl);
+  }, 300);
 }
 
 async function completeKiteLogin(requestToken, apiKey, backendUrl) {
@@ -711,9 +644,10 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     return;
   }
 
-  // Save the token for same-day price fetches — so after importing holdings
-  // the price button works immediately without another login today.
-  if (data.access_token)
+  // Note: this path (holdings import) no longer stores the access_token
+  // anywhere — the price button now does its own fresh login + immediate
+  // one-time use of the token, never persisting it. See
+  // completeKiteLoginForPrices for that flow.
 
   // Merge fetched tickers into the stock list, preserving tiers for any
   // ticker we already know about; new tickers default to "Watch".
@@ -926,39 +860,10 @@ async function fetchStockNews(ticker, company) {
   return { ticker, company, articles, error };
 }
 
-// ---------- Live price + day change, via Kite quotes ----------
-// Unlike news (one request per stock, since each needs its own Google
-// search), quotes can fetch ALL stocks in a single request — Kite's
-// /quote/ohlc endpoint accepts a batch of symbols at once. Requires a
-// Kite login to have happened this session (access tokens expire daily;
-// this app doesn't and can't work around that). If no session is active,
-// this fails soft — the rest of the app (news) still works normally.
-async function fetchQuotes(stocks) {
-  const backendUrl = getBackendUrl();
-  if (!backendUrl) return { quotes: {}, error: 'no-backend-configured', errorMessage: 'Backend URL not set' };
-
-  // Plain ticker list — backend converts to Yahoo Finance .NS/.BO format
-  const symbols = stocks.map(([ticker]) => ticker).join(',');
-
-  try {
-    const controller = new AbortController();
-    // Yahoo downloads 1 year of data for all stocks in one call; allow 45s
-    const timer = setTimeout(() => controller.abort(), 45000);
-    const resp = await fetch(
-      `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timer);
-    const data = await resp.json();
-    if (!resp.ok || data.status !== 'success') {
-      return { quotes: {}, error: data.error || `backend HTTP ${resp.status}`, errorMessage: data.message };
-    }
-    return { quotes: data.quotes || {}, error: null };
-  } catch (e) {
-    if (e.name === 'AbortError') return { quotes: {}, error: 'timeout', errorMessage: 'Timed out after 45s — try again' };
-    return { quotes: {}, error: e.message || String(e) };
-  }
-}
+// (The old Kite-based fetchQuotes() helper was removed here. Prices now
+// come from Yahoo Finance via the backend's /api/quotes — see
+// fetchLatestPrices() above, which calls the backend directly and needs
+// no access_token or Kite login at all.)
 
 async function fetchAllNews() {
   const stocks = Store.getStocks();
@@ -1032,14 +937,15 @@ function applyFetchedQuotes(quotes) {
   const stocks = Store.getStocks();
   if (newsData && newsData.results) {
     for (const r of newsData.results) {
-      const q = quotes[`NSE:${r.ticker}`];
-      if (q) r.quote = q;
+      const q = quotes[r.ticker];
+      if (q && !q.error) r.quote = q; // per-symbol errors (bad/delisted ticker) are skipped, not stored as a "quote"
     }
     Store.setCache(newsData);
   } else {
-    const results = stocks.map(([ticker, company, tier]) => ({
-      ticker, company, tier, articles: [], quote: quotes[`NSE:${ticker}`] || null,
-    }));
+    const results = stocks.map(([ticker, company, tier]) => {
+      const q = quotes[ticker];
+      return { ticker, company, tier, articles: [], quote: (q && !q.error) ? q : null };
+    });
     newsData = { fetchedAt: new Date().toISOString(), results };
     Store.setCache(newsData);
   }
@@ -1308,41 +1214,29 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-  // Price/change only renders if a quote came back for this stock — fails
-  // silently and shows nothing if there's no active Kite session, rather
-  // than an error inline on every single entry (the one status-bar note
-  // from updateStatusBar is enough to explain that once, not 96 times).
+  // Price/change/volume/52wk only render if a quote came back for this
+  // stock — fails silently and shows nothing if prices haven't been
+  // fetched yet or this specific symbol had no data, rather than an
+  // error inline on every single entry.
   let priceHtml = '';
   if (stock.quote && stock.quote.last_price != null) {
-    const q = stock.quote;
-    const chg = q.change_pct;
+    const chg = stock.quote.change_pct;
     const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
 
-    // RVOL badge — only show when volume is notably high or low
-    let volHtml = '';
-    if (q.rvol != null) {
-      if (q.rvol >= 2.0) {
-        volHtml = `<span class="vol-badge vol-surge" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u26a1 ${q.rvol}\xd7 vol</span>`;
-      } else if (q.rvol >= 1.5) {
-        volHtml = `<span class="vol-badge vol-high" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u2191 High Vol</span>`;
-      } else if (q.rvol <= 0.4) {
-        volHtml = `<span class="vol-badge vol-low" title="Volume ${q.rvol}\xd7 20-day avg (${(q.volume/1e5).toFixed(1)}L today vs ${(q.avg_vol_20d/1e5).toFixed(1)}L avg)">\u2193 Low Vol</span>`;
-      }
+    let flagsHtml = '';
+    if (stock.quote.volume_flag === 'high') {
+      flagsHtml += `<span class="pressure-flag pressure-buy" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the 20-day average">▲ high volume</span>`;
+    } else if (stock.quote.volume_flag === 'low') {
+      flagsHtml += `<span class="pressure-flag pressure-sell" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the 20-day average">▼ low volume</span>`;
+    }
+    if (stock.quote.near_52wk_flag === 'near-high') {
+      flagsHtml += `<span class="pressure-flag pressure-buy" title="Within 2% of the 52-week high of ₹${stock.quote.fifty_two_wk_high}">52wk high</span>`;
+    } else if (stock.quote.near_52wk_flag === 'near-low') {
+      flagsHtml += `<span class="pressure-flag pressure-sell" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52wk low</span>`;
     }
 
-    // 52-week position — only flag if near extremes
-    let wkHtml = '';
-    if (q.week52_high != null && q.week52_low != null && q.week52_high !== q.week52_low) {
-      const wkPct = ((q.last_price - q.week52_low) / (q.week52_high - q.week52_low)) * 100;
-      if (wkPct >= 90) {
-        wkHtml = `<span class="wk52-badge wk52-near-high" title="Near 52-week high \u20b9${q.week52_high}">52W High</span>`;
-      } else if (wkPct <= 15) {
-        wkHtml = `<span class="wk52-badge wk52-near-low" title="Near 52-week low \u20b9${q.week52_low}">52W Low</span>`;
-      }
-    }
-
-    priceHtml = `<div class="entry-price">\u20b9${q.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${volHtml}${wkHtml}</div>`;
+    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${flagsHtml}</div>`;
   }
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
