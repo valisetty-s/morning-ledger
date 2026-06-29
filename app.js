@@ -645,9 +645,10 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
   }
 
   // Note: this path (holdings import) no longer stores the access_token
-  // anywhere — the price button now does its own fresh login + immediate
-  // one-time use of the token, never persisting it. See
-  // completeKiteLoginForPrices for that flow.
+  // anywhere. As of v17, prices don't use Kite at all anymore — they
+  // come from Yahoo Finance via fetchLatestPrices(), which needs no
+  // token or login. This comment is just historical context for why
+  // holdings-import alone doesn't bother storing a token either.
 
   // Merge fetched tickers into the stock list, preserving tiers for any
   // ticker we already know about; new tickers default to "Watch".
