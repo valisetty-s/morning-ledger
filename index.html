@@ -215,27 +215,51 @@
     letter-spacing: 0.3px;
     margin-left: 6px;
   }
-  .entry-price {
-    display: inline-block;
+
+  /* ---------- PRICE RIBBON ----------
+     A full-width band under the stock name showing price, day change,
+     volume, and 52-week proximity — deliberately bigger and higher-
+     contrast than the rest of the card, since this is glance-at-a-distance
+     data, not reading material. Color communicates direction at a glance:
+     green ribbon = up day, red/clay ribbon = down day, neutral gray = flat.
+  */
+  .price-ribbon {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 9px;
+    color: #FFFFFF;
+  }
+  .price-ribbon.ribbon-pos { background: var(--sage); }
+  .price-ribbon.ribbon-neg { background: var(--clay); }
+  .price-ribbon.ribbon-neu { background: var(--ink-soft); }
+  .ribbon-price {
     font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 11.5px;
-    color: var(--ink-soft);
-    margin-left: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .ribbon-change {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    opacity: 0.95;
+  }
+  .ribbon-flag {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 100px;
+    background: rgba(255,255,255,0.22);
+    white-space: nowrap;
   }
   .pnl-pos { color: var(--sage); font-weight: 600; }
   .pnl-neg { color: var(--clay); font-weight: 600; }
   .pnl-neu { color: var(--ink-soft); }
-  .pressure-flag {
-    display: inline-block;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 9.5px;
-    font-weight: 600;
-    margin-left: 6px;
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  .pressure-buy { background: var(--sage-dim); color: var(--sage); }
-  .pressure-sell { background: var(--clay-dim); color: var(--clay); }
   .entry-badge {
     font-family: -apple-system, system-ui, sans-serif;
     font-size: 9px;
