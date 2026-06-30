@@ -218,10 +218,10 @@
 
   /* ---------- PRICE RIBBON ----------
      A full-width band under the stock name showing price, day change,
-     volume, and 52-week proximity — deliberately bigger and higher-
-     contrast than the rest of the card, since this is glance-at-a-distance
-     data, not reading material. Color communicates direction at a glance:
-     green ribbon = up day, red/clay ribbon = down day, neutral gray = flat.
+     volume, and 52-week proximity — bigger and higher-contrast than the
+     rest of the card, since this is glance-at-a-distance data, not
+     reading material. Ribbon color communicates direction at a glance:
+     green = up day, clay/red = down day, neutral gray = flat.
   */
   .price-ribbon {
     display: flex;
@@ -257,9 +257,6 @@
     background: rgba(255,255,255,0.22);
     white-space: nowrap;
   }
-  .pnl-pos { color: var(--sage); font-weight: 600; }
-  .pnl-neg { color: var(--clay); font-weight: 600; }
-  .pnl-neu { color: var(--ink-soft); }
   .entry-badge {
     font-family: -apple-system, system-ui, sans-serif;
     font-size: 9px;
@@ -602,7 +599,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v17</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v18</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>

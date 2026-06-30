@@ -1218,33 +1218,40 @@ function renderEntry(stock) {
   // Price/change/volume/52wk only render if a quote came back for this
   // stock — fails silently and shows nothing if prices haven't been
   // fetched yet or this specific symbol had no data, rather than an
-  // error inline on every single entry.
-  let priceHtml = '';
+  // error inline on every single entry. Rendered as a separate block
+  // below the name/ticker row (a "ribbon") rather than crammed inline,
+  // since this needs to be readable at a glance, not just present.
+  let ribbonHtml = '';
   if (stock.quote && stock.quote.last_price != null) {
     const chg = stock.quote.change_pct;
-    const chgClass = chg == null ? 'pnl-neu' : (chg > 0 ? 'pnl-pos' : (chg < 0 ? 'pnl-neg' : 'pnl-neu'));
+    const ribbonClass = chg == null ? 'ribbon-neu' : (chg > 0 ? 'ribbon-pos' : (chg < 0 ? 'ribbon-neg' : 'ribbon-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
 
     let flagsHtml = '';
     if (stock.quote.volume_flag === 'high') {
-      flagsHtml += `<span class="pressure-flag pressure-buy" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the 20-day average">▲ high volume</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the recent average">▲ HIGH VOLUME</span>`;
     } else if (stock.quote.volume_flag === 'low') {
-      flagsHtml += `<span class="pressure-flag pressure-sell" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the 20-day average">▼ low volume</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the recent average">▼ LOW VOLUME</span>`;
     }
     if (stock.quote.near_52wk_flag === 'near-high') {
-      flagsHtml += `<span class="pressure-flag pressure-buy" title="Within 2% of the 52-week high of ₹${stock.quote.fifty_two_wk_high}">52wk high</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week high of ₹${stock.quote.fifty_two_wk_high}">52WK HIGH</span>`;
     } else if (stock.quote.near_52wk_flag === 'near-low') {
-      flagsHtml += `<span class="pressure-flag pressure-sell" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52wk low</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
     }
 
-    priceHtml = `<div class="entry-price">₹${stock.quote.last_price.toFixed(2)} <span class="${chgClass}">${chg != null ? `${chgSign}${chg}%` : ''}</span>${flagsHtml}</div>`;
+    ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
+      <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
+      <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
+      ${flagsHtml}
+    </div>`;
   }
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span>${priceHtml}</div>
+      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>
       ${badgeHtml}
     </div>
+    ${ribbonHtml}
     ${body}
   </div>`;
 }

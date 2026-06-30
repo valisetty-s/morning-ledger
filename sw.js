@@ -2,7 +2,7 @@
 // Caches the app shell so it opens instantly even on a flaky connection.
 // News fetches always go to the network (never cached) since freshness matters.
 
-const CACHE_NAME = 'morning-ledger-v17';
+const CACHE_NAME = 'morning-ledger-v18';
 const SHELL_FILES = [
   './index.html',
   './app.js',
