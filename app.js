@@ -65,6 +65,11 @@ const TIER_LABELS = {
 };
 const TIER_ORDER = ["Top30", "Top31-50", "Top51-75", "Watch"];
 
+// Helper function to clean ticker (remove -BE suffix for display)
+function getCleanTicker(ticker) {
+  return ticker.replace(/-BE$/, '');
+}
+
 // ---------- Storage helpers ----------
 const Store = {
   getApiKey: () => localStorage.getItem('ml_api_key') || '',
@@ -1302,7 +1307,7 @@ function renderEntry(stock) {
     }
 
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
-      <span class="ribbon-code">${escapeHtml(stock.ticker)}</span>
+      <span class="ribbon-code">${escapeHtml(getCleanTicker(stock.ticker))}</span>
       <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
       <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
       ${flagsHtml}
@@ -1311,7 +1316,7 @@ function renderEntry(stock) {
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>
+      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(getCleanTicker(stock.ticker))}</span></div>
       ${badgeHtml}
     </div>
     ${ribbonHtml}
