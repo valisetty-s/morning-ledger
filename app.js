@@ -854,7 +854,9 @@ function applySorting(stocks, sortType) {
       break;
     case 'default':
     default:
-      // Keep original order (by tier, then as they appear)
+      // Alphabetical by company name — the default view now, rather than
+      // leaving stocks in whatever order they happened to be added/imported.
+      sorted.sort((a, b) => a.company.localeCompare(b.company));
       break;
   }
 
