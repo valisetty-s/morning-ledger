@@ -1302,6 +1302,7 @@ function renderEntry(stock) {
     }
 
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
+      <span class="ribbon-code">${escapeHtml(stock.ticker)}</span>
       <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
       <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
       ${flagsHtml}
