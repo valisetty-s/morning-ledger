@@ -92,6 +92,17 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
+const APP_VERSION = 'v21'; // visible in status bar — bump on every release
+
+// Strip BSE board suffixes from tickers before using them in news searches
+// or display. STLTECH-BE → STLTECH, QPOWER-BE → QPOWER.
+// The -BE (Book Entry), -BL (Block), -SM (SME) suffixes are Kite/BSE
+// trading board identifiers — not part of the company name, not recognised
+// by Google News, and confusing to see in the UI.
+function stripBoardSuffix(ticker) {
+  if (!ticker) return ticker;
+  return ticker.replace(/-(BE|BL|SM|BZ|BA|MF|XT|SG|W1)$/i, '').trim();
+}
 
 // ---------- State ----------
 let currentFilter = 'all';
@@ -233,7 +244,7 @@ function init() {
 
 function updateStatusBar() {
   if (!newsData) {
-    refreshStatus.textContent = 'Not yet fetched today';
+    refreshStatus.textContent = `Not yet fetched today · ${APP_VERSION}`;
     datelineStatus.textContent = "Tap refresh to fetch today's news";
     datelineStatus.classList.remove('fresh');
     updatePriceStatus();
@@ -249,7 +260,7 @@ function updateStatusBar() {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix} · ${APP_VERSION}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
@@ -501,19 +512,34 @@ async function fetchLatestPrices() {
   if (!stocks || stocks.length === 0) return;
 
   const priceBtn = $('#price-refresh-btn');
-  if (priceBtn) priceBtn.classList.add('spinning');
+  // Prevent double-tap: if already fetching, ignore the second tap
+  if (priceBtn && priceBtn.classList.contains('spinning')) return;
+
+  priceBtn && priceBtn.classList.add('spinning');
   priceStatusUpdate('Fetching prices…');
 
-  const symbols = stocks.map(([ticker]) => ticker).join(',');
+  // BUG FIX: stripped -BE / -BL suffixes before sending to backend
+  // STLTECH-BE → STLTECH (Yahoo uses STLTECH.BO anyway via to_yahoo_symbol)
+  // but we must strip here so the key returned by backend matches what
+  // applyFetchedQuotes looks up in newsData.results
+  const symbols = stocks.map(([ticker]) => stripBoardSuffix(ticker)).join(',');
+
+  // Warm-up hint — Render free tier cold starts take 30-50s
+  let warmupTimer = setTimeout(() => {
+    priceStatusUpdate('Fetching prices… (server warming up, please wait ~30s on first daily use)');
+  }, 8000);
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000); // a full 96-symbol batch can take a little while
-    const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
+    // 55s timeout: generous enough for a Render cold start + 96-stock fetch
+    const timer = setTimeout(() => controller.abort(), 55000);
+    const resp = await fetch(
+      `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`,
+      { signal: controller.signal }
+    );
     clearTimeout(timer);
+    clearTimeout(warmupTimer);
     const data = await resp.json();
-
-    if (priceBtn) priceBtn.classList.remove('spinning');
 
     if (!resp.ok || data.status !== 'success') {
       priceStatusUpdate(`Prices unavailable: ${data.error || `HTTP ${resp.status}`}`);
@@ -521,11 +547,17 @@ async function fetchLatestPrices() {
     }
 
     applyFetchedQuotes(data.quotes || {});
-    const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
-    priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
+    const successCount = Object.values(data.quotes || {}).filter(q => q && !q.error).length;
+    priceStatusUpdate(`Prices updated ✓ (${successCount}/${stocks.length} stocks · tap to refresh)`);
   } catch (e) {
-    if (priceBtn) priceBtn.classList.remove('spinning');
-    priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
+    clearTimeout(warmupTimer);
+    if (e.name === 'AbortError') {
+      priceStatusUpdate('Prices timed out — server may be cold-starting. Try again in 30 seconds.');
+    } else {
+      priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
+    }
+  } finally {
+    priceBtn && priceBtn.classList.remove('spinning');
   }
 }
 
@@ -857,7 +889,13 @@ const BATCH_PAUSE_MS = 200;
 // instead of a silent mystery. (Declared at top of file with other state.)
 
 async function fetchStockNews(ticker, company) {
-  const { articles, error } = await fetchNewsViaBackend(company, 3);
+  // Use company name for news (already human-readable, no board suffix).
+  // If company == ticker (user had no separate company name), strip the
+  // board suffix so we search "STLTECH" not "STLTECH-BE".
+  const searchName = (company && company !== ticker)
+    ? company
+    : stripBoardSuffix(company);
+  const { articles, error } = await fetchNewsViaBackend(searchName, 3);
   return { ticker, company, articles, error };
 }
 
@@ -1020,7 +1058,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     lookupError = result.error;
   } catch (e) { lookupError = e.message || String(e); }
 
-  const stockObj = { ticker: displayTicker, company: searchTerm, tier: known ? known[2] : 'Watch', articles };
+  const stockObj = { ticker: stripBoardSuffix(displayTicker), company: searchTerm, tier: known ? known[2] : 'Watch', articles };
   const diagnoseLink = articles.length === 0
     ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
     : '';
@@ -1248,7 +1286,7 @@ function renderEntry(stock) {
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>
+      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stripBoardSuffix(stock.ticker))}</span></div>
       ${badgeHtml}
     </div>
     ${ribbonHtml}
