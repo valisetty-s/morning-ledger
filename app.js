@@ -92,21 +92,11 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
-const APP_VERSION = 'v21'; // visible in status bar — bump on every release
-
-// Strip BSE board suffixes from tickers before using them in news searches
-// or display. STLTECH-BE → STLTECH, QPOWER-BE → QPOWER.
-// The -BE (Book Entry), -BL (Block), -SM (SME) suffixes are Kite/BSE
-// trading board identifiers — not part of the company name, not recognised
-// by Google News, and confusing to see in the UI.
-function stripBoardSuffix(ticker) {
-  if (!ticker) return ticker;
-  return ticker.replace(/-(BE|BL|SM|BZ|BA|MF|XT|SG|W1)$/i, '').trim();
-}
 
 // ---------- State ----------
 let currentFilter = 'all';
 let currentSentiment = 'all';
+let currentSort = 'default';
 let newsData = null; // { fetchedAt: ISOstring, results: [{ticker,company,tier,articles:[...]}] }
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 // (lastQuotesError removed — the new fresh-login-per-fetch design for
@@ -160,14 +150,23 @@ function init() {
     });
   });
 
-  document.querySelectorAll('.chip[data-sentiment]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-sentiment]').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      currentSentiment = chip.dataset.sentiment;
-      renderContent();
-    });
-  });
+   document.querySelectorAll('.chip[data-sentiment]').forEach(chip => {
+     chip.addEventListener('click', () => {
+       document.querySelectorAll('.chip[data-sentiment]').forEach(c => c.classList.remove('active'));
+       chip.classList.add('active');
+       currentSentiment = chip.dataset.sentiment;
+       renderContent();
+     });
+   });
+
+   document.querySelectorAll('.chip[data-sort]').forEach(chip => {
+     chip.addEventListener('click', () => {
+       document.querySelectorAll('.chip[data-sort]').forEach(c => c.classList.remove('active'));
+       chip.classList.add('active');
+       currentSort = chip.dataset.sort;
+       renderContent();
+     });
+   });
 
   refreshBtn.addEventListener('click', fetchAllNews);
   const priceBtn = $('#price-refresh-btn');
@@ -244,7 +243,7 @@ function init() {
 
 function updateStatusBar() {
   if (!newsData) {
-    refreshStatus.textContent = `Not yet fetched today · ${APP_VERSION}`;
+    refreshStatus.textContent = 'Not yet fetched today';
     datelineStatus.textContent = "Tap refresh to fetch today's news";
     datelineStatus.classList.remove('fresh');
     updatePriceStatus();
@@ -260,7 +259,7 @@ function updateStatusBar() {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix} · ${APP_VERSION}`;
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
@@ -512,34 +511,19 @@ async function fetchLatestPrices() {
   if (!stocks || stocks.length === 0) return;
 
   const priceBtn = $('#price-refresh-btn');
-  // Prevent double-tap: if already fetching, ignore the second tap
-  if (priceBtn && priceBtn.classList.contains('spinning')) return;
-
-  priceBtn && priceBtn.classList.add('spinning');
+  if (priceBtn) priceBtn.classList.add('spinning');
   priceStatusUpdate('Fetching prices…');
 
-  // BUG FIX: stripped -BE / -BL suffixes before sending to backend
-  // STLTECH-BE → STLTECH (Yahoo uses STLTECH.BO anyway via to_yahoo_symbol)
-  // but we must strip here so the key returned by backend matches what
-  // applyFetchedQuotes looks up in newsData.results
-  const symbols = stocks.map(([ticker]) => stripBoardSuffix(ticker)).join(',');
-
-  // Warm-up hint — Render free tier cold starts take 30-50s
-  let warmupTimer = setTimeout(() => {
-    priceStatusUpdate('Fetching prices… (server warming up, please wait ~30s on first daily use)');
-  }, 8000);
+  const symbols = stocks.map(([ticker]) => ticker).join(',');
 
   try {
     const controller = new AbortController();
-    // 55s timeout: generous enough for a Render cold start + 96-stock fetch
-    const timer = setTimeout(() => controller.abort(), 55000);
-    const resp = await fetch(
-      `${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`,
-      { signal: controller.signal }
-    );
+    const timer = setTimeout(() => controller.abort(), 25000); // a full 96-symbol batch can take a little while
+    const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
     clearTimeout(timer);
-    clearTimeout(warmupTimer);
     const data = await resp.json();
+
+    if (priceBtn) priceBtn.classList.remove('spinning');
 
     if (!resp.ok || data.status !== 'success') {
       priceStatusUpdate(`Prices unavailable: ${data.error || `HTTP ${resp.status}`}`);
@@ -547,17 +531,11 @@ async function fetchLatestPrices() {
     }
 
     applyFetchedQuotes(data.quotes || {});
-    const successCount = Object.values(data.quotes || {}).filter(q => q && !q.error).length;
-    priceStatusUpdate(`Prices updated ✓ (${successCount}/${stocks.length} stocks · tap to refresh)`);
+    const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
+    priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
   } catch (e) {
-    clearTimeout(warmupTimer);
-    if (e.name === 'AbortError') {
-      priceStatusUpdate('Prices timed out — server may be cold-starting. Try again in 30 seconds.');
-    } else {
-      priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
-    }
-  } finally {
-    priceBtn && priceBtn.classList.remove('spinning');
+    if (priceBtn) priceBtn.classList.remove('spinning');
+    priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
   }
 }
 
@@ -823,11 +801,59 @@ function classifySentiment(title) {
 }
 
 function classifyStockOverallSentiment(articles) {
-  if (!articles || articles.length === 0) return null;
-  const sentiments = articles.map(a => classifySentiment(a.title));
-  if (sentiments.includes('negative')) return 'negative';
-  if (sentiments.includes('positive')) return 'positive';
-  return 'neutral';
+   if (!articles || articles.length === 0) return null;
+   const sentiments = articles.map(a => classifySentiment(a.title));
+   if (sentiments.includes('negative')) return 'negative';
+   if (sentiments.includes('positive')) return 'positive';
+   return 'neutral';
+ }
+
+// ---------- Sorting ----------
+function applySorting(stocks, sortType) {
+  if (!stocks || stocks.length === 0) return stocks;
+
+  const sorted = [...stocks]; // Create a copy to avoid mutating original
+
+  switch(sortType) {
+    case 'change-desc':
+      // Gainers first (highest change % on top)
+      sorted.sort((a, b) => {
+        const chgA = (a.quote && a.quote.change_pct != null) ? a.quote.change_pct : -Infinity;
+        const chgB = (b.quote && b.quote.change_pct != null) ? b.quote.change_pct : -Infinity;
+        return chgB - chgA;
+      });
+      break;
+    case 'change-asc':
+      // Losers first (lowest change % on top)
+      sorted.sort((a, b) => {
+        const chgA = (a.quote && a.quote.change_pct != null) ? a.quote.change_pct : Infinity;
+        const chgB = (b.quote && b.quote.change_pct != null) ? b.quote.change_pct : Infinity;
+        return chgA - chgB;
+      });
+      break;
+    case 'volume-high':
+      // High volume first
+      sorted.sort((a, b) => {
+        const volA = (a.quote && a.quote.volume_flag === 'high') ? 1 : 0;
+        const volB = (b.quote && b.quote.volume_flag === 'high') ? 1 : 0;
+        return volB - volA;
+      });
+      break;
+    case 'volume-low':
+      // Low volume first
+      sorted.sort((a, b) => {
+        const volA = (a.quote && a.quote.volume_flag === 'low') ? 1 : 0;
+        const volB = (b.quote && b.quote.volume_flag === 'low') ? 1 : 0;
+        return volB - volA;
+      });
+      break;
+    case 'default':
+    default:
+      // Keep original order (by tier, then as they appear)
+      break;
+  }
+
+  return sorted;
 }
 
 // ---------- Fetching: via your own backend ----------
@@ -889,13 +915,7 @@ const BATCH_PAUSE_MS = 200;
 // instead of a silent mystery. (Declared at top of file with other state.)
 
 async function fetchStockNews(ticker, company) {
-  // Use company name for news (already human-readable, no board suffix).
-  // If company == ticker (user had no separate company name), strip the
-  // board suffix so we search "STLTECH" not "STLTECH-BE".
-  const searchName = (company && company !== ticker)
-    ? company
-    : stripBoardSuffix(company);
-  const { articles, error } = await fetchNewsViaBackend(searchName, 3);
+  const { articles, error } = await fetchNewsViaBackend(company, 3);
   return { ticker, company, articles, error };
 }
 
@@ -1058,7 +1078,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     lookupError = result.error;
   } catch (e) { lookupError = e.message || String(e); }
 
-  const stockObj = { ticker: stripBoardSuffix(displayTicker), company: searchTerm, tier: known ? known[2] : 'Watch', articles };
+  const stockObj = { ticker: displayTicker, company: searchTerm, tier: known ? known[2] : 'Watch', articles };
   const diagnoseLink = articles.length === 0
     ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
     : '';
@@ -1172,54 +1192,58 @@ function formatPublished(iso) {
 }
 
 function renderContent() {
-  if (!newsData) {
-    contentEl.innerHTML = `<div class="empty-state">
-      <div class="glyph">☀︎</div>
-      <h3>Good morning.</h3>
-      <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
-    </div>`;
-    return;
-  }
+   if (!newsData) {
+     contentEl.innerHTML = `<div class="empty-state">
+       <div class="glyph">☀︎</div>
+       <h3>Good morning.</h3>
+       <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
+     </div>`;
+     return;
+   }
 
-  let filtered = newsData.results;
-  if (currentFilter === 'fresh') {
-    filtered = filtered.filter(s => s.articles && s.articles.length > 0);
-  } else if (currentFilter !== 'all') {
-    filtered = filtered.filter(s => s.tier === currentFilter);
-  }
+   let filtered = newsData.results;
+   if (currentFilter === 'fresh') {
+     filtered = filtered.filter(s => s.articles && s.articles.length > 0);
+   } else if (currentFilter !== 'all') {
+     filtered = filtered.filter(s => s.tier === currentFilter);
+   }
 
-  if (currentSentiment !== 'all') {
-    filtered = filtered.filter(s => {
-      const overall = classifyStockOverallSentiment(s.articles);
-      return overall === currentSentiment;
-    });
-  }
+   if (currentSentiment !== 'all') {
+     filtered = filtered.filter(s => {
+       const overall = classifyStockOverallSentiment(s.articles);
+       return overall === currentSentiment;
+     });
+   }
 
-  if (filtered.length === 0) {
-    const sentimentNote = currentSentiment !== 'all' ? ` with ${currentSentiment} news` : '';
-    contentEl.innerHTML = `<div class="empty-state">
-      <div class="glyph">—</div>
-      <h3>Nothing here</h3>
-      <p>No stocks${sentimentNote} match this filter right now.</p>
-    </div>`;
-    return;
-  }
+   if (filtered.length === 0) {
+     const sentimentNote = currentSentiment !== 'all' ? ` with ${currentSentiment} news` : '';
+     contentEl.innerHTML = `<div class="empty-state">
+       <div class="glyph">—</div>
+       <h3>Nothing here</h3>
+       <p>No stocks${sentimentNote} match this filter right now.</p>
+     </div>`;
+     return;
+   }
 
-  if (currentFilter === 'all' || currentFilter === 'fresh') {
-    let html = '';
-    for (const tier of TIER_ORDER) {
-      const group = filtered.filter(s => s.tier === tier);
-      if (!group.length) continue;
-      html += `<div class="section">
-        <div class="section-head"><span class="section-label tier-${tier.toLowerCase()}">${TIER_LABELS[tier]}</span><div class="rule"></div></div>
-        ${group.map(renderEntry).join('')}
-      </div>`;
-    }
-    contentEl.innerHTML = html;
-  } else {
-    contentEl.innerHTML = `<div class="section">${filtered.map(renderEntry).join('')}</div>`;
-  }
-}
+   if (currentFilter === 'all' || currentFilter === 'fresh') {
+     let html = '';
+     for (const tier of TIER_ORDER) {
+       const group = filtered.filter(s => s.tier === tier);
+       if (!group.length) continue;
+       // Apply sorting within each tier group
+       const sortedGroup = applySorting(group, currentSort);
+       html += `<div class="section">
+         <div class="section-head"><span class="section-label tier-${tier.toLowerCase()}">${TIER_LABELS[tier]}</span><div class="rule"></div></div>
+         ${sortedGroup.map(renderEntry).join('')}
+       </div>`;
+     }
+     contentEl.innerHTML = html;
+   } else {
+     // Apply sorting to single tier
+     const sortedFiltered = applySorting(filtered, currentSort);
+     contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
+   }
+ }
 
 function renderEntry(stock) {
   const hasNews = stock.articles && stock.articles.length > 0;
@@ -1286,7 +1310,7 @@ function renderEntry(stock) {
 
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stripBoardSuffix(stock.ticker))}</span></div>
+      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(stock.ticker)}</span></div>
       ${badgeHtml}
     </div>
     ${ribbonHtml}
