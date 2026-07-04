@@ -1289,7 +1289,8 @@ function renderEntry(stock) {
   // below the name/ticker row (a "ribbon") rather than crammed inline,
   // since this needs to be readable at a glance, not just present.
   let ribbonHtml = '';
-  if (stock.quote && stock.quote.last_price != null) {
+  const hasQuote = stock.quote && stock.quote.last_price != null;
+  if (hasQuote) {
     const chg = stock.quote.change_pct;
     const ribbonClass = chg == null ? 'ribbon-neu' : (chg > 0 ? 'ribbon-pos' : (chg < 0 ? 'ribbon-neg' : 'ribbon-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
@@ -1306,19 +1307,35 @@ function renderEntry(stock) {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
     }
 
+    // Stock name + ticker now live inside the ribbon itself, on their own
+    // row above the price/change/flags row — this is what moved here per
+    // the latest request, rather than sitting separately in entry-head.
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
-      <span class="ribbon-code">${escapeHtml(getCleanTicker(stock.ticker))}</span>
-      <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
-      <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
-      ${flagsHtml}
+      <div class="ribbon-name-row">
+        <span class="ribbon-name">${escapeHtml(stock.company)}</span>
+        <span class="ribbon-code">${escapeHtml(getCleanTicker(stock.ticker))}</span>
+      </div>
+      <div class="ribbon-data-row">
+        <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
+        <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
+        ${flagsHtml}
+      </div>
     </div>`;
   }
 
+  // Fallback header: only used when there's no quote yet (prices haven't
+  // been fetched this session, or this specific symbol had no data) —
+  // otherwise the name/ticker live inside the ribbon above instead, so
+  // this row is left empty to avoid showing the name twice.
+  const headHtml = hasQuote
+    ? `<div class="entry-head-badge-only">${badgeHtml}</div>`
+    : `<div class="entry-head">
+        <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(getCleanTicker(stock.ticker))}</span></div>
+        ${badgeHtml}
+      </div>`;
+
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
-    <div class="entry-head">
-      <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(getCleanTicker(stock.ticker))}</span></div>
-      ${badgeHtml}
-    </div>
+    ${headHtml}
     ${ribbonHtml}
     ${body}
   </div>`;

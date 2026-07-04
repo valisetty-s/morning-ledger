@@ -203,6 +203,12 @@
     gap: 10px;
     margin-bottom: 2px;
   }
+  .entry-head-badge-only {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 2px;
+    min-height: 1px;
+  }
   .entry-name {
     font-size: 16px;
     font-weight: 600;
@@ -225,9 +231,8 @@
   */
   .price-ribbon {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 8px;
     padding: 10px 14px;
     border-radius: 9px;
@@ -236,6 +241,25 @@
   .price-ribbon.ribbon-pos { background: var(--sage); }
   .price-ribbon.ribbon-neg { background: var(--clay); }
   .price-ribbon.ribbon-neu { background: var(--ink-soft); }
+  .ribbon-name-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .ribbon-name {
+    font-family: 'Georgia', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 1.25;
+  }
+  .ribbon-data-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
   .ribbon-price {
     font-family: 'SF Mono', 'Courier New', monospace;
     font-size: 22px;
@@ -256,6 +280,7 @@
     background: rgba(255,255,255,0.2);
     padding: 3px 8px;
     border-radius: 4px;
+    flex-shrink: 0;
   }
   .ribbon-flag {
     font-family: -apple-system, system-ui, sans-serif;
@@ -608,7 +633,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v18</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v22</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
