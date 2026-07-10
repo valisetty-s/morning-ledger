@@ -665,14 +665,59 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
   // token or login. This comment is just historical context for why
   // holdings-import alone doesn't bother storing a token either.
 
-  // Merge fetched tickers into the stock list, preserving tiers for any
-  // ticker we already know about; new tickers default to "Watch".
+  // Merge fetched tickers into the stock list, preserving tiers.
+  //
+  // Tier lookup now checks TWO sources, in order:
+  //   1. The currently saved stock list (whatever's in localStorage right
+  //      now) — preserves any manual tier edits made after import
+  //   2. The master DEFAULT_STOCKS list (the full ~96-stock reference
+  //      list with correct tiers for every rank) — a fallback for when a
+  //      ticker isn't in the currently saved list for whatever reason
+  //      (e.g. it was never in an earlier import, or the saved list had
+  //      gotten out of sync). This is the fix for holdings beyond Top 30
+  //      all incorrectly falling into Watch: previously, any ticker not
+  //      found in the CURRENT session's list defaulted straight to
+  //      "Watch" with no fallback — even when that same ticker had a
+  //      perfectly correct tier sitting in the master list all along.
+  // Only if a ticker is genuinely unknown to both sources does it default
+  // to "Watch".
   const existing = Store.getStocks();
   const existingByTicker = new Map(existing.map(([t, c, tier]) => [t.toUpperCase(), [t, c, tier]]));
+  const defaultsByTicker = new Map(DEFAULT_STOCKS.map(([t, c, tier]) => [t.toUpperCase(), [t, c, tier]]));
+
+  // Same suffix list the backend strips for Yahoo/news lookups. Applied in
+  // BOTH directions here: the incoming Kite ticker might have a suffix the
+  // reference lists don't (or vice versa) — e.g. Kite returns "STLTECH"
+  // but the reference list has "STLTECH-BE", or the reverse. Building
+  // suffix-stripped versions of the reference maps too (not just the
+  // incoming ticker) is what makes this match regardless of which side
+  // carries the suffix.
+  const stripSeriesSuffix = (t) => t.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
+  const buildStrippedIndex = (map) => {
+    const stripped = new Map();
+    for (const [key, value] of map) {
+      const s = stripSeriesSuffix(key);
+      if (!stripped.has(s)) stripped.set(s, value); // first match wins if of a collision
+    }
+    return stripped;
+  };
+  const existingStripped = buildStrippedIndex(existingByTicker);
+  const defaultsStripped = buildStrippedIndex(defaultsByTicker);
 
   const merged = holdings.map(h => {
     const ticker = (h.ticker || '').toUpperCase();
     if (existingByTicker.has(ticker)) return existingByTicker.get(ticker);
+    if (defaultsByTicker.has(ticker)) return defaultsByTicker.get(ticker);
+
+    const strippedTicker = stripSeriesSuffix(ticker);
+    if (existingStripped.has(strippedTicker)) {
+      const [, company, tier] = existingStripped.get(strippedTicker);
+      return [ticker, company, tier];
+    }
+    if (defaultsStripped.has(strippedTicker)) {
+      const [, company, tier] = defaultsStripped.get(strippedTicker);
+      return [ticker, company, tier];
+    }
     return [ticker, ticker, 'Watch'];
   });
 
@@ -805,13 +850,37 @@ function classifySentiment(title) {
   return 'neutral';
 }
 
+// Finds the article with the most recent actual publish timestamp, rather
+// than trusting feed order (Google News RSS is not guaranteed to be
+// strictly date-sorted — it can favor relevance). Falls back to the first
+// article in the list only if none of them have a parseable date at all.
+function findMostRecentArticle(articles) {
+  if (!articles || articles.length === 0) return null;
+  let latest = null;
+  let latestTime = -Infinity;
+  for (const a of articles) {
+    const t = a.published ? new Date(a.published).getTime() : NaN;
+    if (!isNaN(t) && t > latestTime) {
+      latestTime = t;
+      latest = a;
+    }
+  }
+  return latest || articles[0];
+}
+
+// Overall sentiment now reflects ONLY the single most recent headline —
+// not "any negative headline wins" as before. Per request: if the latest
+// news is negative, the stock is negative; if the latest news is positive
+// OR neutral, the stock counts as positive (neutral is folded into
+// positive — giving the benefit of the doubt rather than treating
+// ambiguous wording as a third, separate bucket).
 function classifyStockOverallSentiment(articles) {
-   if (!articles || articles.length === 0) return null;
-   const sentiments = articles.map(a => classifySentiment(a.title));
-   if (sentiments.includes('negative')) return 'negative';
-   if (sentiments.includes('positive')) return 'positive';
-   return 'neutral';
- }
+  if (!articles || articles.length === 0) return null;
+  const latest = findMostRecentArticle(articles);
+  if (!latest) return null;
+  const latestSentiment = classifySentiment(latest.title);
+  return latestSentiment === 'negative' ? 'negative' : 'positive';
+}
 
 // ---------- Sorting ----------
 function applySorting(stocks, sortType) {
