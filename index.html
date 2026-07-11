@@ -422,6 +422,34 @@
   .suggestion-ticker { color: var(--ink-soft); font-family: 'SF Mono', monospace; font-size: 11px; }
   .suggestion-empty { padding: 14px; font-family: -apple-system, system-ui, sans-serif; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
 
+  .movers-summary {
+    margin: 0 20px 14px;
+    padding: 12px 16px;
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .movers-counts {
+    display: flex;
+    gap: 16px;
+    font-size: 12.5px;
+    margin-bottom: 8px;
+  }
+  .movers-counts .count-up { color: var(--sage); font-weight: 700; }
+  .movers-counts .count-down { color: var(--clay); font-weight: 700; }
+  .movers-counts .count-flat { color: var(--ink-soft); font-weight: 700; }
+  .movers-best-worst {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .movers-best-worst span.name { color: var(--ink); font-weight: 600; }
+  .movers-best-worst .mover-up span.pct { color: var(--sage); font-weight: 700; }
+  .movers-best-worst .mover-down span.pct { color: var(--clay); font-weight: 700; }
+
   .lookup-result-card {
     margin: 0 20px 18px;
     padding: 16px 18px;
@@ -632,7 +660,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v26</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v27</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -689,6 +717,8 @@
 </div>
 
 <div id="lookup-result"></div>
+
+<div id="movers-summary"></div>
 
 <div id="content">
   <div class="empty-state">

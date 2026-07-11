@@ -1084,6 +1084,14 @@ async function fetchAllNews() {
   refreshLabel.textContent = "Fetch today's news";
   updateStatusBar();
   renderContent();
+
+  // Auto-chain into fetching prices right after news finishes, so a
+  // single tap of "Fetch today's news" gets you both — no need to
+  // separately remember to tap "Fetch latest prices" afterward. Fires
+  // without blocking/awaiting anything above (news has already fully
+  // rendered by this point); fetchLatestPrices manages its own button
+  // state and re-renders again once prices land.
+  fetchLatestPrices();
 }
 
 // ---------- Dedicated "Fetch latest prices" — separate, on-demand ----------
@@ -1291,7 +1299,55 @@ function formatPublished(iso) {
          d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 }
 
+function renderMoversSummary() {
+  const el = document.getElementById('movers-summary');
+  if (!el) return;
+
+  // Always reflects the WHOLE portfolio, not whatever tier/sentiment
+  // filter is currently active — a quick-glance summary should stay
+  // stable regardless of what you're browsing below it.
+  const withQuotes = (newsData && newsData.results ? newsData.results : [])
+    .filter(s => s.quote && s.quote.last_price != null && s.quote.change_pct != null);
+
+  if (withQuotes.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  let up = 0, down = 0, flat = 0;
+  let best = null, worst = null;
+  for (const s of withQuotes) {
+    const chg = s.quote.change_pct;
+    if (chg > 0) up++;
+    else if (chg < 0) down++;
+    else flat++;
+    if (best === null || chg > best.quote.change_pct) best = s;
+    if (worst === null || chg < worst.quote.change_pct) worst = s;
+  }
+
+  const bestHtml = best
+    ? `<div class="mover-up"><span class="name">${escapeHtml(best.company)}</span> <span class="pct">+${best.quote.change_pct}%</span></div>`
+    : '';
+  const worstHtml = worst
+    ? `<div class="mover-down"><span class="name">${escapeHtml(worst.company)}</span> <span class="pct">${worst.quote.change_pct}%</span></div>`
+    : '';
+
+  el.innerHTML = `<div class="movers-summary">
+    <div class="movers-counts">
+      <span class="count-up">▲ ${up} up</span>
+      <span class="count-down">▼ ${down} down</span>
+      <span class="count-flat">${flat} flat</span>
+      <span style="margin-left:auto;color:var(--ink-soft)">of ${withQuotes.length} priced</span>
+    </div>
+    <div class="movers-best-worst">
+      ${bestHtml}
+      ${worstHtml}
+    </div>
+  </div>`;
+}
+
 function renderContent() {
+   renderMoversSummary();
    if (!newsData) {
      contentEl.innerHTML = `<div class="empty-state">
        <div class="glyph">☀︎</div>
