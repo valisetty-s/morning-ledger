@@ -450,6 +450,52 @@
   .movers-best-worst .mover-up span.pct { color: var(--sage); font-weight: 700; }
   .movers-best-worst .mover-down span.pct { color: var(--clay); font-weight: 700; }
 
+  .fundamentals-toggle-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 8px;
+  }
+  .fundamentals-panel {
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 9px;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .fund-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+  }
+  .fund-row:last-of-type { border-bottom: none; }
+  .fund-label { color: var(--ink-soft); }
+  .fund-val { font-family: 'SF Mono', 'Courier New', monospace; font-weight: 600; color: var(--ink); }
+  .fund-caveat {
+    font-size: 11px;
+    cursor: help;
+    color: var(--gold);
+    margin-left: 3px;
+  }
+  .fund-note {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
   .lookup-result-card {
     margin: 0 20px 18px;
     padding: 16px 18px;
@@ -660,7 +706,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v27</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v28</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>

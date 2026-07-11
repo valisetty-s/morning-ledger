@@ -1199,12 +1199,75 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
       <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
     </div>
     ${renderEntry(stockObj)}
+    <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (PE, P/B, ROE...)</button>
+    <div id="fundamentals-panel"></div>
     ${errorNote}
     ${diagnoseLink}
   </div>`;
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
   const diagBtn = document.getElementById('diagnose-btn');
   if (diagBtn) diagBtn.addEventListener('click', () => runDiagnosticCheck(searchTerm));
+  const fundBtn = document.getElementById('fundamentals-btn');
+  if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
+}
+
+// Fundamentals are fetched on demand, one stock at a time — see the
+// backend's /api/fundamentals docstring for why this isn't bundled into
+// the bulk price fetch (it's a much slower, heavier call per stock).
+async function fetchAndShowFundamentals(ticker) {
+  const backendUrl = getBackendUrl();
+  const panel = document.getElementById('fundamentals-panel');
+  const btn = document.getElementById('fundamentals-btn');
+  if (!panel) return;
+  if (!backendUrl) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
+    return;
+  }
+
+  if (btn) btn.textContent = 'Loading…';
+  panel.innerHTML = '';
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+
+    if (!resp.ok || data.status !== 'success') {
+      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(data.error || 'Could not fetch fundamentals')}</div>`;
+      if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
+      return;
+    }
+
+    panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
+    if (btn) btn.style.display = 'none';
+  } catch (e) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(e.message || String(e))}</div>`;
+    if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
+  }
+}
+
+function fmtRatio(v, suffix) {
+  if (v == null) return '—';
+  return `${Number(v).toFixed(2)}${suffix || ''}`;
+}
+function fmtPct(v) {
+  if (v == null) return '—';
+  return `${(Number(v) * 100).toFixed(1)}%`;
+}
+
+function renderFundamentalsPanel(f) {
+  return `<div class="fundamentals-panel">
+    <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
+    <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
+    <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
+    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="yfinance has a known, documented bug (GitHub issue #903) where this figure can be significantly wrong for some stocks — treat it as indicative, not precise">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
+    <div class="fund-note">ROCE isn't shown — Yahoo Finance / yfinance doesn't provide it for any stock, confirmed directly rather than estimated.</div>
+  </div>`;
 }
 
 function clearLookupResult() {
