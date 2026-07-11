@@ -949,6 +949,25 @@ function getBackendUrl() {
   return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
 }
 
+// Sorts articles newest-first by their actual published timestamp, not by
+// whatever order the feed happened to return them in. Google News RSS is
+// not guaranteed to be strictly date-sorted (it can favor relevance), and
+// this app already learned that lesson once for overall sentiment
+// classification (see findMostRecentArticle) — this applies the same fix
+// to the DISPLAY order too, which was still using raw feed order until
+// now. Articles with an unparseable/missing date sort to the end, not the
+// front, so a dateless item never displaces a genuinely dated one from
+// the "first" position.
+function sortArticlesByDateDesc(articles) {
+  return [...articles].sort((a, b) => {
+    const ta = a.published ? new Date(a.published).getTime() : NaN;
+    const tb = b.published ? new Date(b.published).getTime() : NaN;
+    const va = isNaN(ta) ? -Infinity : ta;
+    const vb = isNaN(tb) ? -Infinity : tb;
+    return vb - va;
+  });
+}
+
 async function fetchNewsViaBackend(company, maxArticles) {
   const backendUrl = getBackendUrl();
   if (!backendUrl) {
@@ -963,7 +982,12 @@ async function fetchNewsViaBackend(company, maxArticles) {
     if (!resp.ok || data.status !== 'success') {
       return { articles: [], error: data.error || `backend returned HTTP ${resp.status}` };
     }
-    return { articles: (data.articles || []).slice(0, maxArticles), error: null };
+    // Sort BEFORE slicing to maxArticles — otherwise a genuinely newer
+    // article sitting later in the raw feed order could get cut off
+    // entirely while an older one (that happened to come first) survives
+    // the truncation. Sorting first guarantees the freshest N are kept.
+    const sorted = sortArticlesByDateDesc(data.articles || []);
+    return { articles: sorted.slice(0, maxArticles), error: null };
   } catch (e) {
     return { articles: [], error: e.message || String(e) };
   }
