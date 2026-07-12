@@ -1232,6 +1232,45 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
 // targets a specific container by id (one per stock, since the main
 // list can show many at once) instead of the fixed #fundamentals-panel
 // id the search card uses.
+// Fundamentals (PE, P/B, ROE etc.) don't meaningfully change intraday —
+// caching per stock for the rest of today avoids re-hitting Yahoo's
+// quoteSummary endpoint for something you've already looked at once.
+// This matters specifically because that endpoint is confirmed (from
+// yfinance's own GitHub issues) to be aggressively and sometimes
+// unpredictably rate-limited by Yahoo — caching is the main defense
+// available here, since retrying harder or fetching in bulk would only
+// make the underlying rate-limit problem worse, not better.
+function getCachedFundamentals(ticker) {
+  const raw = localStorage.getItem(`ml_fund_${ticker}`);
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (cached.date !== new Date().toDateString()) return null; // stale, from a previous day
+    return cached.fundamentals;
+  } catch (e) {
+    return null;
+  }
+}
+function setCachedFundamentals(ticker, fundamentals) {
+  localStorage.setItem(`ml_fund_${ticker}`, JSON.stringify({
+    date: new Date().toDateString(),
+    fundamentals,
+  }));
+}
+
+// Gives a clearer, honest message specifically for the rate-limit case,
+// rather than showing yfinance's raw error text as-is. This is a known,
+// documented Yahoo-side limit (confirmed via yfinance's own GitHub
+// issues) — not a bug in this app, and not something retrying
+// immediately will fix.
+function formatFundamentalsError(rawError) {
+  const lower = (rawError || '').toLowerCase();
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return "Yahoo Finance is rate-limiting this type of data right now — a known, temporary limit on their side (not specific to this app or this stock). Try again in a few minutes.";
+  }
+  return rawError || 'Could not fetch fundamentals';
+}
+
 async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
   const backendUrl = getBackendUrl();
   const panel = document.getElementById(targetId);
@@ -1241,28 +1280,37 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
     return;
   }
 
+  const cached = getCachedFundamentals(ticker);
+  if (cached) {
+    panel.innerHTML = renderFundamentalsPanel(cached) +
+      `<div class="fund-note">📦 From earlier today's lookup — not re-fetched, to avoid Yahoo's rate limit.</div>`;
+    btn.style.display = 'none';
+    return;
+  }
+
   const originalLabel = btn.textContent;
   btn.textContent = 'Loading…';
   btn.disabled = true;
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), 25000);
     const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
 
     if (!resp.ok || data.status !== 'success') {
-      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(data.error || 'Could not fetch fundamentals')}</div>`;
+      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(data.error))}</div>`;
       btn.textContent = originalLabel;
       btn.disabled = false;
       return;
     }
 
+    setCachedFundamentals(ticker, data.fundamentals);
     panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
     btn.style.display = 'none';
   } catch (e) {
-    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(e.message || String(e))}</div>`;
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
     btn.textContent = originalLabel;
     btn.disabled = false;
   }
@@ -1278,26 +1326,35 @@ async function fetchAndShowFundamentals(ticker) {
     return;
   }
 
+  const cached = getCachedFundamentals(ticker);
+  if (cached) {
+    panel.innerHTML = renderFundamentalsPanel(cached) +
+      `<div class="fund-note">📦 From earlier today's lookup — not re-fetched, to avoid Yahoo's rate limit.</div>`;
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+
   if (btn) btn.textContent = 'Loading…';
   panel.innerHTML = '';
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), 25000);
     const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
 
     if (!resp.ok || data.status !== 'success') {
-      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(data.error || 'Could not fetch fundamentals')}</div>`;
+      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(data.error))}</div>`;
       if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
       return;
     }
 
+    setCachedFundamentals(ticker, data.fundamentals);
     panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
     if (btn) btn.style.display = 'none';
   } catch (e) {
-    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(e.message || String(e))}</div>`;
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
     if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
   }
 }
