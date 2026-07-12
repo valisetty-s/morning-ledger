@@ -146,6 +146,19 @@ function init() {
     updateStatusBar();
   }
 
+  // Delegated listener for ribbon fundamentals buttons — necessary
+  // because entries are rendered via innerHTML on every filter/sort/
+  // fetch, which means individually-attached listeners would be wiped
+  // out on the next re-render. One listener on the stable #content
+  // container catches clicks on any current or future .ribbon-fund-btn.
+  contentEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ribbon-fund-btn');
+    if (!btn) return;
+    const ticker = btn.dataset.fundTicker;
+    const targetId = btn.dataset.fundTarget;
+    fetchAndShowInlineFundamentals(ticker, targetId, btn);
+  });
+
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     chip.addEventListener('click', () => {
       document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
@@ -1214,6 +1227,47 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
 // Fundamentals are fetched on demand, one stock at a time — see the
 // backend's /api/fundamentals docstring for why this isn't bundled into
 // the bulk price fetch (it's a much slower, heavier call per stock).
+// Same as fetchAndShowFundamentals above, but for the ribbon button in
+// the main scrolling list rather than the single-stock search card —
+// targets a specific container by id (one per stock, since the main
+// list can show many at once) instead of the fixed #fundamentals-panel
+// id the search card uses.
+async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
+  const backendUrl = getBackendUrl();
+  const panel = document.getElementById(targetId);
+  if (!panel) return;
+  if (!backendUrl) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
+    return;
+  }
+
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+
+    if (!resp.ok || data.status !== 'success') {
+      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(data.error || 'Could not fetch fundamentals')}</div>`;
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+      return;
+    }
+
+    panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
+    btn.style.display = 'none';
+  } catch (e) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(e.message || String(e))}</div>`;
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
+}
+
 async function fetchAndShowFundamentals(ticker) {
   const backendUrl = getBackendUrl();
   const panel = document.getElementById('fundamentals-panel');
@@ -1521,20 +1575,26 @@ function renderEntry(stock) {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
     }
 
-    // Stock name + ticker now live inside the ribbon itself, on their own
-    // row above the price/change/flags row — this is what moved here per
-    // the latest request, rather than sitting separately in entry-head.
+    // Stock name + ticker live inside the ribbon itself, on their own row
+    // above the price/change/flags row. A small fundamentals button sits
+    // in the data row too — tapping it fetches PE/P-B/ROE/etc. for just
+    // this one stock on demand (see the /api/fundamentals docstring in
+    // server.py for why this isn't auto-fetched for the whole portfolio:
+    // it's a much slower call per stock than the regular price fetch).
+    const cleanTickerForFund = getCleanTicker(stock.ticker);
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
         <span class="ribbon-name">${escapeHtml(stock.company)}</span>
-        <span class="ribbon-code">${escapeHtml(getCleanTicker(stock.ticker))}</span>
+        <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
       </div>
       <div class="ribbon-data-row">
         <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
         <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
+        <button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="fund-inline-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>
       </div>
-    </div>`;
+    </div>
+    <div class="fund-inline" id="fund-inline-${escapeHtml(stock.ticker)}"></div>`;
   }
 
   // Fallback header: only used when there's no quote yet (prices haven't
