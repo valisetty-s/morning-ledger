@@ -300,10 +300,23 @@
     border: 1px solid rgba(255,255,255,0.4);
     color: #FFFFFF;
     white-space: nowrap;
-    margin-left: auto;
   }
   .ribbon-fund-btn:disabled { opacity: 0.6; }
-  .fund-inline:not(:empty) { margin-top: 8px; }
+  .ribbon-fund-pill {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.16);
+    color: #FFFFFF;
+    white-space: nowrap;
+    cursor: help;
+  }
+  .ribbon-fund-pill.ribbon-fund-error {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: rgba(0,0,0,0.18);
+  }
   .entry-badge {
     font-family: -apple-system, system-ui, sans-serif;
     font-size: 9px;
@@ -720,7 +733,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v30</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v31</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>

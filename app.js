@@ -1273,18 +1273,21 @@ function formatFundamentalsError(rawError) {
 
 async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
   const backendUrl = getBackendUrl();
-  const panel = document.getElementById(targetId);
-  if (!panel) return;
+  const row = document.getElementById(targetId);
+  if (!row || !btn) return;
   if (!backendUrl) {
-    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
+    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="Set your backend URL in Settings first">⚠ backend not set</span>`;
     return;
   }
 
+  // renderEntry already checks the cache before deciding whether to show
+  // this button at all — a cached stock never gets a button in the first
+  // place, it gets pills immediately. This check only matters for the
+  // rare case where the cache was populated by something else in the
+  // brief window between render and click.
   const cached = getCachedFundamentals(ticker);
   if (cached) {
-    panel.innerHTML = renderFundamentalsPanel(cached) +
-      `<div class="fund-note">📦 From earlier today's lookup — not re-fetched, to avoid Yahoo's rate limit.</div>`;
-    btn.style.display = 'none';
+    btn.outerHTML = renderCompactFundamentalPills(cached);
     return;
   }
 
@@ -1300,19 +1303,15 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
     const data = await resp.json();
 
     if (!resp.ok || data.status !== 'success') {
-      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(data.error))}</div>`;
-      btn.textContent = originalLabel;
-      btn.disabled = false;
+      const shortMsg = (data.error || '').toLowerCase().includes('rate limit') ? '⚠ rate limited' : '⚠ unavailable';
+      btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(formatFundamentalsError(data.error))}">${shortMsg}</span>`;
       return;
     }
 
     setCachedFundamentals(ticker, data.fundamentals);
-    panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
-    btn.style.display = 'none';
+    btn.outerHTML = renderCompactFundamentalPills(data.fundamentals);
   } catch (e) {
-    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
-    btn.textContent = originalLabel;
-    btn.disabled = false;
+    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(formatFundamentalsError(e.message || String(e)))}">⚠ error</span>`;
   }
 }
 
@@ -1379,6 +1378,35 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
     <div class="fund-note">ROCE isn't shown — Yahoo Finance / yfinance doesn't provide it for any stock, confirmed directly rather than estimated.</div>
   </div>`;
+}
+
+// Compact version for the ribbon itself — short pills, not the full
+// labeled-row layout renderFundamentalsPanel uses (there's no room for
+// that inside a ribbon). Only fields with actual data get a pill; a
+// missing individual field is simply omitted rather than shown as "—",
+// since cluttering the ribbon with empty placeholders defeats the point
+// of "fits on the ribbon" in the first place.
+function renderCompactFundamentalPills(f) {
+  const pills = [];
+  if (f.trailing_pe != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
+  }
+  if (f.price_to_book != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
+  }
+  if (f.peg_ratio != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="PEG ratio — yfinance has a known bug (GitHub #903) where this can be inaccurate for some stocks">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
+  }
+  if (f.return_on_equity != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
+  }
+  if (f.debt_to_equity != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
+  }
+  if (pills.length === 0) {
+    return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
+  }
+  return pills.join('');
 }
 
 function clearLookupResult() {
@@ -1633,25 +1661,33 @@ function renderEntry(stock) {
     }
 
     // Stock name + ticker live inside the ribbon itself, on their own row
-    // above the price/change/flags row. A small fundamentals button sits
-    // in the data row too — tapping it fetches PE/P-B/ROE/etc. for just
-    // this one stock on demand (see the /api/fundamentals docstring in
-    // server.py for why this isn't auto-fetched for the whole portfolio:
-    // it's a much slower call per stock than the regular price fetch).
+    // above the price/change/flags row. Fundamentals (PE, P/B, ROE etc.)
+    // render as compact pills directly in this same data row too — if
+    // already cached from an earlier lookup today, they show immediately
+    // with no click needed; otherwise a small button fetches them on
+    // demand (see the /api/fundamentals docstring in server.py for why
+    // this is per-stock/on-demand rather than bundled into the bulk
+    // price fetch: Yahoo rate-limits this specific data source, and
+    // fetching it for all ~96 stocks at once would trigger that far
+    // worse, not avoid it).
     const cleanTickerForFund = getCleanTicker(stock.ticker);
+    const cachedFund = getCachedFundamentals(cleanTickerForFund);
+    const fundHtml = cachedFund
+      ? renderCompactFundamentalPills(cachedFund)
+      : `<button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>`;
+
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
         <span class="ribbon-name">${escapeHtml(stock.company)}</span>
         <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
       </div>
-      <div class="ribbon-data-row">
+      <div class="ribbon-data-row" id="ribbon-data-${escapeHtml(stock.ticker)}">
         <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
         <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
-        <button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="fund-inline-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>
+        ${fundHtml}
       </div>
-    </div>
-    <div class="fund-inline" id="fund-inline-${escapeHtml(stock.ticker)}"></div>`;
+    </div>`;
   }
 
   // Fallback header: only used when there's no quote yet (prices haven't
