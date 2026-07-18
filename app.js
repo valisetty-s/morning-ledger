@@ -1374,9 +1374,11 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
     <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="yfinance has a known, documented bug (GitHub issue #903) where this figure can be significantly wrong for some stocks — treat it as indicative, not precise">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Not a direct Yahoo/yfinance field — calculated here as EBIT ÷ (Total Assets − Current Liabilities) from the latest reported balance sheet and income statement">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
     <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Not a direct Yahoo/yfinance field — calculated here as Total Debt ÷ Total Assets from the latest reported balance sheet">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
     <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
-    <div class="fund-note">ROCE isn't shown — Yahoo Finance / yfinance doesn't provide it for any stock, confirmed directly rather than estimated.</div>
+    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data (Yahoo doesn't provide them as ready-made figures) — shown as "—" if that underlying data isn't reported for this stock.</div>
   </div>`;
 }
 
@@ -1400,8 +1402,14 @@ function renderCompactFundamentalPills(f) {
   if (f.return_on_equity != null) {
     pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
   }
+  if (f.roce != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="ROCE — calculated as EBIT ÷ (Total Assets − Current Liabilities), not a direct Yahoo field">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
+  }
   if (f.debt_to_equity != null) {
     pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
+  }
+  if (f.debt_ratio != null) {
+    pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio — calculated as Total Debt ÷ Total Assets, not a direct Yahoo field">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
   }
   if (pills.length === 0) {
     return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
