@@ -152,11 +152,16 @@ function init() {
   // out on the next re-render. One listener on the stable #content
   // container catches clicks on any current or future .ribbon-fund-btn.
   contentEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('.ribbon-fund-btn');
-    if (!btn) return;
-    const ticker = btn.dataset.fundTicker;
-    const targetId = btn.dataset.fundTarget;
-    fetchAndShowInlineFundamentals(ticker, targetId, btn);
+    const fundBtn = e.target.closest('.ribbon-fund-btn');
+    if (fundBtn) {
+      fetchAndShowInlineFundamentals(fundBtn.dataset.fundTicker, fundBtn.dataset.fundTarget, fundBtn);
+      return;
+    }
+    const roceBtn = e.target.closest('.ribbon-roce-btn');
+    if (roceBtn) {
+      fetchAndShowInlineRoce(roceBtn.dataset.fundTicker, roceBtn.dataset.fundTarget, roceBtn);
+      return;
+    }
   });
 
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
@@ -1258,6 +1263,19 @@ function setCachedFundamentals(ticker, fundamentals) {
   }));
 }
 
+function getCachedRoce(ticker) {
+  const raw = localStorage.getItem(`ml_roce_${ticker}`);
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (cached.date !== new Date().toDateString()) return null;
+    return cached.roce;
+  } catch (e) { return null; }
+}
+function setCachedRoce(ticker, roceData) {
+  localStorage.setItem(`ml_roce_${ticker}`, JSON.stringify({ date: new Date().toDateString(), roce: roceData }));
+}
+
 // Gives a clearer, honest message specifically for the rate-limit case,
 // rather than showing yfinance's raw error text as-is. This is a known,
 // documented Yahoo-side limit (confirmed via yfinance's own GitHub
@@ -1313,6 +1331,43 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
   } catch (e) {
     btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(formatFundamentalsError(e.message || String(e)))}">⚠ error</span>`;
   }
+}
+
+async function fetchAndShowInlineRoce(ticker, targetId, btn) {
+  const backendUrl = getBackendUrl();
+  const row = document.getElementById(targetId);
+  if (!row || !btn) return;
+  if (!backendUrl) {
+    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error">backend not set</span>`;
+    return;
+  }
+  const cached = getCachedRoce(ticker);
+  if (cached) { btn.outerHTML = renderCompactRocePills(cached); return; }
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    const resp = await fetch(`${backendUrl}/api/fundamentals/roce?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await resp.json();
+    if (!resp.ok || data.status !== 'success') {
+      const shortMsg = (data.error || '').toLowerCase().includes('rate limit') ? 'rate limited' : 'unavailable';
+      btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(data.error||'')}">⚠ ${shortMsg}</span>`;
+      return;
+    }
+    const roceData = { roce: data.roce, debt_ratio: data.debt_ratio };
+    setCachedRoce(ticker, roceData);
+    btn.outerHTML = renderCompactRocePills(roceData);
+  } catch (e) {
+    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error">⚠ error</span>`;
+  }
+}
+function renderCompactRocePills(r) {
+  const pills = [];
+  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated, not a direct Yahoo field">ROCE ${(Number(r.roce)*100).toFixed(1)}%</span>`);
+  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated, not a direct Yahoo field">DR ${(Number(r.debt_ratio)*100).toFixed(1)}%</span>`);
+  return pills.length ? pills.join('') : `<span class="ribbon-fund-pill" style="opacity:0.75">No ROCE data</span>`;
 }
 
 async function fetchAndShowFundamentals(ticker) {
@@ -1683,6 +1738,10 @@ function renderEntry(stock) {
     const fundHtml = cachedFund
       ? renderCompactFundamentalPills(cachedFund)
       : `<button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>`;
+    const cachedRoce = getCachedRoce(cleanTickerForFund);
+    const roceHtml = cachedRoce
+      ? renderCompactRocePills(cachedRoce)
+      : `<button class="ribbon-roce-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📈 ROCE</button>`;
 
     ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
@@ -1694,6 +1753,7 @@ function renderEntry(stock) {
         <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
         ${fundHtml}
+        ${roceHtml}
       </div>
     </div>`;
   }
