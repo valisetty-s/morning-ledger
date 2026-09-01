@@ -130,7 +130,15 @@
   .sentiment-dot.neutral { background: var(--rule-strong); }
   .sentiment-dot.positive { background: var(--sage); }
 
-  .entry.has-negative { border-left: 2px solid var(--clay); padding-left: 10px; margin-left: -12px; }
+  .entry.has-negative {
+    background: rgba(176, 58, 46, 0.07) !important;
+    border-left: 3px solid var(--clay);
+    border-radius: 6px;
+    padding-left: 10px;
+    margin-left: -2px;
+  }
+  .entry.has-negative .entry-name,
+  .entry.has-negative .ribbon-name { color: var(--clay); }
 
   /* ---------- REFRESH BAR ---------- */
   .refresh-bar {
@@ -235,11 +243,11 @@
     margin-top: 8px;
     padding: 10px 14px;
     border-radius: 9px;
-    color: #FFFFFF;
+    color: var(--ink);
   }
-  .price-ribbon.ribbon-pos { background: var(--sage); }
-  .price-ribbon.ribbon-neg { background: var(--clay); }
-  .price-ribbon.ribbon-neu { background: var(--ink-soft); }
+  .price-ribbon.ribbon-pos { background: #FFFFFF; border-left: 4px solid var(--sage); }
+  .price-ribbon.ribbon-neg { background: #FFFFFF; border-left: 4px solid var(--clay); }
+  .price-ribbon.ribbon-neu { background: #FFFFFF; border-left: 4px solid var(--rule-strong); }
   .ribbon-name-row {
     display: flex;
     align-items: baseline;
@@ -276,7 +284,7 @@
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.3px;
-    background: rgba(255,255,255,0.2);
+    background: var(--paper-dim);
     padding: 3px 8px;
     border-radius: 4px;
     flex-shrink: 0;
@@ -287,7 +295,7 @@
     font-weight: 700;
     padding: 3px 9px;
     border-radius: 100px;
-    background: rgba(255,255,255,0.22);
+    background: var(--paper-dim);
     white-space: nowrap;
   }
   .ribbon-fund-btn, .ribbon-roce-btn {
@@ -296,9 +304,9 @@
     font-weight: 700;
     padding: 3px 9px;
     border-radius: 100px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.4);
-    color: #FFFFFF;
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    color: var(--ink);
     white-space: nowrap;
   }
   .ribbon-fund-btn:disabled, .ribbon-roce-btn:disabled { opacity: 0.6; }
@@ -308,14 +316,14 @@
     font-weight: 700;
     padding: 3px 8px;
     border-radius: 5px;
-    background: rgba(255,255,255,0.16);
-    color: #FFFFFF;
+    background: var(--paper-dim);
+    color: var(--ink);
     white-space: nowrap;
     cursor: help;
   }
   .ribbon-fund-pill.ribbon-fund-error {
     font-family: -apple-system, system-ui, sans-serif;
-    background: rgba(0,0,0,0.18);
+    background: var(--rule);
   }
   .entry-badge {
     font-family: -apple-system, system-ui, sans-serif;
@@ -729,32 +737,13 @@
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
 
-  /* ── Price down today: bold red on price + change % only ── */
-  .price-down {
-    color: #C0392B !important;
-    font-weight: 800 !important;
-    font-size: 1.08em !important;
-    letter-spacing: -0.01em;
-  }
+  /* Explicit white card background */
+  .entry { background: #FFFFFF; border-bottom: 1px solid var(--rule); }
 
-  /* ── Negative news sentiment: full card red tint ──────────── */
-  /* Only fires on news-negative, not on price-down alone.      */
-  .entry.has-negative {
-    background: rgba(192, 57, 43, 0.06);
-    border-left: 3px solid #C0392B;
-    border-radius: 6px;
-    padding-left: 10px;
-    margin-left: -2px;
-  }
-  .entry.has-negative .entry-name,
-  .entry.has-negative .ribbon-name {
-    color: #C0392B;
-  }
-  .entry.has-negative .headline a {
-    color: #7B241C;
-  }
-
-  </style>
+  /* Price direction: ONLY the price+% spans get coloured bold text */
+  .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
+  .price-down { color: #B03A2E !important; font-weight: 800 !important; }
+</style>
 </head>
 <body>
 
