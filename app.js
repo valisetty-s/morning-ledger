@@ -58,11 +58,14 @@ const DEFAULT_STOCKS = [
 ];
 
 const TIER_LABELS = {
-  "Top30": "⭐ Top 30",
-  "Top31-50": "Ranks 31–50",
-  "Top51-75": "Ranks 51–75",
-  "Watch": "Watch list",
+  "Top30":    "✅ Accumulate",
+  "Top31-50": "🔵 Hold",
+  "Top51-75": "🟡 Trim",
+  "Watch":    "🔴 Exit",
 };
+// These labels are Claude's analytical opinion for display purposes only —
+// not financial advice. Underlying tier keys (Top30/Top31-50/Top51-75/Watch)
+// are unchanged so existing saved stock lists keep working without migration.
 const TIER_ORDER = ["Top30", "Top31-50", "Top51-75", "Watch"];
 
 // Helper function to clean ticker (remove -BE suffix for display)
@@ -923,22 +926,6 @@ function applySorting(stocks, sortType) {
         return chgA - chgB;
       });
       break;
-    case 'volume-high':
-      // High volume first
-      sorted.sort((a, b) => {
-        const volA = (a.quote && a.quote.volume_flag === 'high') ? 1 : 0;
-        const volB = (b.quote && b.quote.volume_flag === 'high') ? 1 : 0;
-        return volB - volA;
-      });
-      break;
-    case 'volume-low':
-      // Low volume first
-      sorted.sort((a, b) => {
-        const volA = (a.quote && a.quote.volume_flag === 'low') ? 1 : 0;
-        const volB = (b.quote && b.quote.volume_flag === 'low') ? 1 : 0;
-        return volB - volA;
-      });
-      break;
     case 'default':
     default:
       // Alphabetical by company name — the default view now, rather than
@@ -1711,12 +1698,8 @@ function renderEntry(stock) {
     const ribbonClass = chg == null ? 'ribbon-neu' : (chg > 0 ? 'ribbon-pos' : (chg < 0 ? 'ribbon-neg' : 'ribbon-neu'));
     const chgSign = chg != null && chg > 0 ? '+' : '';
 
+    // Volume flags removed — only 52-week extremes shown
     let flagsHtml = '';
-    if (stock.quote.volume_flag === 'high') {
-      flagsHtml += `<span class="ribbon-flag" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the recent average">▲ HIGH VOLUME</span>`;
-    } else if (stock.quote.volume_flag === 'low') {
-      flagsHtml += `<span class="ribbon-flag" title="Today's volume is ${stock.quote.volume_vs_avg_pct}% of the recent average">▼ LOW VOLUME</span>`;
-    }
     if (stock.quote.near_52wk_flag === 'near-high') {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week high of ₹${stock.quote.fifty_two_wk_high}">52WK HIGH</span>`;
     } else if (stock.quote.near_52wk_flag === 'near-low') {
@@ -1749,8 +1732,8 @@ function renderEntry(stock) {
         <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
       </div>
       <div class="ribbon-data-row" id="ribbon-data-${escapeHtml(stock.ticker)}">
-        <span class="ribbon-price">₹${stock.quote.last_price.toFixed(2)}</span>
-        <span class="ribbon-change">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
+        <span class="ribbon-price${chg != null && chg < 0 ? ' price-down' : ''}">₹${stock.quote.last_price.toFixed(2)}</span>
+        <span class="ribbon-change${chg != null && chg < 0 ? ' price-down' : ''}">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
         ${fundHtml}
         ${roceHtml}

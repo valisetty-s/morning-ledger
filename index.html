@@ -728,7 +728,33 @@
   .kite-status-info { background: var(--paper-dim); color: var(--ink-soft); border: 1px solid var(--rule); }
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
-</style>
+
+  /* ── Price down today: bold red on price + change % only ── */
+  .price-down {
+    color: #C0392B !important;
+    font-weight: 800 !important;
+    font-size: 1.08em !important;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Negative news sentiment: full card red tint ──────────── */
+  /* Only fires on news-negative, not on price-down alone.      */
+  .entry.has-negative {
+    background: rgba(192, 57, 43, 0.06);
+    border-left: 3px solid #C0392B;
+    border-radius: 6px;
+    padding-left: 10px;
+    margin-left: -2px;
+  }
+  .entry.has-negative .entry-name,
+  .entry.has-negative .ribbon-name {
+    color: #C0392B;
+  }
+  .entry.has-negative .headline a {
+    color: #7B241C;
+  }
+
+  </style>
 </head>
 <body>
 
@@ -745,10 +771,10 @@
 <div class="toolbar" id="toolbar">
   <button class="chip active" data-filter="all">All holdings</button>
   <button class="chip" data-filter="fresh">Fresh news only</button>
-  <button class="chip" data-filter="Top30">⭐ Top 30</button>
-  <button class="chip" data-filter="Top31-50">Ranks 31–50</button>
-  <button class="chip" data-filter="Top51-75">Ranks 51–75</button>
-  <button class="chip" data-filter="Watch">Watch list</button>
+  <button class="chip" data-filter="Top30">✅ Accumulate</button>
+  <button class="chip" data-filter="Top31-50">🔵 Hold</button>
+  <button class="chip" data-filter="Top51-75">🟡 Trim</button>
+  <button class="chip" data-filter="Watch">🔴 Exit</button>
 </div>
 
 <div class="toolbar sentiment-toolbar" id="sentiment-toolbar">
@@ -761,8 +787,6 @@
   <button class="chip sort-chip active" data-sort="default">A–Z (default)</button>
   <button class="chip sort-chip" data-sort="change-desc">↑ Gainers first</button>
   <button class="chip sort-chip" data-sort="change-asc">↓ Losers first</button>
-  <button class="chip sort-chip" data-sort="volume-high">▲ High volume</button>
-  <button class="chip sort-chip" data-sort="volume-low">▼ Low volume</button>
 </div>
 
 <div class="refresh-bar">
