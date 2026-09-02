@@ -794,92 +794,246 @@ function showKiteStatus(msg, type) {
 // words ("jump", "fall", "slip", "gain", "decline") that actually dominate
 // real headlines. This version adds that common vocabulary while keeping
 // the original specific phrases (which were accurate, just incomplete).
-const NEGATIVE_WORDS = [
-  // regulatory / legal / governance
-  'fraud', 'scam', 'probe', 'investigat', 'raid', 'fir filed', 'sebi action',
-  'sebi order', 'rbi restriction', 'rbi flags', 'rbi imposes', 'cbi', 'ed raid',
-  'scrutiny', 'non-compliance', 'governance issue', 'accounting lapse', 'lapses',
-  'show cause notice', 'irregularit',
-  // financial distress
-  'downgrade', 'default', 'bankrupt', 'insolven', 'liquidat', 'debt-laden',
-  'debt trap', 'rating cut', 'outlook negative', 'restructuring debt',
-  'fundraising delay', 'fundraise concern', 'cash crunch', 'going concern',
-  // earnings / performance — common everyday phrasing
-  'net loss', 'posts loss', 'loss widens', 'profit declin', 'profit falls',
-  'profit drops', 'profit slips', 'profit dips', 'revenue falls', 'revenue declin',
-  'misses estimate', 'falls short', 'below estimate', 'disappoint', 'muted outlook',
-  'weak quarter', 'weak earnings', 'margin contraction', 'margin pressure',
-  'margin squeeze', 'cost overrun', 'input cost', 'profit warning', 'lowered guidance',
-  // everyday stock movement words — this is the category that was missing
-  'shares fall', 'shares falls', 'shares slip', 'shares slips', 'shares slide',
-  'shares slides', 'shares drop', 'shares drops', 'shares decline', 'shares tank',
-  'shares tanks', 'shares tumble', 'shares crash', 'shares plunge', 'shares sink',
-  'shares dip', 'shares dips', 'shares edge lower', 'shares trade lower',
-  'stock falls', 'stock slips', 'stock slides', 'stock drops', 'stock declines',
-  'stock tanks', 'stock tumbles', 'stock crashes', 'stock plunges', 'stock dips',
-  '52-week low', 'hits low', 'multi-year low', 'underperform', 'sell rating',
-  'red flag', 'concern over', 'warns of', 'cautious outlook', 'weak demand',
-  'demand slowdown', 'sales decline', 'sales fall', 'sales drop',
-  // leadership / operations
-  'resign', 'steps down', 'quits', 'sacked', 'fired', 'arrest', 'lawsuit', 'sued',
-  'penalty', 'fine imposed', 'ban', 'banned', 'halted', 'suspend', 'delisted',
-  'strike', 'shutdown', 'shuts down', 'layoff', 'job cut', 'recall',
-  'breach', 'hack', 'cyberattack', 'data leak', 'accident', 'fire breaks',
-  'explosion', 'death', 'killed', 'protest', 'boycott', 'controversy',
-  'stake sale concern', 'pledge shares', 'promoter sells', 'promoter pledg',
-  'fii exit', 'fii selling', 'delay in', 'order cancel', 'contract terminat',
+// ── Sentiment classification ─────────────────────────────────────────────
+//
+// Three-phase scoring, built for Indian financial news:
+//
+// Phase 1: Strong compound phrases checked first — these override everything.
+//   "avoids default" must not trigger on "default" alone.
+//   "turns profitable" must beat any incidental negative word nearby.
+//
+// Phase 2: Negation-aware weighted scoring. Negative keywords near a
+//   negation word ("avoids", "not", "no", "clears", "dismisses") are
+//   neutralised. Positive keywords are not negated this way.
+//
+// Phase 3: Score threshold → negative / positive / neutral.
+//   Threshold is -2 (not -1) so a single weak negative word like "concern"
+//   or "dip" in an otherwise flat headline doesn't flag the whole stock.
+//
+// False negatives (missing a real negative) are preferred over false
+// positives (marking good news as bad). When in doubt: neutral.
+
+const STRONG_POSITIVE_PHRASES = [
+  'turns profitable','back in black','debt-free','net debt free','zero debt',
+  'becomes debt free','avoids default','clears all debt','fully repaid',
+  'record profit','record revenue','record order book','record order inflow',
+  'all-time high','52-week high','lifetime high','multi-year high',
+  'gets clean chit','given clean chit','clean chit from','court dismisses plea',
+  'nclt dismisses','no penalty imposed','penalty waived','fine waived',
+  'sebi gives nod','sebi approves','rbi approves','gets sebi nod',
+  'shares recover','stock recovers','bounces back','rebounds strongly',
+  'wins defence order','bags defence order','l1 bidder','preferred bidder',
+  'order inflow record','order book grows','order book up','order book highest',
+  'usfda nod','usfda approval','dcgi approval','fda clears','drug approved',
+  'qip subscribed','ipo subscribed','oversubscribed',
+  'promoter raises stake','promoter increases stake','promoter buys back',
+  'fii increases stake','fii raises stake',
+  'pat up','pat rises','pat jumps','pat surges','pat grows','pat doubles',
+  'ebitda up','ebitda rises','ebitda grows','ebitda beats',
+  'net profit rises','net profit up','net profit jumps','net profit grows',
+  'net profit doubles','net profit triples','net profit beats',
+  'revenue up','revenue rises','revenue grows','revenue beats',
+  'anti-dumping duty','anti-dumping relief','pli benefit','pli approved',
+  'bags rs ','bags inr','wins rs ','wins inr','secures rs ',
 ];
 
-const POSITIVE_WORDS = [
-  // earnings / performance — common everyday phrasing first
-  'profit rises', 'profit rise', 'profit jumps', 'profit surges', 'profit soars',
-  'profit grows', 'profit climbs', 'profit beats', 'revenue rises', 'revenue grows',
-  'revenue jumps', 'revenue surges', 'beats estimate', 'beats street', 'tops estimate',
-  'beat street view', 'strong quarter', 'strong earnings', 'strong show',
-  'raises guidance', 'raises outlook', 'improved margin', 'margin expansion',
-  'strong growth', 'robust growth', 'strong demand', 'demand surge',
-  // everyday stock movement words — same gap as the negative list had
-  'shares jump', 'shares jumps', 'shares rise', 'shares rises', 'shares gain',
-  'shares gains', 'shares surge', 'shares surges', 'shares rally', 'shares rallies',
-  'shares climb', 'shares climbs', 'shares soar', 'shares soars', 'shares advance',
-  'shares advances', 'shares up', 'stock jumps', 'stock rises', 'stock gains',
-  'stock surges', 'stock rallies', 'stock climbs', 'stock soars', 'stock advances',
-  '52-week high', 'all-time high', 'record high', 'hits high', 'multi-year high',
-  'outperform', 'buy rating', 'target price raised', 'upgrade', 'rating upgrade',
-  'outlook positive', 'top gainer', 'best performer',
-  // deals / corporate actions
-  'wins order', 'wins contract', 'wins record', 'wins deal', 'secures order',
-  'bags order', 'bags contract', 'new contract', 'gets nod', 'gets approval',
-  'usfda nod', 'receives approval', 'expansion plan', 'capacity expansion',
-  'buyback', 'dividend announce', 'special dividend', 'bonus issue', 'stock split',
-  'partnership with', 'strategic tie-up', 'joint venture', 'acquisition complete',
-  'foray into', 'launches', 'unveils', 'breakthrough', 'patent grant',
-  'fii buying', 'institutional buying', 'promoter buys', 'stake increase',
-  'debt-free', 'turns profitable', 'pre-sales',
-  // these specific patterns catch real headlines where an amount sits
-  // between the verb and "order" (e.g. "bags 300 MW wind order", "wins
-  // Rs 5,000 crore order") without using a bare standalone "wins"/"bags"
-  // match, which tested as a false-positive risk on cases like "bags a
-  // fine" — narrower phrasing here trades a little recall for safety.
-  'wind order', 'mw order', 'crore order', 'rs order', 'export order',
-  'raises guidance', 'raises outlook', 'raises fy', 'raises revenue guidance',
+const STRONG_NEGATIVE_PHRASES = [
+  'files for bankruptcy','files bankruptcy petition','declared bankrupt',
+  'nclt admits insolvency','insolvency proceedings initiated','cirp initiated',
+  'goes into liquidation','winding up order','winding-up petition',
+  'promoter pledges entire','promoter pledges all shares',
+  'zero revenue quarter','nil revenue',
+  'default on payment','fails to repay','loan account npa',
+  'account declared npa','classified as npa','asset classified npa',
+  'statutory auditor resigns','auditor quits citing','auditor flags concern',
+  'going concern doubt','going concern qualification','going concern risk',
+  'sebi bars','sebi bans','sebi debarred','rbi cancels licence','rbi revokes',
+  'rbi imposes penalty','ed attaches assets','cbi arrests','ed arrests',
+  'pat falls','pat declines','pat drops','pat slips','pat down','pat shrinks',
+  'reports net loss','posts net loss','net loss widens','loss deepens',
+  'net profit falls','net profit declines','net profit drops',
+  'net profit down','net profit slips','net profit halves','net profit plunges',
+  'revenue falls','revenue declines','revenue drops','revenue down',
+  'ebitda falls','ebitda down','ebitda drops','ebitda declines','ebitda loss',
+  'ebitda margin contracts','ebitda margin falls','margin contracts',
+];
+
+const NEGATION_WORDS = [
+  'avoids ','avoided ','no ','not ','doesn't','does not','did not','didnt',
+  'cannot','can't','denies','denied','dismisses','dismissed','clears ',
+  'cleared ','resolves','resolved','rejects','rejected','rules out',
+  'refutes','refuted','allays','allayed','dispels','dispelled',
+  'unfounded','no merit','no evidence','quashes','quashed','overturns','stayed',
+  'no concern','no default','not guilty','acquitted','exonerated',
+];
+
+// [keyword, weight] — weight 1 = moderate, 2 = strong signal
+const NEGATIVE_KEYWORDS = [
+  // regulatory / legal
+  ['fraud',2],['scam',2],['money laundering',2],['bribery',2],
+  ['arrested',2],['chargesheet',2],['fir filed',2],['fir against',2],
+  ['ed raid',2],['cbi raid',2],['cbi probe',2],['it raid',2],['i-t raid',2],
+  ['sebi probe',1],['sebi order',1],['sebi action',1],['sebi notice',1],
+  ['rbi penalty',2],['rbi notice',1],['rbi flags',1],['rbi bars',2],
+  ['nclt',1],['nclat',1],['irdai notice',1],['trai notice',1],
+  ['gst notice',1],['gst demand',1],['tax demand',1],['tax evasion',2],
+  ['show cause notice',1],['demand notice',1],['non-compliance',1],
+  ['irregularit',1],['accounting lapse',2],['governance concern',1],
+  ['misrepresent',2],['audit qualif',2],['audit objection',1],
+  // financial distress
+  ['default',2],['bankrupt',2],['insolven',2],['liquidat',2],
+  ['npa',2],['debt trap',2],['cash crunch',2],['going concern',2],
+  ['debt-laden',1],['overleveraged',1],['covenant breach',2],
+  ['rating cut',1],['downgrade',1],['outlook negative',1],
+  ['credit watch negative',2],['restructuring debt',1],['debt restructur',1],
+  ['fundraising struggle',1],['write-off',2],['impairment',2],['provisions rise',1],
+  // earnings / guidance
+  ['net loss',2],['loss widens',2],['loss deepens',2],
+  ['profit declin',1],['profit slump',2],['profit miss',1],
+  ['below estimate',1],['misses estimate',1],['misses expectation',1],
+  ['below expectation',1],['disappoints',1],['disappointing quarter',1],
+  ['weak quarter',1],['weak earnings',1],['muted quarter',1],
+  ['margin pressure',1],['margin squeeze',1],['cost overrun',1],
+  ['input cost pressure',1],['raw material cost rise',1],
+  ['profit warning',2],['lowered guidance',1],['cuts guidance',1],
+  ['guidance cut',1],['outlook cut',1],['muted outlook',1],
+  ['cautious outlook',1],['weak demand',1],['demand slowdown',1],
+  ['sales decline',1],['sales fall',1],['volume decline',1],
+  ['agr dues',1],['spectrum dues',1],['import duty cut',1],
+  // stock price movement
+  ['shares fall',1],['shares slip',1],['shares slide',1],
+  ['shares drop',1],['shares tank',2],['shares tumble',2],
+  ['shares crash',2],['shares plunge',2],['shares sink',2],
+  ['stock falls',1],['stock slips',1],['stock slides',1],
+  ['stock drops',1],['stock tanks',2],['stock tumbles',2],
+  ['stock crashes',2],['stock plunges',2],['stock sinks',2],
+  ['52-week low',2],['multi-year low',2],['all-time low',2],
+  ['hits low',1],['touches low',1],['new low',1],
+  ['sell rating',1],['underperform rating',1],['reduce rating',1],
+  ['target cut',1],['price target cut',1],['target price reduced',1],
+  // corporate / leadership
+  ['resign',1],['steps down',1],['sacked',2],['fired',2],['termination',1],
+  ['lawsuit',1],['sued',1],['legal notice',1],
+  ['penalty imposed',1],['fine imposed',1],['fine of rs',1],['fine of inr',1],
+  ['banned',2],['debarred',2],['licence cancelled',2],
+  ['halted',1],['suspended',1],['trading halt',1],['delisted',2],
+  ['layoff',1],['job cut',1],['retrenchment',1],['workforce reduction',1],
+  ['plant shutdown',2],['factory shutdown',2],['shuts plant',2],
+  ['recall',1],['product recall',2],
+  ['data breach',2],['cyberattack',2],['ransomware',2],
+  ['accident at',1],['explosion at',2],['fire at plant',2],
+  ['strike',1],['labour unrest',2],['worker strike',2],
+  ['promoter pledge',1],['pledge increases',1],['promoter sells stake',1],
+  ['fii exit',1],['fii selling',1],['fii reduces stake',1],
+  ['order cancell',2],['contract terminat',2],['order cancelled',2],
+  ['project delay',1],['execution delay',1],['delay in commissioning',1],
+];
+
+const POSITIVE_KEYWORDS = [
+  // earnings
+  ['profit rises',1],['profit jumps',2],['profit surges',2],
+  ['profit soars',2],['profit grows',1],['profit climbs',1],
+  ['profit beats',1],['profit doubles',2],['profit triples',2],['profit up',1],
+  ['revenue rises',1],['revenue grows',1],['revenue jumps',2],
+  ['revenue surges',2],['revenue up',1],['revenue beats',1],
+  ['beats estimate',1],['beats expectation',1],['tops estimate',1],
+  ['exceeds estimate',1],['ahead of estimate',1],
+  ['strong quarter',1],['robust quarter',1],['stellar quarter',2],
+  ['raises guidance',1],['upgrades guidance',1],['raises fy guidance',1],
+  ['margin expansion',1],['margin improves',1],['improved margins',1],
+  ['strong demand',1],['demand surge',2],['demand uptick',1],
+  ['capacity utilisation rises',1],['utilisation improves',1],
+  // stock movement
+  ['shares jump',1],['shares rise',1],['shares gain',1],
+  ['shares surge',2],['shares rally',1],['shares climb',1],
+  ['shares soar',2],['shares advance',1],['shares up',1],
+  ['shares hit high',2],['shares touch high',2],['shares scale high',2],
+  ['stock jumps',1],['stock rises',1],['stock gains',1],
+  ['stock surges',2],['stock rallies',1],['stock climbs',1],
+  ['stock soars',2],['stock advances',1],['stock hits high',2],
+  ['outperforms',1],['top gainer',1],['best performer',1],
+  ['buy rating',1],['strong buy',2],['accumulate rating',1],
+  ['rating upgrade',1],['upgraded to buy',1],['outlook upgraded',1],
+  ['target raised',1],['target price raised',1],['price target hiked',1],
+  // orders / wins
+  ['wins order',2],['wins contract',2],['bags order',2],
+  ['bags contract',2],['secures order',2],['secures contract',2],
+  ['gets order',1],['receives order',1],['new order',1],
+  ['order win',2],['preferred bidder',2],['export order',1],
+  ['repeat order',1],['order book record',2],['strong order book',1],
+  ['order pipeline',1],['order inflow',1],
+  // approvals
+  ['gets nod',1],['gets approval',1],['receives approval',1],
+  ['usfda nod',2],['usfda approval',2],['fda approval',2],
+  ['dcgi approval',2],['drug approval',2],['patent granted',2],
+  ['environmental clearance',1],['sebi nod',1],['rbi nod',1],
+  // corporate actions
+  ['buyback',1],['share buyback',2],['dividend declared',1],
+  ['interim dividend',1],['special dividend',2],['bumper dividend',2],
+  ['bonus shares',1],['stock split',1],
+  ['qip successful',1],['qip subscribed',1],
+  // deals / partnerships
+  ['strategic partnership',1],['joint venture',1],['merger approved',1],
+  ['acquisition complete',1],['mou signed',1],['agreement signed',1],
+  ['foray into',1],['enters new market',1],
+  // capacity / expansion
+  ['capacity expansion',1],['expansion plan',1],['new plant',1],
+  ['capex plan',1],['scale up',1],['greenfield project',1],
+  // institutional interest
+  ['fii buying',1],['fii increases',1],['promoter buys',1],
+  ['institutional buying',1],['dii buying',1],['mutual fund buying',1],
+  // balance sheet improvement
+  ['debt reduction',1],['reduces debt',1],['repays loan',1],
+  ['loan repaid',1],['credit upgrade',2],['rating upgraded',2],
+  ['outlook positive',1],['outlook upgraded',1],
+  // misc
+  ['product launch',1],['new launch',1],['breakthrough',2],
+  ['pli incentive',1],['pli benefit',1],['subsidy received',1],
+  ['pre-sales strong',1],['strong pre-sales',1],
 ];
 
 function classifySentiment(title) {
   if (!title) return 'neutral';
   const lower = title.toLowerCase();
-  const hasNegative = NEGATIVE_WORDS.some(w => lower.includes(w));
-  const hasPositive = POSITIVE_WORDS.some(w => lower.includes(w));
-  if (hasNegative && !hasPositive) return 'negative';
-  if (hasPositive && !hasNegative) return 'positive';
-  if (hasNegative && hasPositive) return 'negative';
+
+  // Phase 1: strong compound phrases override everything
+  for (const phrase of STRONG_POSITIVE_PHRASES) {
+    if (lower.includes(phrase)) return 'positive';
+  }
+  for (const phrase of STRONG_NEGATIVE_PHRASES) {
+    if (lower.includes(phrase)) return 'negative';
+  }
+
+  // Phase 2: check if headline contains a negation word
+  const hasNegation = NEGATION_WORDS.some(n => lower.includes(n));
+
+  let score = 0;
+
+  for (const [word, weight] of NEGATIVE_KEYWORDS) {
+    if (lower.includes(word)) {
+      if (hasNegation) {
+        // Negation neutralises weak negatives; halves strong ones
+        if (weight >= 2) score -= 1;
+        // else skip: e.g. "no concerns", "avoids default" → don't penalise
+      } else {
+        score -= weight;
+      }
+    }
+  }
+
+  for (const [word, weight] of POSITIVE_KEYWORDS) {
+    if (lower.includes(word)) {
+      score += weight;
+    }
+  }
+
+  // Threshold -2: single weak word like "concern" or "dip" alone = neutral
+  if (score <= -2) return 'negative';
+  if (score >= 1)  return 'positive';
   return 'neutral';
 }
 
-// Finds the article with the most recent actual publish timestamp, rather
-// than trusting feed order (Google News RSS is not guaranteed to be
-// strictly date-sorted — it can favor relevance). Falls back to the first
-// article in the list only if none of them have a parseable date at all.
+
 function findMostRecentArticle(articles) {
   if (!articles || articles.length === 0) return null;
   let latest = null;
