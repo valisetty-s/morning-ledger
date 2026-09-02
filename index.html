@@ -130,15 +130,8 @@
   .sentiment-dot.neutral { background: var(--rule-strong); }
   .sentiment-dot.positive { background: var(--sage); }
 
-  .entry.has-negative {
-    background: rgba(176, 58, 46, 0.07) !important;
-    border-left: 3px solid var(--clay);
-    border-radius: 6px;
-    padding-left: 10px;
-    margin-left: -2px;
-  }
-  .entry.has-negative .entry-name,
-  .entry.has-negative .ribbon-name { color: var(--clay); }
+  /* has-negative: no background coloring — only the sentiment dot and badge signal negative news */
+  .entry.has-negative { border-left: none; }
 
   /* ---------- REFRESH BAR ---------- */
   .refresh-bar {
@@ -245,9 +238,9 @@
     border-radius: 9px;
     color: var(--ink);
   }
-  .price-ribbon.ribbon-pos { background: #FFFFFF; border-left: 4px solid var(--paper); }
-  .price-ribbon.ribbon-neg { background: #FFFFFF; border-left: 4px solid var(--paper); }
-  .price-ribbon.ribbon-neu { background: #FFFFFF; border-left: 4px solid var(--rule-strong); }
+  .price-ribbon.ribbon-pos,
+  .price-ribbon.ribbon-neg,
+  .price-ribbon.ribbon-neu { background: var(--paper); }
   .ribbon-name-row {
     display: flex;
     align-items: baseline;
@@ -258,7 +251,7 @@
     font-family: 'Georgia', serif;
     font-size: 15px;
     font-weight: 700;
-    color: #FFFFFF;
+    color: var(--ink);
     line-height: 1.25;
   }
   .ribbon-data-row {
@@ -737,8 +730,7 @@
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
 
-  /* Explicit white card background */
-  .entry { background: #FFFFFF; border-bottom: 1px solid var(--rule); }
+  .entry { background: var(--paper); }
 
   /* Price direction: ONLY the price+% spans get coloured bold text */
   .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
