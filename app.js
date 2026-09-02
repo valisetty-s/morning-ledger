@@ -88,7 +88,7 @@ const Store = {
     try { return JSON.parse(raw); } catch { return null; }
   },
   setCache: (obj) => localStorage.setItem('ml_news_cache', JSON.stringify(obj)),
-  getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || '',
+  getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || DEFAULT_KITE_API_KEY,
   setKiteApiKey: (v) => localStorage.setItem('ml_kite_api_key', v),
   // Deliberately NO access_token storage here. Earlier versions stored it
   // in localStorage with a same-day expiry check, but that mechanism kept
@@ -99,6 +99,11 @@ const Store = {
   // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
+
+// Default credentials — used when localStorage is empty (e.g. incognito mode).
+// localStorage values always override these if they exist.
+const DEFAULT_BACKEND_URL = 'https://kite-portfolio.onrender.com';
+const DEFAULT_KITE_API_KEY = 'av7jcofmfblpij52';
 
 // ---------- State ----------
 let currentFilter = 'all';
@@ -309,10 +314,11 @@ function openSettings() {
   const stocks = Store.getStocks();
   $('#stocklist-input').value = stocks.map(s => s.join(',')).join('\n');
   // Pre-fill saved Kite API key and backend URL if any
-  const savedKey = Store.getKiteApiKey();
-  if (savedKey) $('#kite-api-key-input').value = savedKey;
-  const savedBackend = localStorage.getItem(KITE_BACKEND_URL_KEY);
-  if (savedBackend) $('#kite-backend-url-input').value = savedBackend;
+  // Always populate with the resolved value (localStorage → default).
+  // In incognito, localStorage is empty so the hardcoded defaults show up,
+  // meaning the user never sees a blank field.
+  $('#kite-api-key-input').value  = Store.getKiteApiKey();
+  $('#kite-backend-url-input').value = getBackendUrl();
   $('#settings-overlay').classList.add('open');
 }
 function closeSettings() {
@@ -619,7 +625,7 @@ function checkKiteOAuthCallback() {
 
   const requestToken = params.get('request_token');
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
-  const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
+  const backendUrl = getBackendUrl();  // uses default if localStorage empty
 
   // Clean the URL immediately, synchronously, before anything else — so
   // there's no window where a re-render or navigation could re-read the
@@ -950,7 +956,7 @@ function applySorting(stocks, sortType) {
 // set in Settings — the same field used for Kite login.
 
 function getBackendUrl() {
-  return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
+  return localStorage.getItem(KITE_BACKEND_URL_KEY) || DEFAULT_BACKEND_URL;
 }
 
 // Sorts articles newest-first by their actual published timestamp, not by
