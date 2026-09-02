@@ -144,13 +144,19 @@ function timeLabel(isoString) {
 
 // ---------- Init ----------
 function init() {
+  try {
   datelineDate.textContent = todayLabel();
 
   const cached = Store.getCache();
   if (cached && cached.results) {
-    newsData = cached;
-    renderContent();
-    updateStatusBar();
+    try {
+      newsData = cached;
+      renderContent();
+      updateStatusBar();
+    } catch (renderErr) {
+      console.error('[MorningLedger] Error rendering cached data:', renderErr);
+      // Don't let a render error stop the rest of init from running
+    }
   }
 
   // Delegated listener for ribbon fundamentals buttons — necessary
@@ -269,6 +275,16 @@ function init() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+
+  } catch (initErr) {
+    console.error('[MorningLedger] init() error — some features may not work:', initErr);
+    // Still try to attach the settings listener even if init crashed
+    const fab = document.getElementById('settings-fab');
+    if (fab && !fab._settingsWired) {
+      fab.addEventListener('click', openSettings);
+      fab._settingsWired = true;
+    }
+  }
 }
 
 function updateStatusBar() {
@@ -311,15 +327,17 @@ function updatePriceStatus() {
 
 // ---------- Settings panel ----------
 function openSettings() {
-  const stocks = Store.getStocks();
-  $('#stocklist-input').value = stocks.map(s => s.join(',')).join('\n');
-  // Pre-fill saved Kite API key and backend URL if any
-  // Always populate with the resolved value (localStorage → default).
-  // In incognito, localStorage is empty so the hardcoded defaults show up,
-  // meaning the user never sees a blank field.
-  $('#kite-api-key-input').value  = Store.getKiteApiKey();
-  $('#kite-backend-url-input').value = getBackendUrl();
-  $('#settings-overlay').classList.add('open');
+  try {
+    const stocks = Store.getStocks();
+    const el = (id) => document.getElementById(id);
+    if (el('stocklist-input'))       el('stocklist-input').value       = stocks.map(s => s.join(',')).join('\n');
+    if (el('kite-api-key-input'))    el('kite-api-key-input').value    = Store.getKiteApiKey();
+    if (el('kite-backend-url-input')) el('kite-backend-url-input').value = getBackendUrl();
+    const overlay = el('settings-overlay');
+    if (overlay) overlay.classList.add('open');
+  } catch (e) {
+    console.error('[MorningLedger] openSettings error:', e);
+  }
 }
 function closeSettings() {
   $('#settings-overlay').classList.remove('open');
