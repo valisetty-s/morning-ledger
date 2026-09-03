@@ -877,8 +877,8 @@ const STRONG_NEGATIVE_PHRASES = [
 ];
 
 const NEGATION_WORDS = [
-  'avoids ','avoided ','no ','not ','doesn't','does not','did not','didnt',
-  'cannot','can't','denies','denied','dismisses','dismissed','clears ',
+  'avoids ','avoided ','no ','not ',"doesn't",'does not','did not','didnt',
+  'cannot',"can't",'denies','denied','dismisses','dismissed','clears ',
   'cleared ','resolves','resolved','rejects','rejected','rules out',
   'refutes','refuted','allays','allayed','dispels','dispelled',
   'unfounded','no merit','no evidence','quashes','quashed','overturns','stayed',
