@@ -130,8 +130,15 @@
   .sentiment-dot.neutral { background: var(--rule-strong); }
   .sentiment-dot.positive { background: var(--sage); }
 
-  /* has-negative: no background coloring — only the sentiment dot and badge signal negative news */
-  .entry.has-negative { border-left: none; }
+  .entry.has-negative {
+    background: rgba(176, 58, 46, 0.07) !important;
+    border-left: 3px solid var(--clay);
+    border-radius: 6px;
+    padding-left: 10px;
+    margin-left: -2px;
+  }
+  .entry.has-negative .entry-name,
+  .entry.has-negative .ribbon-name { color: var(--clay); }
 
   /* ---------- REFRESH BAR ---------- */
   .refresh-bar {
@@ -238,9 +245,9 @@
     border-radius: 9px;
     color: var(--ink);
   }
-  .price-ribbon.ribbon-pos,
-  .price-ribbon.ribbon-neg,
-  .price-ribbon.ribbon-neu { background: var(--paper); }
+  .price-ribbon.ribbon-pos { background: #FFFFFF; border-left: 4px solid var(--sage); }
+  .price-ribbon.ribbon-neg { background: #FFFFFF; border-left: 4px solid var(--clay); }
+  .price-ribbon.ribbon-neu { background: #FFFFFF; border-left: 4px solid var(--rule-strong); }
   .ribbon-name-row {
     display: flex;
     align-items: baseline;
@@ -251,7 +258,7 @@
     font-family: 'Georgia', serif;
     font-size: 15px;
     font-weight: 700;
-    color: var(--ink);
+    color: #FFFFFF;
     line-height: 1.25;
   }
   .ribbon-data-row {
@@ -730,7 +737,8 @@
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
 
-  .entry { background: var(--paper); }
+  /* Explicit white card background */
+  .entry { background: #FFFFFF; border-bottom: 1px solid var(--rule); }
 
   /* Price direction: ONLY the price+% spans get coloured bold text */
   .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
@@ -740,7 +748,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v34</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v36</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -752,10 +760,6 @@
 <div class="toolbar" id="toolbar">
   <button class="chip active" data-filter="all">All holdings</button>
   <button class="chip" data-filter="fresh">Fresh news only</button>
-  <button class="chip" data-filter="Top30">✅ Accumulate</button>
-  <button class="chip" data-filter="Top31-50">🔵 Hold</button>
-  <button class="chip" data-filter="Top51-75">🟡 Trim</button>
-  <button class="chip" data-filter="Watch">🔴 Exit</button>
 </div>
 
 <div class="toolbar sentiment-toolbar" id="sentiment-toolbar">
@@ -806,7 +810,7 @@
   </div>
 </div>
 
-<button class="fab" id="settings-fab" aria-label="Settings" onclick="openSettings()">
+<button class="fab" id="settings-fab" aria-label="Settings">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 </button>
 
