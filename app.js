@@ -910,19 +910,25 @@ function applySorting(stocks, sortType) {
 
   switch(sortType) {
     case 'change-desc':
-      // Gainers first (highest change % on top)
+      // Gainers first (highest change % on top, unpriced at the bottom)
       sorted.sort((a, b) => {
-        const chgA = (a.quote && a.quote.change_pct != null) ? a.quote.change_pct : -Infinity;
-        const chgB = (b.quote && b.quote.change_pct != null) ? b.quote.change_pct : -Infinity;
-        return chgB - chgA;
+        const hasA = a.quote && a.quote.change_pct != null;
+        const hasB = b.quote && b.quote.change_pct != null;
+        if (hasA && !hasB) return -1;
+        if (!hasA && hasB) return 1;
+        if (!hasA && !hasB) return (a.company || '').localeCompare(b.company || '');
+        return b.quote.change_pct - a.quote.change_pct;
       });
       break;
     case 'change-asc':
-      // Losers first (lowest change % on top)
+      // Losers first (lowest change % on top, unpriced at the bottom)
       sorted.sort((a, b) => {
-        const chgA = (a.quote && a.quote.change_pct != null) ? a.quote.change_pct : Infinity;
-        const chgB = (b.quote && b.quote.change_pct != null) ? b.quote.change_pct : Infinity;
-        return chgA - chgB;
+        const hasA = a.quote && a.quote.change_pct != null;
+        const hasB = b.quote && b.quote.change_pct != null;
+        if (hasA && !hasB) return -1;
+        if (!hasA && hasB) return 1;
+        if (!hasA && !hasB) return (a.company || '').localeCompare(b.company || '');
+        return a.quote.change_pct - b.quote.change_pct;
       });
       break;
     case 'default':
@@ -1061,9 +1067,8 @@ async function fetchAllNews() {
       // Preserve any quote data already attached from a previous "Fetch
       // latest prices" tap, since news and prices are now fetched
       // independently and shouldn't wipe each other out.
-      const existingQuote = newsData && newsData.results && newsData.results[batchStart + batchIdx]
-        ? newsData.results[batchStart + batchIdx].quote
-        : null;
+      const prevEntry = newsData && newsData.results && newsData.results.find(r => r.ticker === ticker);
+      const existingQuote = prevEntry ? prevEntry.quote : null;
       results[batchStart + batchIdx] = { ticker, company, tier, articles, quote: existingQuote || null };
       if (articles.length === 0) {
         diagnostics.emptyCount++;
