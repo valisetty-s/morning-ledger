@@ -82,6 +82,72 @@
   .dateline .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--rule-strong); }
   .dateline .fresh { color: var(--sunrise); font-weight: 600; }
 
+  /* ---------- AI GLOBAL CUES CARD ---------- */
+  #global-cues-container {
+    padding: 14px 20px 0;
+  }
+  .global-cues-card {
+    background: var(--paper-dim);
+    border: 1px solid var(--rule-strong);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .gc-header {
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+  .gc-section { margin-bottom: 10px; }
+  .gc-bullet { margin-bottom: 4px; line-height: 1.4; }
+  .gc-label { font-weight: 600; }
+  .gc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  @media (max-width: 480px) {
+    .gc-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- AI SINGLE STOCK BRIEFING ---------- */
+  .ai-briefing-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: linear-gradient(135deg, #7A5C9B 0%, #4D3962 100%);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .ai-briefing-btn:disabled { opacity: 0.7; }
+  .ai-briefing-card {
+    margin-top: 12px;
+    padding: 14px;
+    background: #F4EFF8;
+    border: 1px solid #D8CBE4;
+    border-radius: 9px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .ai-b-row { margin-bottom: 8px; }
+  .ai-b-row:last-child { margin-bottom: 0; }
+
   /* ---------- TOOLBAR ---------- */
   .toolbar {
     display: flex;
@@ -201,6 +267,7 @@
   .entry {
     padding: 14px 0;
     border-bottom: 1px solid var(--rule);
+    background: #FFFFFF;
   }
   .entry:last-child { border-bottom: none; }
   .entry-head {
@@ -229,13 +296,6 @@
     margin-left: 6px;
   }
 
-  /* ---------- PRICE RIBBON ----------
-     A full-width band under the stock name showing price, day change,
-     volume, and 52-week proximity — bigger and higher-contrast than the
-     rest of the card, since this is glance-at-a-distance data, not
-     reading material. Ribbon color communicates direction at a glance:
-     green = up day, clay/red = down day, neutral gray = flat.
-  */
   .price-ribbon {
     display: flex;
     flex-direction: column;
@@ -737,10 +797,6 @@
   .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
   .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
 
-  /* Explicit white card background */
-  .entry { background: #FFFFFF; border-bottom: 1px solid var(--rule); }
-
-  /* Price direction: ONLY the price+% spans get coloured bold text */
   .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
   .price-down { color: #B03A2E !important; font-weight: 800 !important; }
 </style>
@@ -748,7 +804,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v36</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v37</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -756,6 +812,8 @@
     <span id="dateline-status">Tap refresh to fetch today's news</span>
   </div>
 </div>
+
+<div id="global-cues-container" style="display: none;"></div>
 
 <div class="toolbar" id="toolbar">
   <button class="chip active" data-filter="all">All holdings</button>

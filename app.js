@@ -1,10 +1,3 @@
-// ============================================================
-// The Morning Ledger — client-side portfolio news briefing
-// Everything runs in your phone's browser. Nothing is sent to
-// any server except direct calls to Google News RSS when you tap
-// "Fetch today's news".
-// ============================================================
-
 const DEFAULT_STOCKS = [
   ["VBL","Varun Beverages","Top30"],["SHRIRAMFIN","Shriram Finance","Top30"],
   ["MAXHEALTH","Max Healthcare","Top30"],["CGPOWER","CG Power & Industrial","Top30"],
@@ -63,16 +56,12 @@ const TIER_LABELS = {
   "Top51-75": "🟡 Trim",
   "Watch":    "🔴 Exit",
 };
-// Labels are Claude's analytical opinion for display only — not financial advice.
-// Internal tier keys (Top30/Top31-50/Top51-75/Watch) are unchanged.
 const TIER_ORDER = ["Top30", "Top31-50", "Top51-75", "Watch"];
 
-// Helper function to clean ticker (remove -BE suffix for display)
 function getCleanTicker(ticker) {
   return ticker.replace(/-BE$/, '');
 }
 
-// ---------- Storage helpers ----------
 const Store = {
   getApiKey: () => localStorage.getItem('ml_api_key') || '',
   setApiKey: (v) => localStorage.setItem('ml_api_key', v),
@@ -90,27 +79,15 @@ const Store = {
   setCache: (obj) => localStorage.setItem('ml_news_cache', JSON.stringify(obj)),
   getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || '',
   setKiteApiKey: (v) => localStorage.setItem('ml_kite_api_key', v),
-  // Deliberately NO access_token storage here. Earlier versions stored it
-  // in localStorage with a same-day expiry check, but that mechanism kept
-  // producing "session expired" false reports that were genuinely hard to
-  // pin down (v12-v15). The price button now does a fresh login every
-  // time and uses the resulting token immediately, once, then discards
-  // it — removing this whole category of persistence bug entirely rather
-  // than continuing to patch it.
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 
-// ---------- State ----------
 let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'default';
-let newsData = null; // { fetchedAt: ISOstring, results: [{ticker,company,tier,articles:[...]}] }
+let newsData = null; 
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
-// (lastQuotesError removed — the new fresh-login-per-fetch design for
-// prices reports status directly via priceStatusUpdate() instead of
-// through a separate tracked-error variable.)
 
-// ---------- DOM refs ----------
 const $ = (sel) => document.querySelector(sel);
 const contentEl = $('#content');
 const refreshBtn = $('#refresh-btn');
@@ -137,7 +114,6 @@ function timeLabel(isoString) {
   return new Date(isoString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ---------- Init ----------
 function init() {
   datelineDate.textContent = todayLabel();
 
@@ -148,11 +124,8 @@ function init() {
     updateStatusBar();
   }
 
-  // Delegated listener for ribbon fundamentals buttons — necessary
-  // because entries are rendered via innerHTML on every filter/sort/
-  // fetch, which means individually-attached listeners would be wiped
-  // out on the next re-render. One listener on the stable #content
-  // container catches clicks on any current or future .ribbon-fund-btn.
+  fetchAndRenderGlobalCues();
+
   contentEl.addEventListener('click', (e) => {
     const fundBtn = e.target.closest('.ribbon-fund-btn');
     if (fundBtn) {
@@ -197,7 +170,6 @@ function init() {
   const priceBtn = $('#price-refresh-btn');
   if (priceBtn) priceBtn.addEventListener('click', fetchLatestPrices);
 
-  // Single-stock lookup
   let lookupDebounceTimer = null;
   lookupInput.addEventListener('input', () => {
     clearTimeout(lookupDebounceTimer);
@@ -226,20 +198,16 @@ function init() {
     }
   });
 
-  // Settings panel
   $('#settings-fab').addEventListener('click', openSettings);
   $('#settings-close').addEventListener('click', closeSettings);
   $('#settings-cancel').addEventListener('click', closeSettings);
   $('#settings-save').addEventListener('click', saveSettings);
 
-  // XLSX/XLS/CSV upload — SheetJS handles all three
   $('#csv-upload-btn').addEventListener('click', () => $('#csv-file-input').click());
   $('#csv-file-input').addEventListener('change', handleSpreadsheetUpload);
 
-  // Kite holdings import
   $('#kite-import-btn').addEventListener('click', importFromKite);
 
-  // Install banner (Android/Chrome)
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -291,11 +259,6 @@ function updateStatusBar() {
   updatePriceStatus();
 }
 
-// Sets the baseline price status (idle state, reflecting whether any
-// price data is currently showing). Live progress messages during an
-// actual login+fetch attempt are set directly via priceStatusUpdate(),
-// not through this function — this only runs to (re)establish the
-// resting state after a render.
 function updatePriceStatus() {
   const priceStatusEl = $('#price-status');
   if (!priceStatusEl) return;
@@ -304,11 +267,9 @@ function updatePriceStatus() {
   priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
 }
 
-// ---------- Settings panel ----------
 function openSettings() {
   const stocks = Store.getStocks();
   $('#stocklist-input').value = stocks.map(s => s.join(',')).join('\n');
-  // Pre-fill saved Kite API key and backend URL if any
   const savedKey = Store.getKiteApiKey();
   if (savedKey) $('#kite-api-key-input').value = savedKey;
   const savedBackend = localStorage.getItem(KITE_BACKEND_URL_KEY);
@@ -319,7 +280,6 @@ function closeSettings() {
   $('#settings-overlay').classList.remove('open');
 }
 function saveSettings() {
-  // Save Kite API key and backend URL if entered
   const kiteKey = $('#kite-api-key-input').value.trim();
   if (kiteKey) Store.setKiteApiKey(kiteKey);
   const backendUrl = $('#kite-backend-url-input').value.trim();
@@ -334,10 +294,7 @@ function saveSettings() {
   closeSettings();
 }
 
-// ---------- Spreadsheet upload (XLSX / XLS / CSV) via SheetJS ----------
 const VALID_TIERS = ['Top30', 'Top31-50', 'Top51-75', 'Watch'];
-
-// Load SheetJS lazily on first use
 let _sheetjsLoaded = false;
 function ensureSheetJS() {
   return new Promise((resolve, reject) => {
@@ -351,31 +308,10 @@ function ensureSheetJS() {
   });
 }
 
-// A real NSE/BSE ticker is letters/digits/&/- only, 1-20 chars, and critically
-// is NOT a sentence, a label, or a plain number. This single check is what
-// was missing before — without it, statement text like "Client ID" or
-// "585017.85" or "Equity Holdings Statement as on..." got accepted as if
-// it were a stock ticker, because the old fallback parser trusted column 0
-// blindly with no validation at all.
-// ISINs are a distinct, checkable format that should never be treated as a
-// ticker: exactly 12 characters, starting with a 2-letter country code (e.g.
-// "IN" for India) followed by a security-type letter (commonly "E" for
-// equity), 9 alphanumeric characters total after the country code, ending
-// in 1 check digit. Real tickers don't follow this shape. Without this
-// check, an ISIN like INE918Z01012 structurally passes a generic
-// "looks like a short alphanumeric code" test, but Google News has no
-// listing for an ISIN — only for the company name or trading symbol.
 function looksLikeISIN(value) {
   return /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(String(value || '').trim().toUpperCase());
 }
 
-// Common section labels and words that appear in Kite statements/reports
-// and happen to be short, space-free, and alphanumeric enough to pass the
-// shape checks above — but are never real tickers. This list was built
-// directly from the exact garbage that showed up in testing (e.g.
-// "Summary", "Total", "Client ID" minus its space). It's not exhaustive —
-// shape-based validation fundamentally cannot catch every possible label
-// with certainty — but it closes the specific gaps already seen in practice.
 const KNOWN_NON_TICKER_LABELS = new Set([
   'SUMMARY', 'TOTAL', 'GRAND', 'SUBTOTAL', 'NOTES', 'DISCLAIMER', 'PAGE',
   'DATE', 'NAME', 'ADDRESS', 'PAN', 'EMAIL', 'PHONE', 'STATEMENT', 'REPORT',
@@ -387,13 +323,13 @@ const KNOWN_NON_TICKER_LABELS = new Set([
 function looksLikeRealTicker(value) {
   const v = String(value || '').trim();
   if (!v) return false;
-  if (v.length > 20) return false; // tickers aren't sentences
-  if (/\s/.test(v)) return false; // tickers never contain spaces; labels/sentences do
-  if (/^-?\d+(\.\d+)?$/.test(v)) return false; // pure numbers are amounts, not tickers
-  if (!/^[A-Z0-9&\-]+$/i.test(v)) return false; // only letters, digits, & and - allowed
-  if (!/[A-Z]/i.test(v)) return false; // must contain at least one letter
-  if (looksLikeISIN(v)) return false; // ISINs are identifiers, not searchable tickers
-  if (KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false; // known statement label, not a stock
+  if (v.length > 20) return false;
+  if (/\s/.test(v)) return false;
+  if (/^-?\d+(\.\d+)?$/.test(v)) return false;
+  if (!/^[A-Z0-9&\-]+$/i.test(v)) return false;
+  if (!/[A-Z]/i.test(v)) return false;
+  if (looksLikeISIN(v)) return false;
+  if (KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false;
   return true;
 }
 
@@ -412,7 +348,7 @@ function parseRowsFromSheet(rows) {
     const ticker = String(row[0]).trim().toUpperCase();
     if (!looksLikeRealTicker(ticker)) {
       skippedCount++;
-      continue; // refuse to accept statement text, labels, or numbers as a "ticker"
+      continue;
     }
     const company = String(row[1] || row[0]).trim();
     let tier = String(row[2] || '').trim();
@@ -425,12 +361,6 @@ function parseRowsFromSheet(rows) {
   return result;
 }
 
-// Detect Kite Holdings export format and remap columns.
-// Broadened beyond exact column-name matches: Kite has multiple export
-// formats (Holdings CSV, tax P&L statement, equity holdings statement) with
-// different headers. We now also try matching on ISIN columns and a wider
-// set of header name variants, since a statement export's headers don't
-// always say exactly "instrument" or "tradingsymbol".
 function parseKiteHoldingsRows(rows) {
   if (!rows || rows.length === 0) return null;
   const header = rows[0].map(c => String(c || '').toLowerCase().trim());
@@ -438,13 +368,13 @@ function parseKiteHoldingsRows(rows) {
   const instrIdx = header.findIndex(h =>
     h === 'instrument' || h === 'tradingsymbol' || h === 'symbol' || h.includes('trading symbol'));
 
-  if (instrIdx === -1) return null; // genuinely not a recognizable Kite holdings format
+  if (instrIdx === -1) return null;
 
   const result = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const ticker = String(row[instrIdx] || '').trim().toUpperCase();
-    if (!looksLikeRealTicker(ticker)) continue; // same validation, even on the Kite-format path
+    if (!looksLikeRealTicker(ticker)) continue;
     result.push([ticker, ticker, 'Watch']);
   }
   return result.length > 0 ? result : null;
@@ -472,10 +402,8 @@ async function handleSpreadsheetUpload(event) {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      // Get as array of arrays
       const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
 
-      // Try Kite format first
       let parsed = parseKiteHoldingsRows(rows);
       let isKite = !!parsed;
       if (!parsed) parsed = parseRowsFromSheet(rows);
@@ -500,30 +428,13 @@ async function handleSpreadsheetUpload(event) {
     filenameEl.textContent = 'Could not read that file.';
     filenameEl.style.color = 'var(--clay)';
   };
-  reader.readAsArrayBuffer(file); // SheetJS needs ArrayBuffer, not text
+  reader.readAsArrayBuffer(file);
 }
-
-// ---------- Kite Connect holdings import ----------
-// Full flow: user visits Kite login → gets redirected back with
-// ?request_token=... → app sends that token to YOUR backend (which holds
-// the api_secret safely) → backend exchanges it, fetches holdings, and
-// returns them here. The api_secret and access_token never touch the browser.
-
-// Backend URL is configured by the user in Settings (see KITE_BACKEND_URL_KEY
-// near the top of this file, alongside the other storage keys).
 
 async function importFromKite() {
   return startKiteLogin('holdings');
 }
 
-// Prices no longer need Kite login at all — they come from Yahoo Finance
-// via the backend's /api/quotes endpoint, which needs no authentication.
-// This replaced an earlier design that tried to use Kite's own quote API,
-// which turned out to require a paid market-data subscription Kite never
-// actually grants through the free Personal API — confirmed directly by
-// testing (a permissions error), not assumed. Yahoo Finance is free and,
-// as a side benefit, also provides 52-week high/low and a real volume
-// average, neither of which Kite's API exposes at all regardless of plan.
 async function fetchLatestPrices() {
   const backendUrl = getBackendUrl();
   if (!backendUrl) {
@@ -543,7 +454,7 @@ async function fetchLatestPrices() {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000); // a full 96-symbol batch can take a little while
+    const timer = setTimeout(() => controller.abort(), 25000);
     const resp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symbols)}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
@@ -581,11 +492,7 @@ async function startKiteLogin(intent) {
   Store.setKiteApiKey(apiKey);
   localStorage.setItem(KITE_BACKEND_URL_KEY, backendUrl.replace(/\/$/, ''));
 
-  // Clear the double-callback guard from any previous login attempt — this
-  // is a genuinely NEW login starting, so the next callback should be
-  // allowed to process normally.
   sessionStorage.removeItem('ml_kite_callback_handled');
-
   showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
   localStorage.setItem('ml_kite_pending_key', apiKey);
 
@@ -598,20 +505,10 @@ function priceStatusUpdate(text) {
   if (el) el.textContent = text;
 }
 
-// Called on page load to check if we've just returned from Kite OAuth.
-// Only the holdings-import flow uses this now — prices no longer go
-// through Kite at all, so there's no "intent" branching needed anymore.
 function checkKiteOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') !== 'login' || params.get('status') !== 'success') return;
 
-  // Guard against this running twice for the same login. Real-world testing
-  // showed the exchange call sometimes fires twice — once correctly, then a
-  // second time that Kite rejects (request_tokens are single-use, Kite's own
-  // rule). The most likely cause is some combination of how mobile Chrome
-  // handles back/forward navigation and this function re-running before the
-  // URL cleanup below had fully taken effect. A session-scoped flag, checked
-  // and set BEFORE any async work starts, closes that race entirely.
   if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') {
     return;
   }
@@ -621,9 +518,6 @@ function checkKiteOAuthCallback() {
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
   const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
 
-  // Clean the URL immediately, synchronously, before anything else — so
-  // there's no window where a re-render or navigation could re-read the
-  // same request_token from the address bar.
   history.replaceState({}, '', window.location.pathname);
 
   if (!requestToken || !apiKey) {
@@ -679,45 +573,16 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     return;
   }
 
-  // Note: this path (holdings import) no longer stores the access_token
-  // anywhere. As of v17, prices don't use Kite at all anymore — they
-  // come from Yahoo Finance via fetchLatestPrices(), which needs no
-  // token or login. This comment is just historical context for why
-  // holdings-import alone doesn't bother storing a token either.
-
-  // Merge fetched tickers into the stock list, preserving tiers.
-  //
-  // Tier lookup now checks TWO sources, in order:
-  //   1. The currently saved stock list (whatever's in localStorage right
-  //      now) — preserves any manual tier edits made after import
-  //   2. The master DEFAULT_STOCKS list (the full ~96-stock reference
-  //      list with correct tiers for every rank) — a fallback for when a
-  //      ticker isn't in the currently saved list for whatever reason
-  //      (e.g. it was never in an earlier import, or the saved list had
-  //      gotten out of sync). This is the fix for holdings beyond Top 30
-  //      all incorrectly falling into Watch: previously, any ticker not
-  //      found in the CURRENT session's list defaulted straight to
-  //      "Watch" with no fallback — even when that same ticker had a
-  //      perfectly correct tier sitting in the master list all along.
-  // Only if a ticker is genuinely unknown to both sources does it default
-  // to "Watch".
   const existing = Store.getStocks();
   const existingByTicker = new Map(existing.map(([t, c, tier]) => [t.toUpperCase(), [t, c, tier]]));
   const defaultsByTicker = new Map(DEFAULT_STOCKS.map(([t, c, tier]) => [t.toUpperCase(), [t, c, tier]]));
 
-  // Same suffix list the backend strips for Yahoo/news lookups. Applied in
-  // BOTH directions here: the incoming Kite ticker might have a suffix the
-  // reference lists don't (or vice versa) — e.g. Kite returns "STLTECH"
-  // but the reference list has "STLTECH-BE", or the reverse. Building
-  // suffix-stripped versions of the reference maps too (not just the
-  // incoming ticker) is what makes this match regardless of which side
-  // carries the suffix.
   const stripSeriesSuffix = (t) => t.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
   const buildStrippedIndex = (map) => {
     const stripped = new Map();
     for (const [key, value] of map) {
       const s = stripSeriesSuffix(key);
-      if (!stripped.has(s)) stripped.set(s, value); // first match wins if of a collision
+      if (!stripped.has(s)) stripped.set(s, value);
     }
     return stripped;
   };
@@ -750,10 +615,6 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     'success'
   );
 
-  // Show the freshly imported holdings immediately on the main page (as a
-  // plain list, before news has loaded) so there's instant visible feedback
-  // that the import worked — then close settings and auto-trigger the full
-  // news fetch, so the user doesn't have to do anything else manually.
   renderImportedHoldingsPreview(merged, userName);
 
   setTimeout(() => {
@@ -781,30 +642,19 @@ function showKiteStatus(msg, type) {
   el.className = 'kite-status kite-status-' + type;
 }
 
-// ---------- Sentiment classification ----------
-// Word lists rebuilt after testing against 25 realistic Indian financial
-// headlines showed only 32% accuracy — the original lists leaned on rare,
-// dramatic words ("plunge", "soars", "crash") and missed the everyday
-// words ("jump", "fall", "slip", "gain", "decline") that actually dominate
-// real headlines. This version adds that common vocabulary while keeping
-// the original specific phrases (which were accurate, just incomplete).
 const NEGATIVE_WORDS = [
-  // regulatory / legal / governance
   'fraud', 'scam', 'probe', 'investigat', 'raid', 'fir filed', 'sebi action',
   'sebi order', 'rbi restriction', 'rbi flags', 'rbi imposes', 'cbi', 'ed raid',
   'scrutiny', 'non-compliance', 'governance issue', 'accounting lapse', 'lapses',
   'show cause notice', 'irregularit',
-  // financial distress
   'downgrade', 'default', 'bankrupt', 'insolven', 'liquidat', 'debt-laden',
   'debt trap', 'rating cut', 'outlook negative', 'restructuring debt',
   'fundraising delay', 'fundraise concern', 'cash crunch', 'going concern',
-  // earnings / performance — common everyday phrasing
   'net loss', 'posts loss', 'loss widens', 'profit declin', 'profit falls',
   'profit drops', 'profit slips', 'profit dips', 'revenue falls', 'revenue declin',
   'misses estimate', 'falls short', 'below estimate', 'disappoint', 'muted outlook',
   'weak quarter', 'weak earnings', 'margin contraction', 'margin pressure',
   'margin squeeze', 'cost overrun', 'input cost', 'profit warning', 'lowered guidance',
-  // everyday stock movement words — this is the category that was missing
   'shares fall', 'shares falls', 'shares slip', 'shares slips', 'shares slide',
   'shares slides', 'shares drop', 'shares drops', 'shares decline', 'shares tank',
   'shares tanks', 'shares tumble', 'shares crash', 'shares plunge', 'shares sink',
@@ -814,7 +664,6 @@ const NEGATIVE_WORDS = [
   '52-week low', 'hits low', 'multi-year low', 'underperform', 'sell rating',
   'red flag', 'concern over', 'warns of', 'cautious outlook', 'weak demand',
   'demand slowdown', 'sales decline', 'sales fall', 'sales drop',
-  // leadership / operations
   'resign', 'steps down', 'quits', 'sacked', 'fired', 'arrest', 'lawsuit', 'sued',
   'penalty', 'fine imposed', 'ban', 'banned', 'halted', 'suspend', 'delisted',
   'strike', 'shutdown', 'shuts down', 'layoff', 'job cut', 'recall',
@@ -825,14 +674,12 @@ const NEGATIVE_WORDS = [
 ];
 
 const POSITIVE_WORDS = [
-  // earnings / performance — common everyday phrasing first
   'profit rises', 'profit rise', 'profit jumps', 'profit surges', 'profit soars',
   'profit grows', 'profit climbs', 'profit beats', 'revenue rises', 'revenue grows',
   'revenue jumps', 'revenue surges', 'beats estimate', 'beats street', 'tops estimate',
   'beat street view', 'strong quarter', 'strong earnings', 'strong show',
   'raises guidance', 'raises outlook', 'improved margin', 'margin expansion',
   'strong growth', 'robust growth', 'strong demand', 'demand surge',
-  // everyday stock movement words — same gap as the negative list had
   'shares jump', 'shares jumps', 'shares rise', 'shares rises', 'shares gain',
   'shares gains', 'shares surge', 'shares surges', 'shares rally', 'shares rallies',
   'shares climb', 'shares climbs', 'shares soar', 'shares soars', 'shares advance',
@@ -841,7 +688,6 @@ const POSITIVE_WORDS = [
   '52-week high', 'all-time high', 'record high', 'hits high', 'multi-year high',
   'outperform', 'buy rating', 'target price raised', 'upgrade', 'rating upgrade',
   'outlook positive', 'top gainer', 'best performer',
-  // deals / corporate actions
   'wins order', 'wins contract', 'wins record', 'wins deal', 'secures order',
   'bags order', 'bags contract', 'new contract', 'gets nod', 'gets approval',
   'usfda nod', 'receives approval', 'expansion plan', 'capacity expansion',
@@ -850,11 +696,6 @@ const POSITIVE_WORDS = [
   'foray into', 'launches', 'unveils', 'breakthrough', 'patent grant',
   'fii buying', 'institutional buying', 'promoter buys', 'stake increase',
   'debt-free', 'turns profitable', 'pre-sales',
-  // these specific patterns catch real headlines where an amount sits
-  // between the verb and "order" (e.g. "bags 300 MW wind order", "wins
-  // Rs 5,000 crore order") without using a bare standalone "wins"/"bags"
-  // match, which tested as a false-positive risk on cases like "bags a
-  // fine" — narrower phrasing here trades a little recall for safety.
   'wind order', 'mw order', 'crore order', 'rs order', 'export order',
   'raises guidance', 'raises outlook', 'raises fy', 'raises revenue guidance',
 ];
@@ -870,10 +711,6 @@ function classifySentiment(title) {
   return 'neutral';
 }
 
-// Finds the article with the most recent actual publish timestamp, rather
-// than trusting feed order (Google News RSS is not guaranteed to be
-// strictly date-sorted — it can favor relevance). Falls back to the first
-// article in the list only if none of them have a parseable date at all.
 function findMostRecentArticle(articles) {
   if (!articles || articles.length === 0) return null;
   let latest = null;
@@ -888,12 +725,6 @@ function findMostRecentArticle(articles) {
   return latest || articles[0];
 }
 
-// Overall sentiment now reflects ONLY the single most recent headline —
-// not "any negative headline wins" as before. Per request: if the latest
-// news is negative, the stock is negative; if the latest news is positive
-// OR neutral, the stock counts as positive (neutral is folded into
-// positive — giving the benefit of the doubt rather than treating
-// ambiguous wording as a third, separate bucket).
 function classifyStockOverallSentiment(articles) {
   if (!articles || articles.length === 0) return null;
   const latest = findMostRecentArticle(articles);
@@ -902,15 +733,13 @@ function classifyStockOverallSentiment(articles) {
   return latestSentiment === 'negative' ? 'negative' : 'positive';
 }
 
-// ---------- Sorting ----------
 function applySorting(stocks, sortType) {
   if (!stocks || stocks.length === 0) return stocks;
 
-  const sorted = [...stocks]; // Create a copy to avoid mutating original
+  const sorted = [...stocks];
 
   switch(sortType) {
     case 'change-desc':
-      // Gainers first (highest change % on top, unpriced at the bottom)
       sorted.sort((a, b) => {
         const hasA = a.quote && a.quote.change_pct != null;
         const hasB = b.quote && b.quote.change_pct != null;
@@ -921,7 +750,6 @@ function applySorting(stocks, sortType) {
       });
       break;
     case 'change-asc':
-      // Losers first (lowest change % on top, unpriced at the bottom)
       sorted.sort((a, b) => {
         const hasA = a.quote && a.quote.change_pct != null;
         const hasB = b.quote && b.quote.change_pct != null;
@@ -933,8 +761,6 @@ function applySorting(stocks, sortType) {
       break;
     case 'default':
     default:
-      // Alphabetical by company name — the default view now, rather than
-      // leaving stocks in whatever order they happened to be added/imported.
       sorted.sort((a, b) => a.company.localeCompare(b.company));
       break;
   }
@@ -942,32 +768,10 @@ function applySorting(stocks, sortType) {
   return sorted;
 }
 
-// ---------- Fetching: via your own backend ----------
-// Both free anonymous CORS proxies this app relied on stopped working:
-// CodeTabs is currently rejecting requests with 400s for many users
-// (a reported, ongoing issue with their free service, not specific to
-// this app), and r.jina.ai explicitly blocks anonymous access to
-// news.google.com due to abuse from other users of their shared service.
-//
-// News fetching now goes through your own backend instead (the same one
-// used for Kite login) — it makes the request to Google directly, with
-// no CORS restriction at all (CORS is purely a browser-side rule) and no
-// shared anonymous-abuse exposure. This requires the backend URL to be
-// set in Settings — the same field used for Kite login.
-
 function getBackendUrl() {
   return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
 }
 
-// Sorts articles newest-first by their actual published timestamp, not by
-// whatever order the feed happened to return them in. Google News RSS is
-// not guaranteed to be strictly date-sorted (it can favor relevance), and
-// this app already learned that lesson once for overall sentiment
-// classification (see findMostRecentArticle) — this applies the same fix
-// to the DISPLAY order too, which was still using raw feed order until
-// now. Articles with an unparseable/missing date sort to the end, not the
-// front, so a dateless item never displaces a genuinely dated one from
-// the "first" position.
 function sortArticlesByDateDesc(articles) {
   return [...articles].sort((a, b) => {
     const ta = a.published ? new Date(a.published).getTime() : NaN;
@@ -992,10 +796,6 @@ async function fetchNewsViaBackend(company, maxArticles) {
     if (!resp.ok || data.status !== 'success') {
       return { articles: [], error: data.error || `backend returned HTTP ${resp.status}` };
     }
-    // Sort BEFORE slicing to maxArticles — otherwise a genuinely newer
-    // article sitting later in the raw feed order could get cut off
-    // entirely while an older one (that happened to come first) survives
-    // the truncation. Sorting first guarantees the freshest N are kept.
     const sorted = sortArticlesByDateDesc(data.articles || []);
     return { articles: sorted.slice(0, maxArticles), error: null };
   } catch (e) {
@@ -1003,36 +803,13 @@ async function fetchNewsViaBackend(company, maxArticles) {
   }
 }
 
-// ---------- Parallel batch fetcher ----------
-// Fetches up to BATCH_SIZE stocks concurrently, then moves to the next batch,
-// with a short pause between batches.
-//
-// Lowered from 8 to 4, with a 400ms gap added between batches. Free,
-// unauthenticated proxy services (CodeTabs, r.jina.ai) are shared
-// infrastructure with no published guarantee for sustained bursts —
-// 8-at-a-time, 12 batches back-to-back from one device is the kind of
-// pattern that gets silently throttled even without a documented limit.
-// This trades some speed for reliability: roughly 96 stocks ÷ 4 × (fetch
-// time + 400ms pause) — slower than the original aggressive batching, but
-// much less likely to get rate-limited mid-run, which is the actual
-// failure mode worth avoiding.
 const BATCH_SIZE = 6;
 const BATCH_PAUSE_MS = 200;
-
-// Tracks which proxy actually served each successful response, and how
-// many stocks got zero articles from every proxy. Surfaced in the status
-// bar after a fetch completes, so "nothing showing up" becomes diagnosable
-// instead of a silent mystery. (Declared at top of file with other state.)
 
 async function fetchStockNews(ticker, company) {
   const { articles, error } = await fetchNewsViaBackend(company, 3);
   return { ticker, company, articles, error };
 }
-
-// (The old Kite-based fetchQuotes() helper was removed here. Prices now
-// come from Yahoo Finance via the backend's /api/quotes — see
-// fetchLatestPrices() above, which calls the backend directly and needs
-// no access_token or Kite login at all.)
 
 async function fetchAllNews() {
   const stocks = Store.getStocks();
@@ -1054,19 +831,12 @@ async function fetchAllNews() {
   let completed = 0;
   const diagnostics = { errorCount: 0, emptyCount: 0, totalCount: stocks.length, lastError: null };
 
-  // Your own backend has no anonymous-abuse exposure and no CORS
-  // restriction, so a higher batch size than the old proxy-based approach
-  // is safe here — Render's own connection limits are the real ceiling,
-  // and 8 concurrent requests to your own server is comfortably under that.
   for (let batchStart = 0; batchStart < stocks.length; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE, stocks.length);
     const batch = stocks.slice(batchStart, batchEnd);
 
     const batchPromises = batch.map(async ([ticker, company, tier], batchIdx) => {
       const { articles, error } = await fetchStockNews(ticker, company);
-      // Preserve any quote data already attached from a previous "Fetch
-      // latest prices" tap, since news and prices are now fetched
-      // independently and shouldn't wipe each other out.
       const prevEntry = newsData && newsData.results && newsData.results.find(r => r.ticker === ticker);
       const existingQuote = prevEntry ? prevEntry.quote : null;
       results[batchStart + batchIdx] = { ticker, company, tier, articles, quote: existingQuote || null };
@@ -1094,27 +864,15 @@ async function fetchAllNews() {
   updateStatusBar();
   renderContent();
 
-  // Auto-chain into fetching prices right after news finishes, so a
-  // single tap of "Fetch today's news" gets you both — no need to
-  // separately remember to tap "Fetch latest prices" afterward. Fires
-  // without blocking/awaiting anything above (news has already fully
-  // rendered by this point); fetchLatestPrices manages its own button
-  // state and re-renders again once prices land.
   fetchLatestPrices();
 }
 
-// ---------- Dedicated "Fetch latest prices" — separate, on-demand ----------
-// Split out from the news fetch entirely. Originally prices were bundled
-// into every news fetch automatically, but that coupling made a real bug
-// Merges fetched quote data into whatever's currently displayed and
-// re-renders. Called once, right after a fresh Kite login completes and
-// quotes are fetched — not on a timer, not from stored state.
 function applyFetchedQuotes(quotes) {
   const stocks = Store.getStocks();
   if (newsData && newsData.results) {
     for (const r of newsData.results) {
       const q = quotes[r.ticker];
-      if (q && !q.error) r.quote = q; // per-symbol errors (bad/delisted ticker) are skipped, not stored as a "quote"
+      if (q && !q.error) r.quote = q;
     }
     Store.setCache(newsData);
   } else {
@@ -1129,7 +887,6 @@ function applyFetchedQuotes(quotes) {
   renderContent();
 }
 
-// ---------- Single-stock lookup ----------
 function getStockSuggestions(query) {
   const stocks = Store.getStocks();
   const q = query.trim().toLowerCase();
@@ -1171,6 +928,123 @@ function renderSuggestions(query) {
   });
 }
 
+async function fetchAndRenderGlobalCues() {
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) return;
+
+  const container = document.getElementById('global-cues-container');
+  
+  const cachedStr = localStorage.getItem('ml_global_cues');
+  if (cachedStr) {
+      try {
+          const cached = JSON.parse(cachedStr);
+          if (Date.now() - cached.time < 30 * 60 * 1000) {
+              renderGlobalCues(cached.cues, container);
+              return;
+          }
+      } catch(e) {}
+  }
+  
+  try {
+      const resp = await fetch(`${backendUrl}/api/market/global-cues`);
+      const data = await resp.json();
+      if (data.status === 'success') {
+          localStorage.setItem('ml_global_cues', JSON.stringify({ time: Date.now(), cues: data.cues }));
+          renderGlobalCues(data.cues, container);
+      }
+  } catch (e) {
+      console.error('Failed to fetch global cues', e);
+  }
+}
+
+function renderGlobalCues(cues, container) {
+  container.style.display = 'block';
+  container.innerHTML = `
+  <div class="global-cues-card">
+    <div class="gc-header">🌐 OVERNIGHT GLOBAL CUES & SECTOR SPILLOVER</div>
+    
+    <div class="gc-section">
+      <div class="gc-bullet">• <span class="gc-label">Global Headlines:</span> ${escapeHtml(cues.global_headlines[0] || '')}</div>
+      ${cues.global_headlines[1] ? `<div class="gc-bullet">• ${escapeHtml(cues.global_headlines[1])}</div>` : ''}
+    </div>
+
+    <div class="gc-section">
+      <div class="gc-bullet">• <span class="gc-label">Expected India Impact:</span> ${escapeHtml(cues.indian_impact)}</div>
+    </div>
+    
+    <div class="gc-grid">
+       <div><span class="gc-label">🇺🇸 USA:</span> ${escapeHtml(cues.usa_market)}</div>
+       <div><span class="gc-label">🇯🇵 Japan:</span> ${escapeHtml(cues.japan_market)}</div>
+       <div><span class="gc-label">🇰🇷 S. Korea:</span> ${escapeHtml(cues.korea_market)}</div>
+       <div><span class="gc-label">🇨🇳 China:</span> ${escapeHtml(cues.china_market)}</div>
+    </div>
+  </div>`;
+}
+
+async function fetchAndShowAIBriefing(ticker, company, articles) {
+    const backendUrl = getBackendUrl();
+    const panel = document.getElementById('ai-briefing-panel');
+    const btn = document.getElementById('ai-briefing-btn');
+    if (!panel) return;
+    if (!backendUrl) {
+        panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
+        return;
+    }
+    
+    btn.textContent = '✨ Analyzing...';
+    btn.disabled = true;
+    panel.innerHTML = '';
+
+    const cleanTickerForFund = getCleanTicker(ticker);
+    let fundamentals = getCachedFundamentals(cleanTickerForFund);
+    if (!fundamentals) {
+        try {
+            const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanTickerForFund)}`);
+            const data = await resp.json();
+            if (data.status === 'success') {
+                fundamentals = data.fundamentals;
+                setCachedFundamentals(cleanTickerForFund, fundamentals);
+            }
+        } catch(e) {}
+    }
+
+    try {
+        const resp = await fetch(`${backendUrl}/api/ai/briefing`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: ticker,
+                company: company,
+                fundamentals: fundamentals || {},
+                news: articles
+            })
+        });
+        const data = await resp.json();
+        if (data.status === 'success') {
+            const b = data.briefing;
+            const sentColor = b.sentiment === 'BULLISH' ? 'var(--sage)' : (b.sentiment === 'BEARISH' ? 'var(--clay)' : 'var(--ink)');
+            panel.innerHTML = `
+              <div class="ai-briefing-card">
+                 <div class="ai-b-row"><strong>Business:</strong> ${escapeHtml(b.business_summary)}</div>
+                 <div class="ai-b-row"><strong>Financials:</strong> ${escapeHtml(b.financial_health)}</div>
+                 <div class="ai-b-row"><strong>Sentiment:</strong> <span style="color:${sentColor};font-weight:700">${escapeHtml(b.sentiment)}</span></div>
+                 <div class="ai-b-row"><strong>Catalyst:</strong> ${escapeHtml(b.key_catalyst)}</div>
+                 <div class="ai-b-row"><strong>Risk:</strong> ${escapeHtml(b.key_risk)}</div>
+              </div>
+            `;
+            btn.style.display = 'none';
+        } else {
+            panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(data.error)}</div>`;
+            btn.textContent = '✨ Generate AI 1-Minute Briefing';
+            btn.disabled = false;
+        }
+    } catch(e) {
+        panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(String(e))}</div>`;
+        btn.textContent = '✨ Generate AI 1-Minute Briefing';
+        btn.disabled = false;
+    }
+}
+
 async function runSingleStockLookup(tickerTyped, companyTyped) {
   const stocks = Store.getStocks();
   const known = stocks.find(([t, c]) =>
@@ -1196,6 +1070,8 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
   } catch (e) { lookupError = e.message || String(e); }
 
   const stockObj = { ticker: displayTicker, company: searchTerm, tier: known ? known[2] : 'Watch', articles };
+  const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn" data-ticker="${escapeHtml(displayTicker)}" data-company="${escapeHtml(searchTerm)}">✨ Generate AI 1-Minute Briefing</button>`;
+  
   const diagnoseLink = articles.length === 0
     ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
     : '';
@@ -1208,6 +1084,8 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
       <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
     </div>
     ${renderEntry(stockObj)}
+    ${aiBtnHtml}
+    <div id="ai-briefing-panel"></div>
     <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (PE, P/B, ROE...)</button>
     <div id="fundamentals-panel"></div>
     ${errorNote}
@@ -1218,30 +1096,16 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
   if (diagBtn) diagBtn.addEventListener('click', () => runDiagnosticCheck(searchTerm));
   const fundBtn = document.getElementById('fundamentals-btn');
   if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
+  const aiBtn = document.getElementById('ai-briefing-btn');
+  if (aiBtn) aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles));
 }
 
-// Fundamentals are fetched on demand, one stock at a time — see the
-// backend's /api/fundamentals docstring for why this isn't bundled into
-// the bulk price fetch (it's a much slower, heavier call per stock).
-// Same as fetchAndShowFundamentals above, but for the ribbon button in
-// the main scrolling list rather than the single-stock search card —
-// targets a specific container by id (one per stock, since the main
-// list can show many at once) instead of the fixed #fundamentals-panel
-// id the search card uses.
-// Fundamentals (PE, P/B, ROE etc.) don't meaningfully change intraday —
-// caching per stock for the rest of today avoids re-hitting Yahoo's
-// quoteSummary endpoint for something you've already looked at once.
-// This matters specifically because that endpoint is confirmed (from
-// yfinance's own GitHub issues) to be aggressively and sometimes
-// unpredictably rate-limited by Yahoo — caching is the main defense
-// available here, since retrying harder or fetching in bulk would only
-// make the underlying rate-limit problem worse, not better.
 function getCachedFundamentals(ticker) {
   const raw = localStorage.getItem(`ml_fund_${ticker}`);
   if (!raw) return null;
   try {
     const cached = JSON.parse(raw);
-    if (cached.date !== new Date().toDateString()) return null; // stale, from a previous day
+    if (cached.date !== new Date().toDateString()) return null;
     return cached.fundamentals;
   } catch (e) {
     return null;
@@ -1267,11 +1131,6 @@ function setCachedRoce(ticker, roceData) {
   localStorage.setItem(`ml_roce_${ticker}`, JSON.stringify({ date: new Date().toDateString(), roce: roceData }));
 }
 
-// Gives a clearer, honest message specifically for the rate-limit case,
-// rather than showing yfinance's raw error text as-is. This is a known,
-// documented Yahoo-side limit (confirmed via yfinance's own GitHub
-// issues) — not a bug in this app, and not something retrying
-// immediately will fix.
 function formatFundamentalsError(rawError) {
   const lower = (rawError || '').toLowerCase();
   if (lower.includes('rate limit') || lower.includes('too many requests')) {
@@ -1289,18 +1148,12 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
     return;
   }
 
-  // renderEntry already checks the cache before deciding whether to show
-  // this button at all — a cached stock never gets a button in the first
-  // place, it gets pills immediately. This check only matters for the
-  // rare case where the cache was populated by something else in the
-  // brief window between render and click.
   const cached = getCachedFundamentals(ticker);
   if (cached) {
     btn.outerHTML = renderCompactFundamentalPills(cached);
     return;
   }
 
-  const originalLabel = btn.textContent;
   btn.textContent = 'Loading…';
   btn.disabled = true;
 
@@ -1428,12 +1281,6 @@ function renderFundamentalsPanel(f) {
   </div>`;
 }
 
-// Compact version for the ribbon itself — short pills, not the full
-// labeled-row layout renderFundamentalsPanel uses (there's no room for
-// that inside a ribbon). Only fields with actual data get a pill; a
-// missing individual field is simply omitted rather than shown as "—",
-// since cluttering the ribbon with empty placeholders defeats the point
-// of "fits on the ribbon" in the first place.
 function renderCompactFundamentalPills(f) {
   const pills = [];
   if (f.trailing_pe != null) {
@@ -1469,11 +1316,6 @@ function clearLookupResult() {
   lookupSuggestions.classList.remove('open');
 }
 
-// ---------- Raw diagnostic viewer ----------
-// Shows exactly what each proxy returns for one stock, unparsed — so a
-// "no news found" report can be turned into something concrete to debug
-// rather than a guess. Reachable via a small "diagnose" link that appears
-// next to a stock once it shows "No recent news found".
 async function runDiagnosticCheck(company) {
   lookupResult.innerHTML = `<div class="lookup-result-card">
     <div class="lookup-result-head">
@@ -1527,7 +1369,6 @@ async function runDiagnosticCheck(company) {
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
 }
 
-// ---------- Rendering ----------
 function renderLoadingSkeleton(count) {
   let html = '<div class="section">';
   for (let i = 0; i < Math.min(count, 6); i++) {
@@ -1559,9 +1400,6 @@ function renderMoversSummary() {
   const el = document.getElementById('movers-summary');
   if (!el) return;
 
-  // Always reflects the WHOLE portfolio, not whatever tier/sentiment
-  // filter is currently active — a quick-glance summary should stay
-  // stable regardless of what you're browsing below it.
   const withQuotes = (newsData && newsData.results ? newsData.results : [])
     .filter(s => s.quote && s.quote.last_price != null && s.quote.change_pct != null);
 
@@ -1635,8 +1473,6 @@ function renderContent() {
      return;
    }
 
-   // Flat list — no tier/category grouping. All holdings render together
-   // in one section, sorted by whatever sort mode is active.
    const sortedFiltered = applySorting(filtered, currentSort);
    contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
  }
@@ -1673,12 +1509,6 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-  // Price/change/volume/52wk only render if a quote came back for this
-  // stock — fails silently and shows nothing if prices haven't been
-  // fetched yet or this specific symbol had no data, rather than an
-  // error inline on every single entry. Rendered as a separate block
-  // below the name/ticker row (a "ribbon") rather than crammed inline,
-  // since this needs to be readable at a glance, not just present.
   let ribbonHtml = '';
   const hasQuote = stock.quote && stock.quote.last_price != null;
   if (hasQuote) {
@@ -1693,16 +1523,6 @@ function renderEntry(stock) {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
     }
 
-    // Stock name + ticker live inside the ribbon itself, on their own row
-    // above the price/change/flags row. Fundamentals (PE, P/B, ROE etc.)
-    // render as compact pills directly in this same data row too — if
-    // already cached from an earlier lookup today, they show immediately
-    // with no click needed; otherwise a small button fetches them on
-    // demand (see the /api/fundamentals docstring in server.py for why
-    // this is per-stock/on-demand rather than bundled into the bulk
-    // price fetch: Yahoo rate-limits this specific data source, and
-    // fetching it for all ~96 stocks at once would trigger that far
-    // worse, not avoid it).
     const cleanTickerForFund = getCleanTicker(stock.ticker);
     const cachedFund = getCachedFundamentals(cleanTickerForFund);
     const fundHtml = cachedFund
@@ -1728,10 +1548,6 @@ function renderEntry(stock) {
     </div>`;
   }
 
-  // Fallback header: only used when there's no quote yet (prices haven't
-  // been fetched this session, or this specific symbol had no data) —
-  // otherwise the name/ticker live inside the ribbon above instead, so
-  // this row is left empty to avoid showing the name twice.
   const headHtml = hasQuote
     ? `<div class="entry-head-badge-only">${badgeHtml}</div>`
     : `<div class="entry-head">
