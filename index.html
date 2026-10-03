@@ -119,7 +119,7 @@
     .gc-grid { grid-template-columns: 1fr; }
   }
 
-  /* ---------- AI SINGLE STOCK BRIEFING ---------- */
+  /* ---------- AI BRIEFINGS ---------- */
   .ai-briefing-btn {
     display: block;
     width: 100%;
@@ -134,18 +134,37 @@
     border-radius: 8px;
     cursor: pointer;
   }
-  .ai-briefing-btn:disabled { opacity: 0.7; }
+  .ai-briefing-btn:disabled { opacity: 0.7; cursor: wait; }
+
+  .ribbon-ai-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 6px 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #4D3962;
+    background: #F4EFF8;
+    border: 1px solid #D8CBE4;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .ribbon-ai-btn:active { background: #E7DEEE; }
+  .ribbon-ai-btn:disabled { opacity: 0.6; cursor: wait; }
+
   .ai-briefing-card {
-    margin-top: 12px;
+    margin-top: 10px;
     padding: 14px;
     background: #F4EFF8;
     border: 1px solid #D8CBE4;
     border-radius: 9px;
     font-family: -apple-system, system-ui, sans-serif;
-    font-size: 13px;
+    font-size: 12.5px;
     line-height: 1.5;
   }
-  .ai-b-row { margin-bottom: 8px; }
+  .ai-b-row { margin-bottom: 7px; }
   .ai-b-row:last-child { margin-bottom: 0; }
 
   /* ---------- TOOLBAR ---------- */
@@ -263,7 +282,7 @@
   .section-label.tier-top51-75 { color: var(--sunrise); }
   .section-label.tier-watch { color: var(--clay); }
 
-  /* ---------- ENTRY (single stock dispatch) ---------- */
+  /* ---------- ENTRY ---------- */
   .entry {
     padding: 14px 0;
     border-bottom: 1px solid var(--rule);
@@ -420,7 +439,6 @@
     font-size: 11px;
     color: var(--ink-soft);
     margin-top: 8px;
-    padding-left: 0;
   }
   .more-articles .sub-headline {
     font-family: 'Georgia', serif;
@@ -804,7 +822,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v37</span></div>
+  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v38</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>

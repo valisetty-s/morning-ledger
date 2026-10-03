@@ -137,6 +137,16 @@ function init() {
       fetchAndShowInlineRoce(roceBtn.dataset.fundTicker, roceBtn.dataset.fundTarget, roceBtn);
       return;
     }
+    const aiBtn = e.target.closest('.ribbon-ai-btn');
+    if (aiBtn) {
+      const ticker = aiBtn.dataset.ticker;
+      const company = aiBtn.dataset.company;
+      const tier = aiBtn.dataset.tier || 'Watch';
+      const stockData = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null;
+      const articles = stockData ? stockData.articles : [];
+      fetchAndShowAIBriefing(ticker, company, articles, `ai-panel-entry-${ticker}`, aiBtn, tier);
+      return;
+    }
   });
 
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
@@ -148,23 +158,23 @@ function init() {
     });
   });
 
-   document.querySelectorAll('.chip[data-sentiment]').forEach(chip => {
-     chip.addEventListener('click', () => {
-       document.querySelectorAll('.chip[data-sentiment]').forEach(c => c.classList.remove('active'));
-       chip.classList.add('active');
-       currentSentiment = chip.dataset.sentiment;
-       renderContent();
-     });
-   });
+  document.querySelectorAll('.chip[data-sentiment]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-sentiment]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentSentiment = chip.dataset.sentiment;
+      renderContent();
+    });
+  });
 
-   document.querySelectorAll('.chip[data-sort]').forEach(chip => {
-     chip.addEventListener('click', () => {
-       document.querySelectorAll('.chip[data-sort]').forEach(c => c.classList.remove('active'));
-       chip.classList.add('active');
-       currentSort = chip.dataset.sort;
-       renderContent();
-     });
-   });
+  document.querySelectorAll('.chip[data-sort]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-sort]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentSort = chip.dataset.sort;
+      renderContent();
+    });
+  });
 
   refreshBtn.addEventListener('click', fetchAllNews);
   const priceBtn = $('#price-refresh-btn');
@@ -356,7 +366,7 @@ function parseRowsFromSheet(rows) {
     result.push([ticker, company, tier]);
   }
   if (skippedCount > 0) {
-    console.warn(`Skipped ${skippedCount} row(s) that didn't look like real tickers (likely statement text, not a stock list).`);
+    console.warn(`Skipped ${skippedCount} row(s) that didn't look like real tickers.`);
   }
   return result;
 }
@@ -409,14 +419,14 @@ async function handleSpreadsheetUpload(event) {
       if (!parsed) parsed = parseRowsFromSheet(rows);
 
       if (!parsed || parsed.length === 0) {
-        filenameEl.textContent = 'Could not find any real stock tickers in this file — it may be a tax/contract statement rather than a holdings list. Try Console → Portfolio → Holdings → Export instead.';
+        filenameEl.textContent = 'Could not find any real stock tickers in this file.';
         filenameEl.style.color = 'var(--clay)';
         return;
       }
 
       $('#stocklist-input').value = parsed.map(r => r.join(',')).join('\n');
       filenameEl.textContent = isKite
-        ? `✓ ${file.name} — ${parsed.length} holdings from Kite export (all set to Watch tier — edit tiers above)`
+        ? `✓ ${file.name} — ${parsed.length} holdings from Kite export (all set to Watch tier)`
         : `✓ ${file.name} — ${parsed.length} stocks loaded`;
       filenameEl.style.color = 'var(--sage)';
     } catch (err) {
@@ -486,7 +496,7 @@ async function startKiteLogin(intent) {
   }
   if (!backendUrl) {
     openSettings();
-    showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login (see instructions below).', 'error');
+    showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login.', 'error');
     return;
   }
   Store.setKiteApiKey(apiKey);
@@ -531,9 +541,7 @@ function checkKiteOAuthCallback() {
     setTimeout(() => {
       openSettings();
       showKiteStatus(
-        `Login worked, but no backend URL is configured, so I can't safely complete it.\n\n` +
-        `Request token (for reference): ${requestToken}\n\n` +
-        `Enter your backend URL below, then try again.`,
+        `Login worked, but no backend URL is configured.\n\nRequest token: ${requestToken}\n\nEnter your backend URL below, then try again.`,
         'error'
       );
     }, 300);
@@ -558,7 +566,7 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     });
     data = await resp.json();
   } catch (e) {
-    showKiteStatus(`Could not reach your backend at ${backendUrl}. Check the URL is correct and the server is running.\n\n${e}`, 'error');
+    showKiteStatus(`Could not reach your backend at ${backendUrl}.\n\n${e}`, 'error');
     return;
   }
 
@@ -819,7 +827,7 @@ async function fetchAllNews() {
   }
   if (!getBackendUrl()) {
     openSettings();
-    showKiteStatus('News fetching needs your backend URL set below (the same one used for Kite login) — paste it in and try again.', 'error');
+    showKiteStatus('News fetching needs your backend URL set below — paste it in and try again.', 'error');
     return;
   }
 
@@ -933,27 +941,27 @@ async function fetchAndRenderGlobalCues() {
   if (!backendUrl) return;
 
   const container = document.getElementById('global-cues-container');
-  
+
   const cachedStr = localStorage.getItem('ml_global_cues');
   if (cachedStr) {
-      try {
-          const cached = JSON.parse(cachedStr);
-          if (Date.now() - cached.time < 30 * 60 * 1000) {
-              renderGlobalCues(cached.cues, container);
-              return;
-          }
-      } catch(e) {}
-  }
-  
-  try {
-      const resp = await fetch(`${backendUrl}/api/market/global-cues`);
-      const data = await resp.json();
-      if (data.status === 'success') {
-          localStorage.setItem('ml_global_cues', JSON.stringify({ time: Date.now(), cues: data.cues }));
-          renderGlobalCues(data.cues, container);
+    try {
+      const cached = JSON.parse(cachedStr);
+      if (Date.now() - cached.time < 30 * 60 * 1000) {
+        renderGlobalCues(cached.cues, container);
+        return;
       }
+    } catch(e) {}
+  }
+
+  try {
+    const resp = await fetch(`${backendUrl}/api/market/global-cues`);
+    const data = await resp.json();
+    if (data.status === 'success') {
+      localStorage.setItem('ml_global_cues', JSON.stringify({ time: Date.now(), cues: data.cues }));
+      renderGlobalCues(data.cues, container);
+    }
   } catch (e) {
-      console.error('Failed to fetch global cues', e);
+    console.error('Failed to fetch global cues', e);
   }
 }
 
@@ -981,68 +989,76 @@ function renderGlobalCues(cues, container) {
   </div>`;
 }
 
-async function fetchAndShowAIBriefing(ticker, company, articles) {
-    const backendUrl = getBackendUrl();
-    const panel = document.getElementById('ai-briefing-panel');
-    const btn = document.getElementById('ai-briefing-btn');
-    if (!panel) return;
-    if (!backendUrl) {
-        panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
-        return;
-    }
-    
-    btn.textContent = '✨ Analyzing...';
+async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, btnTarget, tier = 'Watch') {
+  const backendUrl = getBackendUrl();
+  const panel = typeof targetPanelId === 'string' ? document.getElementById(targetPanelId) : targetPanelId;
+  const btn = typeof btnTarget === 'string' ? document.getElementById(btnTarget) : btnTarget;
+
+  if (!panel) return;
+  if (!backendUrl) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">Backend URL not set (Settings).</div>`;
+    return;
+  }
+
+  if (btn) {
+    btn.textContent = '✨ Analyzing…';
     btn.disabled = true;
-    panel.innerHTML = '';
+  }
+  panel.innerHTML = '';
 
-    const cleanTickerForFund = getCleanTicker(ticker);
-    let fundamentals = getCachedFundamentals(cleanTickerForFund);
-    if (!fundamentals) {
-        try {
-            const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanTickerForFund)}`);
-            const data = await resp.json();
-            if (data.status === 'success') {
-                fundamentals = data.fundamentals;
-                setCachedFundamentals(cleanTickerForFund, fundamentals);
-            }
-        } catch(e) {}
-    }
-
+  const cleanTickerForFund = getCleanTicker(ticker);
+  let fundamentals = getCachedFundamentals(cleanTickerForFund);
+  if (!fundamentals) {
     try {
-        const resp = await fetch(`${backendUrl}/api/ai/briefing`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                symbol: ticker,
-                company: company,
-                fundamentals: fundamentals || {},
-                news: articles
-            })
-        });
-        const data = await resp.json();
-        if (data.status === 'success') {
-            const b = data.briefing;
-            const sentColor = b.sentiment === 'BULLISH' ? 'var(--sage)' : (b.sentiment === 'BEARISH' ? 'var(--clay)' : 'var(--ink)');
-            panel.innerHTML = `
-              <div class="ai-briefing-card">
-                 <div class="ai-b-row"><strong>Business:</strong> ${escapeHtml(b.business_summary)}</div>
-                 <div class="ai-b-row"><strong>Financials:</strong> ${escapeHtml(b.financial_health)}</div>
-                 <div class="ai-b-row"><strong>Sentiment:</strong> <span style="color:${sentColor};font-weight:700">${escapeHtml(b.sentiment)}</span></div>
-                 <div class="ai-b-row"><strong>Catalyst:</strong> ${escapeHtml(b.key_catalyst)}</div>
-                 <div class="ai-b-row"><strong>Risk:</strong> ${escapeHtml(b.key_risk)}</div>
-              </div>
-            `;
-            btn.style.display = 'none';
-        } else {
-            panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(data.error)}</div>`;
-            btn.textContent = '✨ Generate AI 1-Minute Briefing';
-            btn.disabled = false;
-        }
-    } catch(e) {
-        panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(String(e))}</div>`;
-        btn.textContent = '✨ Generate AI 1-Minute Briefing';
+      const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanTickerForFund)}`);
+      const data = await resp.json();
+      if (data.status === 'success') {
+        fundamentals = data.fundamentals;
+        setCachedFundamentals(cleanTickerForFund, fundamentals);
+      }
+    } catch(e) {}
+  }
+
+  try {
+    const resp = await fetch(`${backendUrl}/api/ai/briefing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: ticker,
+        company: company,
+        tier: tier,
+        fundamentals: fundamentals || {},
+        news: articles
+      })
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      const b = data.briefing;
+      const sentColor = b.sentiment === 'BULLISH' ? 'var(--sage)' : (b.sentiment === 'BEARISH' ? 'var(--clay)' : 'var(--ink)');
+      panel.innerHTML = `
+        <div class="ai-briefing-card">
+          <div class="ai-b-row"><strong>Business:</strong> ${escapeHtml(b.business_summary)}</div>
+          <div class="ai-b-row"><strong>Financials:</strong> ${escapeHtml(b.financial_health)}</div>
+          <div class="ai-b-row"><strong>Sentiment:</strong> <span style="color:${sentColor};font-weight:700">${escapeHtml(b.sentiment)}</span></div>
+          <div class="ai-b-row"><strong>Catalyst:</strong> ${escapeHtml(b.key_catalyst)}</div>
+          <div class="ai-b-row"><strong>Risk:</strong> ${escapeHtml(b.key_risk)}</div>
+        </div>
+      `;
+      if (btn) btn.style.display = 'none';
+    } else {
+      panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(data.error)}</div>`;
+      if (btn) {
+        btn.textContent = '✨ AI 1-Min Briefing';
         btn.disabled = false;
+      }
     }
+  } catch(e) {
+    panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(String(e))}</div>`;
+    if (btn) {
+      btn.textContent = '✨ AI 1-Min Briefing';
+      btn.disabled = false;
+    }
+  }
 }
 
 async function runSingleStockLookup(tickerTyped, companyTyped) {
@@ -1051,6 +1067,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     t.toLowerCase() === tickerTyped.toLowerCase() || c.toLowerCase() === companyTyped.toLowerCase());
   const searchTerm = known ? known[1] : companyTyped;
   const displayTicker = known ? known[0] : tickerTyped.toUpperCase();
+  const stockTier = known ? known[2] : 'Watch';
 
   lookupResult.innerHTML = `<div class="lookup-result-card">
     <div class="lookup-result-head">
@@ -1069,9 +1086,9 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     lookupError = result.error;
   } catch (e) { lookupError = e.message || String(e); }
 
-  const stockObj = { ticker: displayTicker, company: searchTerm, tier: known ? known[2] : 'Watch', articles };
-  const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn" data-ticker="${escapeHtml(displayTicker)}" data-company="${escapeHtml(searchTerm)}">✨ Generate AI 1-Minute Briefing</button>`;
-  
+  const stockObj = { ticker: displayTicker, company: searchTerm, tier: stockTier, articles };
+  const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn">✨ Generate AI 1-Minute Briefing</button>`;
+
   const diagnoseLink = articles.length === 0
     ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
     : '';
@@ -1097,7 +1114,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
   const fundBtn = document.getElementById('fundamentals-btn');
   if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
   const aiBtn = document.getElementById('ai-briefing-btn');
-  if (aiBtn) aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles));
+  if (aiBtn) aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
 }
 
 function getCachedFundamentals(ticker) {
@@ -1134,7 +1151,7 @@ function setCachedRoce(ticker, roceData) {
 function formatFundamentalsError(rawError) {
   const lower = (rawError || '').toLowerCase();
   if (lower.includes('rate limit') || lower.includes('too many requests')) {
-    return "Yahoo Finance is rate-limiting this type of data right now — a known, temporary limit on their side (not specific to this app or this stock). Try again in a few minutes.";
+    return "Yahoo Finance is rate-limiting this type of data right now — a known, temporary limit on their side. Try again in a few minutes.";
   }
   return rawError || 'Could not fetch fundamentals';
 }
@@ -1209,8 +1226,8 @@ async function fetchAndShowInlineRoce(ticker, targetId, btn) {
 }
 function renderCompactRocePills(r) {
   const pills = [];
-  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated, not a direct Yahoo field">ROCE ${(Number(r.roce)*100).toFixed(1)}%</span>`);
-  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated, not a direct Yahoo field">DR ${(Number(r.debt_ratio)*100).toFixed(1)}%</span>`);
+  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated">ROCE ${(Number(r.roce)*100).toFixed(1)}%</span>`);
+  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated">DR ${(Number(r.debt_ratio)*100).toFixed(1)}%</span>`);
   return pills.length ? pills.join('') : `<span class="ribbon-fund-pill" style="opacity:0.75">No ROCE data</span>`;
 }
 
@@ -1271,42 +1288,26 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
-    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="yfinance has a known, documented bug (GitHub issue #903) where this figure can be significantly wrong for some stocks — treat it as indicative, not precise">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
-    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Not a direct Yahoo/yfinance field — calculated here as EBIT ÷ (Total Assets − Current Liabilities) from the latest reported balance sheet and income statement">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
     <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
-    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Not a direct Yahoo/yfinance field — calculated here as Total Debt ÷ Total Assets from the latest reported balance sheet">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
     <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
-    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data (Yahoo doesn't provide them as ready-made figures) — shown as "—" if that underlying data isn't reported for this stock.</div>
+    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data.</div>
   </div>`;
 }
 
 function renderCompactFundamentalPills(f) {
   const pills = [];
-  if (f.trailing_pe != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
-  }
-  if (f.price_to_book != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
-  }
-  if (f.peg_ratio != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="PEG ratio — yfinance has a known bug (GitHub #903) where this can be inaccurate for some stocks">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
-  }
-  if (f.return_on_equity != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
-  }
-  if (f.roce != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="ROCE — calculated as EBIT ÷ (Total Assets − Current Liabilities), not a direct Yahoo field">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
-  }
-  if (f.debt_to_equity != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
-  }
-  if (f.debt_ratio != null) {
-    pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio — calculated as Total Debt ÷ Total Assets, not a direct Yahoo field">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
-  }
-  if (pills.length === 0) {
-    return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
-  }
+  if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
+  if (f.price_to_book != null) pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
+  if (f.peg_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
+  if (f.return_on_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
+  if (f.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
+  if (f.debt_to_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
+  if (f.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
+  if (pills.length === 0) return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
   return pills.join('');
 }
 
@@ -1331,8 +1332,8 @@ async function runDiagnosticCheck(company) {
 
   if (!backendUrl) {
     statusLine = 'No backend URL configured';
-    snippet = 'Set your backend URL in Settings (the same one used for Kite login) before fetching news.';
-    requestUrl = '(none — backend URL is empty)';
+    snippet = 'Set your backend URL in Settings before fetching news.';
+    requestUrl = '(none)';
   } else {
     requestUrl = `${backendUrl}/api/news?company=${encodeURIComponent(company)}`;
     try {
@@ -1350,8 +1351,7 @@ async function runDiagnosticCheck(company) {
       snippet = text.slice(0, 600);
     } catch (e) {
       statusLine = `Failed: ${e.message || e}`;
-      snippet = '(no response — check the backend URL is correct and the server is running. Try opening ' +
-                 (backendUrl ? `${backendUrl}/healthz` : '(no backend URL set)') + ' directly in a browser tab.)';
+      snippet = '(no response from server)';
     }
   }
 
@@ -1441,41 +1441,41 @@ function renderMoversSummary() {
 }
 
 function renderContent() {
-   renderMoversSummary();
-   if (!newsData) {
-     contentEl.innerHTML = `<div class="empty-state">
-       <div class="glyph">☀︎</div>
-       <h3>Good morning.</h3>
-       <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
-     </div>`;
-     return;
-   }
+  renderMoversSummary();
+  if (!newsData) {
+    contentEl.innerHTML = `<div class="empty-state">
+      <div class="glyph">☀︎</div>
+      <h3>Good morning.</h3>
+      <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
+    </div>`;
+    return;
+  }
 
-   let filtered = newsData.results;
-   if (currentFilter === 'fresh') {
-     filtered = filtered.filter(s => s.articles && s.articles.length > 0);
-   }
+  let filtered = newsData.results;
+  if (currentFilter === 'fresh') {
+    filtered = filtered.filter(s => s.articles && s.articles.length > 0);
+  }
 
-   if (currentSentiment !== 'all') {
-     filtered = filtered.filter(s => {
-       const overall = classifyStockOverallSentiment(s.articles);
-       return overall === currentSentiment;
-     });
-   }
+  if (currentSentiment !== 'all') {
+    filtered = filtered.filter(s => {
+      const overall = classifyStockOverallSentiment(s.articles);
+      return overall === currentSentiment;
+    });
+  }
 
-   if (filtered.length === 0) {
-     const sentimentNote = currentSentiment !== 'all' ? ` with ${currentSentiment} news` : '';
-     contentEl.innerHTML = `<div class="empty-state">
-       <div class="glyph">—</div>
-       <h3>Nothing here</h3>
-       <p>No stocks${sentimentNote} match this filter right now.</p>
-     </div>`;
-     return;
-   }
+  if (filtered.length === 0) {
+    const sentimentNote = currentSentiment !== 'all' ? ` with ${currentSentiment} news` : '';
+    contentEl.innerHTML = `<div class="empty-state">
+      <div class="glyph">—</div>
+      <h3>Nothing here</h3>
+      <p>No stocks${sentimentNote} match this filter right now.</p>
+    </div>`;
+    return;
+  }
 
-   const sortedFiltered = applySorting(filtered, currentSort);
-   contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
- }
+  const sortedFiltered = applySorting(filtered, currentSort);
+  contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
+}
 
 function renderEntry(stock) {
   const hasNews = stock.articles && stock.articles.length > 0;
@@ -1518,9 +1518,9 @@ function renderEntry(stock) {
 
     let flagsHtml = '';
     if (stock.quote.near_52wk_flag === 'near-high') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week high of ₹${stock.quote.fifty_two_wk_high}">52WK HIGH</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week high of ₹${stock.quote.fifty_two_wk_high}">52WK HIGH</span>`;
     } else if (stock.quote.near_52wk_flag === 'near-low') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of the 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
     }
 
     const cleanTickerForFund = getCleanTicker(stock.ticker);
@@ -1555,10 +1555,18 @@ function renderEntry(stock) {
         ${badgeHtml}
       </div>`;
 
+  const aiBriefingHtml = `
+    <div>
+      <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI 1-Min Briefing</button>
+      <div id="ai-panel-entry-${escapeHtml(stock.ticker)}"></div>
+    </div>
+  `;
+
   return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
     ${headHtml}
     ${ribbonHtml}
     ${body}
+    ${aiBriefingHtml}
   </div>`;
 }
 

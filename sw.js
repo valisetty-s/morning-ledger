@@ -1,5 +1,5 @@
-// sw.js
-const CACHE_NAME = 'morning-ledger-v37';
+// Service worker for The Morning Ledger
+const CACHE_NAME = 'morning-ledger-v38';
 const SHELL_FILES = [
   './index.html',
   './app.js',
@@ -24,8 +24,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
-  if (event.request.method !== 'GET') return;
-  if (!url.startsWith(self.location.origin)) return;
+
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  if (!url.startsWith(self.location.origin)) {
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
