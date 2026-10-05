@@ -70,13 +70,7 @@ const Store = {
     if (!raw) return DEFAULT_STOCKS;
     try {
       const parsed = JSON.parse(raw);
-      return parsed.map(s => [
-        s[0], 
-        s[1] || s[0], 
-        s[2] || 'Watch', 
-        Number(s[3]) || 0, 
-        Number(s[4]) || 0
-      ]);
+      return parsed.map(s => [s[0], s[1] || s[0], s[2] || 'Watch', Number(s[3]) || 0, Number(s[4]) || 0]);
     } catch {
       return DEFAULT_STOCKS;
     }
@@ -135,7 +129,10 @@ function init() {
     updateStatusBar();
   }
 
-  fetchAndRenderGlobalCues();
+  const cuesBtn = $('#global-cues-btn');
+  if (cuesBtn) {
+    cuesBtn.addEventListener('click', fetchAndRenderGlobalCues);
+  }
 
   contentEl.addEventListener('click', (e) => {
     const fundBtn = e.target.closest('.ribbon-fund-btn');
@@ -197,7 +194,6 @@ function init() {
     const val = lookupInput.value;
     lookupDebounceTimer = setTimeout(() => renderSuggestions(val), 150);
   });
-  
   lookupInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -214,7 +210,6 @@ function init() {
       lookupSuggestions.classList.remove('open');
     }
   });
-  
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.lookup-bar')) {
       lookupSuggestions.classList.remove('open');
@@ -270,7 +265,7 @@ function updateStatusBar() {
   let diagSuffix = '';
   if (d && d.totalCount > 0 && d.errorCount > 0) {
     if (d.errorCount === d.totalCount) {
-      diagSuffix = ` — ⚠ backend could not be reached for any stock (${escapeHtml(d.lastError || 'unknown error')}). Check your backend URL in Settings and that it's running.`;
+      diagSuffix = ` — ⚠ backend could not be reached for any stock (${escapeHtml(d.lastError || 'unknown error')}). Check your backend URL in Settings.`;
     } else if (d.errorCount > d.totalCount * 0.3) {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
@@ -292,9 +287,7 @@ function updatePriceStatus() {
 function openSettings() {
   const stocks = Store.getStocks();
   $('#stocklist-input').value = stocks.map(s => {
-    if (s[3] || s[4]) {
-      return `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`;
-    }
+    if (s[3] || s[4]) return `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`;
     return `${s[0]},${s[1]},${s[2]}`;
   }).join('\n');
 
@@ -358,14 +351,10 @@ const KNOWN_NON_TICKER_LABELS = new Set([
 
 function looksLikeRealTicker(value) {
   const v = String(value || '').trim();
-  if (!v) return false;
-  if (v.length > 20) return false;
-  if (/\s/.test(v)) return false;
+  if (!v || v.length > 20 || /\s/.test(v)) return false;
   if (/^-?\d+(\.\d+)?$/.test(v)) return false;
-  if (!/^[A-Z0-9&\-]+$/i.test(v)) return false;
-  if (!/[A-Z]/i.test(v)) return false;
-  if (looksLikeISIN(v)) return false;
-  if (KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false;
+  if (!/^[A-Z0-9&\-]+$/i.test(v) || !/[A-Z]/i.test(v)) return false;
+  if (looksLikeISIN(v) || KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false;
   return true;
 }
 
@@ -376,26 +365,18 @@ function parseRowsFromSheet(rows) {
   const startIdx = hasHeader ? 1 : 0;
 
   const result = [];
-  let skippedCount = 0;
   for (let i = startIdx; i < rows.length; i++) {
     const row = rows[i];
     if (!row || !row[0]) continue;
-
     const ticker = String(row[0]).trim().toUpperCase();
-    if (!looksLikeRealTicker(ticker)) {
-      skippedCount++;
-      continue;
-    }
+    if (!looksLikeRealTicker(ticker)) continue;
+
     const company = String(row[1] || row[0]).trim();
     let tier = String(row[2] || '').trim();
     if (!VALID_TIERS.includes(tier)) tier = 'Watch';
-    
     const qty = Number(row[3]) || 0;
     const avgPrice = Number(row[4]) || 0;
     result.push([ticker, company, tier, qty, avgPrice]);
-  }
-  if (skippedCount > 0) {
-    console.warn(`Skipped ${skippedCount} row(s) that didn't look like real tickers.`);
   }
   return result;
 }
@@ -403,10 +384,7 @@ function parseRowsFromSheet(rows) {
 function parseKiteHoldingsRows(rows) {
   if (!rows || rows.length === 0) return null;
   const header = rows[0].map(c => String(c || '').toLowerCase().trim());
-
-  const instrIdx = header.findIndex(h =>
-    h === 'instrument' || h === 'tradingsymbol' || h === 'symbol' || h.includes('trading symbol'));
-
+  const instrIdx = header.findIndex(h => h === 'instrument' || h === 'tradingsymbol' || h === 'symbol');
   if (instrIdx === -1) return null;
 
   const qtyIdx = header.findIndex(h => h === 'quantity' || h === 'qty');
@@ -417,10 +395,8 @@ function parseKiteHoldingsRows(rows) {
     const row = rows[i];
     const ticker = String(row[instrIdx] || '').trim().toUpperCase();
     if (!looksLikeRealTicker(ticker)) continue;
-    
     const qty = qtyIdx !== -1 ? (Number(row[qtyIdx]) || 0) : 0;
     const avgPrice = avgIdx !== -1 ? (Number(row[avgIdx]) || 0) : 0;
-    
     result.push([ticker, ticker, 'Watch', qty, avgPrice]);
   }
   return result.length > 0 ? result : null;
@@ -437,7 +413,7 @@ async function handleSpreadsheetUpload(event) {
   try {
     await ensureSheetJS();
   } catch (e) {
-    filenameEl.textContent = 'Could not load spreadsheet reader — check your connection.';
+    filenameEl.textContent = 'Could not load spreadsheet reader.';
     filenameEl.style.color = 'var(--clay)';
     return;
   }
@@ -450,29 +426,20 @@ async function handleSpreadsheetUpload(event) {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
 
-      let parsed = parseKiteHoldingsRows(rows);
-      let isKite = !!parsed;
-      if (!parsed) parsed = parseRowsFromSheet(rows);
-
+      let parsed = parseKiteHoldingsRows(rows) || parseRowsFromSheet(rows);
       if (!parsed || parsed.length === 0) {
-        filenameEl.textContent = 'Could not find any real stock tickers in this file.';
+        filenameEl.textContent = 'No stock tickers found in file.';
         filenameEl.style.color = 'var(--clay)';
         return;
       }
 
       $('#stocklist-input').value = parsed.map(r => r.join(',')).join('\n');
-      filenameEl.textContent = isKite
-        ? `✓ ${file.name} — ${parsed.length} holdings from Kite export (all set to Watch tier)`
-        : `✓ ${file.name} — ${parsed.length} stocks loaded`;
+      filenameEl.textContent = `✓ ${file.name} — ${parsed.length} stocks loaded`;
       filenameEl.style.color = 'var(--sage)';
     } catch (err) {
-      filenameEl.textContent = `Could not read "${file.name}" — try saving as .xlsx`;
+      filenameEl.textContent = `Could not read "${file.name}"`;
       filenameEl.style.color = 'var(--clay)';
     }
-  };
-  reader.onerror = () => {
-    filenameEl.textContent = 'Could not read that file.';
-    filenameEl.style.color = 'var(--clay)';
   };
   reader.readAsArrayBuffer(file);
 }
@@ -947,29 +914,52 @@ function renderSuggestions(query) {
 
 async function fetchAndRenderGlobalCues() {
   const backendUrl = getBackendUrl();
-  if (!backendUrl) return;
-
+  const btn = $('#global-cues-btn');
   const container = document.getElementById('global-cues-container');
-  const cachedStr = localStorage.getItem('ml_global_cues');
-  if (cachedStr) {
-    try {
-      const cached = JSON.parse(cachedStr);
-      if (Date.now() - cached.time < 30 * 60 * 1000) {
-        renderGlobalCues(cached.cues, container);
-        return;
-      }
-    } catch (e) {}
+
+  if (!container) return;
+
+  if (!backendUrl) {
+    openSettings();
+    showKiteStatus('Enter your backend URL in Settings first to fetch global cues.', 'error');
+    return;
+  }
+
+  // If container is already visible and populated, allow toggling it closed
+  if (container.style.display === 'block' && container.innerHTML.trim() !== '') {
+    container.style.display = 'none';
+    if (btn) btn.textContent = '🌐 Global Cues';
+    return;
+  }
+
+  if (btn) {
+    btn.classList.add('spinning');
+    btn.textContent = 'Fetching Cues…';
   }
 
   try {
     const resp = await fetch(`${backendUrl}/api/market/global-cues`);
     const data = await resp.json();
-    if (data.status === 'success') {
+
+    if (btn) {
+      btn.classList.remove('spinning');
+      btn.textContent = '🌐 Close Global Cues';
+    }
+
+    if (resp.ok && data.status === 'success') {
       localStorage.setItem('ml_global_cues', JSON.stringify({ time: Date.now(), cues: data.cues }));
       renderGlobalCues(data.cues, container);
+    } else {
+      container.style.display = 'block';
+      container.innerHTML = `<div class="quiet" style="color:var(--clay);padding:10px 0;">Could not load cues: ${escapeHtml(data.error || 'Server error')}</div>`;
     }
   } catch (e) {
-    console.error('Failed to fetch global cues', e);
+    if (btn) {
+      btn.classList.remove('spinning');
+      btn.textContent = '🌐 Global Cues';
+    }
+    container.style.display = 'block';
+    container.innerHTML = `<div class="quiet" style="color:var(--clay);padding:10px 0;">Network error: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
 
@@ -1413,7 +1403,7 @@ function renderContent() {
   renderMoversSummary();
   if (!newsData) {
     contentEl.innerHTML = `<div class="empty-state">
-      <div class="glyph">☀︎</div>
+      <div class="glyph">☀︎︎</div>
       <h3>Good morning.</h3>
       <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
     </div>`;
