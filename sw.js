@@ -1,5 +1,5 @@
 // Service worker for The Morning Ledger
-const CACHE_NAME = 'morning-ledger-v39';
+const CACHE_NAME = 'morning-ledger-v40';
 const SHELL_FILES = [
   './index.html',
   './app.js',
