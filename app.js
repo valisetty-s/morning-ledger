@@ -70,7 +70,13 @@ const Store = {
     if (!raw) return DEFAULT_STOCKS;
     try {
       const parsed = JSON.parse(raw);
-      return parsed.map(s => [s[0], s[1] || s[0], s[2] || 'Watch', Number(s[3]) || 0, Number(s[4]) || 0]);
+      return parsed.map(s => [
+        s[0], 
+        s[1] || s[0], 
+        s[2] || 'Watch', 
+        Number(s[3]) || 0, 
+        Number(s[4]) || 0
+      ]);
     } catch {
       return DEFAULT_STOCKS;
     }
@@ -191,6 +197,7 @@ function init() {
     const val = lookupInput.value;
     lookupDebounceTimer = setTimeout(() => renderSuggestions(val), 150);
   });
+  
   lookupInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -207,6 +214,7 @@ function init() {
       lookupSuggestions.classList.remove('open');
     }
   });
+  
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.lookup-bar')) {
       lookupSuggestions.classList.remove('open');
@@ -262,12 +270,12 @@ function updateStatusBar() {
   let diagSuffix = '';
   if (d && d.totalCount > 0 && d.errorCount > 0) {
     if (d.errorCount === d.totalCount) {
-      diagSuffix = ` — ⚠ backend unreachable (${escapeHtml(d.lastError || 'check backend URL')})`;
+      diagSuffix = ` — ⚠ backend could not be reached for any stock (${escapeHtml(d.lastError || 'unknown error')}). Check your backend URL in Settings and that it's running.`;
     } else if (d.errorCount > d.totalCount * 0.3) {
-      diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed (${escapeHtml(d.lastError || 'details')})`;
+      diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (stale)'}${diagSuffix}`;
+  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
   datelineStatus.classList.toggle('fresh', fresh);
 
@@ -284,7 +292,9 @@ function updatePriceStatus() {
 function openSettings() {
   const stocks = Store.getStocks();
   $('#stocklist-input').value = stocks.map(s => {
-    if (s[3] || s[4]) return `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`;
+    if (s[3] || s[4]) {
+      return `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`;
+    }
     return `${s[0]},${s[1]},${s[2]}`;
   }).join('\n');
 
@@ -348,10 +358,14 @@ const KNOWN_NON_TICKER_LABELS = new Set([
 
 function looksLikeRealTicker(value) {
   const v = String(value || '').trim();
-  if (!v || v.length > 20 || /\s/.test(v)) return false;
+  if (!v) return false;
+  if (v.length > 20) return false;
+  if (/\s/.test(v)) return false;
   if (/^-?\d+(\.\d+)?$/.test(v)) return false;
-  if (!/^[A-Z0-9&\-]+$/i.test(v) || !/[A-Z]/i.test(v)) return false;
-  if (looksLikeISIN(v) || KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false;
+  if (!/^[A-Z0-9&\-]+$/i.test(v)) return false;
+  if (!/[A-Z]/i.test(v)) return false;
+  if (looksLikeISIN(v)) return false;
+  if (KNOWN_NON_TICKER_LABELS.has(v.toUpperCase())) return false;
   return true;
 }
 
@@ -362,18 +376,26 @@ function parseRowsFromSheet(rows) {
   const startIdx = hasHeader ? 1 : 0;
 
   const result = [];
+  let skippedCount = 0;
   for (let i = startIdx; i < rows.length; i++) {
     const row = rows[i];
     if (!row || !row[0]) continue;
-    const ticker = String(row[0]).trim().toUpperCase();
-    if (!looksLikeRealTicker(ticker)) continue;
 
+    const ticker = String(row[0]).trim().toUpperCase();
+    if (!looksLikeRealTicker(ticker)) {
+      skippedCount++;
+      continue;
+    }
     const company = String(row[1] || row[0]).trim();
     let tier = String(row[2] || '').trim();
     if (!VALID_TIERS.includes(tier)) tier = 'Watch';
+    
     const qty = Number(row[3]) || 0;
     const avgPrice = Number(row[4]) || 0;
     result.push([ticker, company, tier, qty, avgPrice]);
+  }
+  if (skippedCount > 0) {
+    console.warn(`Skipped ${skippedCount} row(s) that didn't look like real tickers.`);
   }
   return result;
 }
@@ -381,7 +403,10 @@ function parseRowsFromSheet(rows) {
 function parseKiteHoldingsRows(rows) {
   if (!rows || rows.length === 0) return null;
   const header = rows[0].map(c => String(c || '').toLowerCase().trim());
-  const instrIdx = header.findIndex(h => h === 'instrument' || h === 'tradingsymbol' || h === 'symbol');
+
+  const instrIdx = header.findIndex(h =>
+    h === 'instrument' || h === 'tradingsymbol' || h === 'symbol' || h.includes('trading symbol'));
+
   if (instrIdx === -1) return null;
 
   const qtyIdx = header.findIndex(h => h === 'quantity' || h === 'qty');
@@ -392,8 +417,10 @@ function parseKiteHoldingsRows(rows) {
     const row = rows[i];
     const ticker = String(row[instrIdx] || '').trim().toUpperCase();
     if (!looksLikeRealTicker(ticker)) continue;
+    
     const qty = qtyIdx !== -1 ? (Number(row[qtyIdx]) || 0) : 0;
     const avgPrice = avgIdx !== -1 ? (Number(row[avgIdx]) || 0) : 0;
+    
     result.push([ticker, ticker, 'Watch', qty, avgPrice]);
   }
   return result.length > 0 ? result : null;
@@ -410,7 +437,7 @@ async function handleSpreadsheetUpload(event) {
   try {
     await ensureSheetJS();
   } catch (e) {
-    filenameEl.textContent = 'Could not load spreadsheet reader.';
+    filenameEl.textContent = 'Could not load spreadsheet reader — check your connection.';
     filenameEl.style.color = 'var(--clay)';
     return;
   }
@@ -423,20 +450,29 @@ async function handleSpreadsheetUpload(event) {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
 
-      let parsed = parseKiteHoldingsRows(rows) || parseRowsFromSheet(rows);
+      let parsed = parseKiteHoldingsRows(rows);
+      let isKite = !!parsed;
+      if (!parsed) parsed = parseRowsFromSheet(rows);
+
       if (!parsed || parsed.length === 0) {
-        filenameEl.textContent = 'No stock tickers found in file.';
+        filenameEl.textContent = 'Could not find any real stock tickers in this file.';
         filenameEl.style.color = 'var(--clay)';
         return;
       }
 
       $('#stocklist-input').value = parsed.map(r => r.join(',')).join('\n');
-      filenameEl.textContent = `✓ ${file.name} — ${parsed.length} stocks loaded`;
+      filenameEl.textContent = isKite
+        ? `✓ ${file.name} — ${parsed.length} holdings from Kite export (all set to Watch tier)`
+        : `✓ ${file.name} — ${parsed.length} stocks loaded`;
       filenameEl.style.color = 'var(--sage)';
     } catch (err) {
-      filenameEl.textContent = `Could not read "${file.name}"`;
+      filenameEl.textContent = `Could not read "${file.name}" — try saving as .xlsx`;
       filenameEl.style.color = 'var(--clay)';
     }
+  };
+  reader.onerror = () => {
+    filenameEl.textContent = 'Could not read that file.';
+    filenameEl.style.color = 'var(--clay)';
   };
   reader.readAsArrayBuffer(file);
 }
@@ -449,7 +485,7 @@ async function fetchLatestPrices() {
   const backendUrl = getBackendUrl();
   if (!backendUrl) {
     openSettings();
-    showKiteStatus('Enter your backend URL in Settings before fetching prices.', 'error');
+    showKiteStatus('Enter your backend URL first (see instructions below) before fetching prices.', 'error');
     return;
   }
 
@@ -461,6 +497,7 @@ async function fetchLatestPrices() {
   priceStatusUpdate('Fetching prices…');
 
   const symbols = stocks.map(([ticker]) => ticker).join(',');
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
@@ -469,6 +506,7 @@ async function fetchLatestPrices() {
     const data = await resp.json();
 
     if (priceBtn) priceBtn.classList.remove('spinning');
+
     if (!resp.ok || data.status !== 'success') {
       priceStatusUpdate(`Prices unavailable: ${data.error || `HTTP ${resp.status}`}`);
       return;
@@ -489,22 +527,23 @@ async function startKiteLogin(intent) {
 
   if (!apiKey) {
     openSettings();
-    showKiteStatus('Enter your Kite API key first.', 'error');
+    showKiteStatus('Enter your Kite API key first (see instructions below).', 'error');
     return;
   }
   if (!backendUrl) {
     openSettings();
-    showKiteStatus('Enter your backend URL first.', 'error');
+    showKiteStatus('Enter your backend URL first — this is the small server that securely completes the login.', 'error');
     return;
   }
   Store.setKiteApiKey(apiKey);
   localStorage.setItem(KITE_BACKEND_URL_KEY, backendUrl.replace(/\/$/, ''));
 
   sessionStorage.removeItem('ml_kite_callback_handled');
-  showKiteStatus('Opening Kite login… Redirecting back here automatically after authorization.', 'info');
+  showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
   localStorage.setItem('ml_kite_pending_key', apiKey);
 
-  window.open(`https://kite.zerodha.com/connect/login?api_key=${encodeURIComponent(apiKey)}&v=3`, '_self');
+  const loginUrl = `https://kite.zerodha.com/connect/login?api_key=${encodeURIComponent(apiKey)}&v=3`;
+  window.open(loginUrl, '_self');
 }
 
 function priceStatusUpdate(text) {
@@ -515,18 +554,32 @@ function priceStatusUpdate(text) {
 function checkKiteOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') !== 'login' || params.get('status') !== 'success') return;
-  if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') return;
+
+  if (sessionStorage.getItem('ml_kite_callback_handled') === 'true') {
+    return;
+  }
   sessionStorage.setItem('ml_kite_callback_handled', 'true');
 
   const requestToken = params.get('request_token');
   const apiKey = Store.getKiteApiKey() || localStorage.getItem('ml_kite_pending_key');
   const backendUrl = localStorage.getItem(KITE_BACKEND_URL_KEY);
+
   history.replaceState({}, '', window.location.pathname);
 
-  if (!requestToken || !apiKey || !backendUrl) {
+  if (!requestToken || !apiKey) {
     setTimeout(() => {
       openSettings();
-      showKiteStatus('Login returned but credentials or backend configuration is incomplete.', 'error');
+      showKiteStatus('Login returned but request token or API key is missing. Try again.', 'error');
+    }, 300);
+    return;
+  }
+  if (!backendUrl) {
+    setTimeout(() => {
+      openSettings();
+      showKiteStatus(
+        `Login worked, but no backend URL is configured.\n\nRequest token: ${requestToken}\n\nEnter your backend URL below, then try again.`,
+        'error'
+      );
     }, 300);
     return;
   }
@@ -538,7 +591,7 @@ function checkKiteOAuthCallback() {
 }
 
 async function completeKiteLogin(requestToken, apiKey, backendUrl) {
-  showKiteStatus('Completing login and fetching holdings with quantities…', 'info');
+  showKiteStatus('Completing login and fetching your holdings…', 'info');
 
   let resp, data;
   try {
@@ -549,18 +602,18 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
     });
     data = await resp.json();
   } catch (e) {
-    showKiteStatus(`Could not reach backend at ${backendUrl}.\n\n${e}`, 'error');
+    showKiteStatus(`Could not reach your backend at ${backendUrl}.\n\n${e}`, 'error');
     return;
   }
 
   if (!resp.ok || data.status !== 'success') {
-    showKiteStatus(`Backend error:\n${data.error || JSON.stringify(data)}`, 'error');
+    showKiteStatus(`Backend reported an error:\n${data.error || JSON.stringify(data)}`, 'error');
     return;
   }
 
   const holdings = data.holdings || [];
   if (holdings.length === 0) {
-    showKiteStatus('Logged in successfully, but Kite returned 0 holdings.', 'error');
+    showKiteStatus('Logged in successfully, but Kite returned zero holdings.', 'error');
     return;
   }
 
@@ -583,7 +636,7 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
   const merged = holdings.map(h => {
     const ticker = (h.ticker || '').toUpperCase();
     const qty = Number(h.quantity) || 0;
-    const avgPrice = Number(h.average_price) || 0; // Fetched successfully from Kite Connect API
+    const avgPrice = Number(h.average_price) || 0;
 
     let company = ticker;
     let tier = 'Watch';
@@ -611,7 +664,11 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
   $('#stocklist-input').value = merged.map(s => `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`).join('\n');
 
   const userName = (data.user && data.user.user_name) || 'your account';
-  showKiteStatus(`✓ Imported ${holdings.length} holdings from ${userName}'s account. Fetching morning updates…`, 'success');
+  showKiteStatus(
+    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account. Closing settings and fetching today's news now…`,
+    'success'
+  );
+
   renderImportedHoldingsPreview(merged, userName);
 
   setTimeout(() => {
@@ -624,9 +681,10 @@ function renderImportedHoldingsPreview(stocksList, userName) {
   const rows = stocksList.map(([ticker, company, tier, qty, avgPrice]) =>
     `<div class="entry"><div class="entry-head"><div><span class="entry-name">${escapeHtml(company)}</span><span class="entry-ticker">${escapeHtml(ticker)}</span>${qty ? ` <span style="font-size:11px;color:var(--ink-soft)">(Qty: ${qty})</span>` : ''}</div><span class="entry-badge fresh">${escapeHtml(tier)}</span></div></div>`
   ).join('');
+  
   contentEl.innerHTML = `<div class="section">
     <div class="section-head"><span class="section-label">✓ Imported from ${escapeHtml(userName)}'s Kite account</span><div class="rule"></div></div>
-    <div class="quiet" style="margin-bottom:8px">Fetching news and live quotes now…</div>
+    <div class="quiet" style="margin-bottom:8px">Fetching today's news for these now…</div>
     ${rows}
   </div>`;
 }
@@ -671,18 +729,11 @@ const POSITIVE_WORDS = [
 function classifySentiment(title) {
   if (!title) return 'neutral';
   const lower = title.toLowerCase();
-  const hasNegative = NEGATIVE_WORDS.some(w => lower.includes(w));
-  const hasPositive = POSITIVE_WORDS.some(w => lower.includes(w));
-  if (hasNegative && !hasPositive) return 'negative';
-You are completely right—the file is so massively comprehensive now that it hit my output length limit and got cut off right in the middle of the `classifySentiment` function!
-
-Here is the exact **bottom half** of your `app.js` file, picking up perfectly where it truncated (at `w));` inside the `classifySentiment` function) all the way to the end. You can safely paste this directly beneath the first half you already copied.
-
-```javascript
-  w));
-  if (hasNegative && !hasPositive) return 'negative';
-  if (hasPositive && !hasNegative) return 'positive';
-  if (hasNegative && hasPositive) return 'negative';
+  const hasNeg = NEGATIVE_WORDS.some(w => lower.includes(w));
+  const hasPos = POSITIVE_WORDS.some(w => lower.includes(w));
+  if (hasNeg && !hasPos) return 'negative';
+  if (hasPos && !hasNeg) return 'positive';
+  if (hasNeg && hasPos) return 'negative';
   return 'neutral';
 }
 
@@ -704,14 +755,13 @@ function classifyStockOverallSentiment(articles) {
   if (!articles || articles.length === 0) return null;
   const latest = findMostRecentArticle(articles);
   if (!latest) return null;
-  const latestSentiment = classifySentiment(latest.title);
-  return latestSentiment === 'negative' ? 'negative' : 'positive';
+  return classifySentiment(latest.title) === 'negative' ? 'negative' : 'positive';
 }
 
 function applySorting(stocks, sortType) {
   if (!stocks || stocks.length === 0) return stocks;
   const sorted = [...stocks];
-  switch(sortType) {
+  switch (sortType) {
     case 'change-desc':
       sorted.sort((a, b) => {
         const hasA = a.quote && a.quote.change_pct != null;
@@ -734,7 +784,7 @@ function applySorting(stocks, sortType) {
       break;
     case 'default':
     default:
-      sorted.sort((a, b) => a.company.localeCompare(b.company));
+      sorted.sort((a, b) => (a.company || '').localeCompare(b.company || ''));
       break;
   }
   return sorted;
@@ -756,9 +806,7 @@ function sortArticlesByDateDesc(articles) {
 
 async function fetchNewsViaBackend(company, maxArticles) {
   const backendUrl = getBackendUrl();
-  if (!backendUrl) {
-    return { articles: [], error: 'no-backend-configured' };
-  }
+  if (!backendUrl) return { articles: [], error: 'no-backend-configured' };
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
@@ -766,7 +814,7 @@ async function fetchNewsViaBackend(company, maxArticles) {
     clearTimeout(timer);
     const data = await resp.json();
     if (!resp.ok || data.status !== 'success') {
-      return { articles: [], error: data.error || `backend returned HTTP ${resp.status}` };
+      return { articles: [], error: data.error || `HTTP ${resp.status}` };
     }
     const sorted = sortArticlesByDateDesc(data.articles || []);
     return { articles: sorted.slice(0, maxArticles), error: null };
@@ -774,9 +822,6 @@ async function fetchNewsViaBackend(company, maxArticles) {
     return { articles: [], error: e.message || String(e) };
   }
 }
-
-const BATCH_SIZE = 6;
-const BATCH_PAUSE_MS = 200;
 
 async function fetchStockNews(ticker, company) {
   const { articles, error } = await fetchNewsViaBackend(company, 3);
@@ -803,8 +848,8 @@ async function fetchAllNews() {
   let completed = 0;
   const diagnostics = { errorCount: 0, emptyCount: 0, totalCount: stocks.length, lastError: null };
 
-  for (let batchStart = 0; batchStart < stocks.length; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, stocks.length);
+  for (let batchStart = 0; batchStart < stocks.length; batchStart += 6) {
+    const batchEnd = Math.min(batchStart + 6, stocks.length);
     const batch = stocks.slice(batchStart, batchEnd);
 
     const batchPromises = batch.map(async ([ticker, company, tier, qty = 0, avgPrice = 0], batchIdx) => {
@@ -814,16 +859,18 @@ async function fetchAllNews() {
       results[batchStart + batchIdx] = { ticker, company, tier, qty, avgPrice, articles, quote: existingQuote || null };
       if (articles.length === 0) {
         diagnostics.emptyCount++;
-        if (error) { diagnostics.errorCount++; diagnostics.lastError = error; }
+        if (error) {
+          diagnostics.errorCount++;
+          diagnostics.lastError = error;
+        }
       }
       completed++;
       refreshLabel.textContent = `Fetching… ${completed}/${stocks.length}`;
     });
 
     await Promise.all(batchPromises);
-
     if (batchEnd < stocks.length) {
-      await new Promise(r => setTimeout(r, BATCH_PAUSE_MS));
+      await new Promise(r => setTimeout(r, 200));
     }
   }
 
@@ -835,7 +882,6 @@ async function fetchAllNews() {
   refreshLabel.textContent = "Fetch today's news";
   updateStatusBar();
   renderContent();
-
   fetchLatestPrices();
 }
 
@@ -850,7 +896,7 @@ function applyFetchedQuotes(quotes) {
   } else {
     const results = stocks.map(([ticker, company, tier, qty, avgPrice]) => {
       const q = quotes[ticker];
-      return { ticker, company, tier, qty, avgPrice, articles: [], quote: (q && !q.error) ? q : null };
+      return { ticker, company, tier, qty, avgPrice, articles: [], quote: q && !q.error ? q : null };
     });
     newsData = { fetchedAt: new Date().toISOString(), results };
     Store.setCache(newsData);
@@ -864,8 +910,7 @@ function getStockSuggestions(query) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   return stocks
-    .filter(([ticker, company]) =>
-      ticker.toLowerCase().includes(q) || company.toLowerCase().includes(q))
+    .filter(([ticker, company]) => ticker.toLowerCase().includes(q) || company.toLowerCase().includes(q))
     .slice(0, 6);
 }
 
@@ -905,7 +950,6 @@ async function fetchAndRenderGlobalCues() {
   if (!backendUrl) return;
 
   const container = document.getElementById('global-cues-container');
-
   const cachedStr = localStorage.getItem('ml_global_cues');
   if (cachedStr) {
     try {
@@ -914,7 +958,7 @@ async function fetchAndRenderGlobalCues() {
         renderGlobalCues(cached.cues, container);
         return;
       }
-    } catch(e) {}
+    } catch (e) {}
   }
 
   try {
@@ -934,16 +978,13 @@ function renderGlobalCues(cues, container) {
   container.innerHTML = `
   <div class="global-cues-card">
     <div class="gc-header">🌐 OVERNIGHT GLOBAL CUES & SECTOR SPILLOVER</div>
-    
     <div class="gc-section">
       <div class="gc-bullet">• <span class="gc-label">Global Headlines:</span> ${escapeHtml(cues.global_headlines[0] || '')}</div>
       ${cues.global_headlines[1] ? `<div class="gc-bullet">• ${escapeHtml(cues.global_headlines[1])}</div>` : ''}
     </div>
-
     <div class="gc-section">
       <div class="gc-bullet">• <span class="gc-label">Expected India Impact:</span> ${escapeHtml(cues.indian_impact)}</div>
     </div>
-    
     <div class="gc-grid">
        <div><span class="gc-label">🇺🇸 USA:</span> ${escapeHtml(cues.usa_market)}</div>
        <div><span class="gc-label">🇯🇵 Japan:</span> ${escapeHtml(cues.japan_market)}</div>
@@ -951,6 +992,52 @@ function renderGlobalCues(cues, container) {
        <div><span class="gc-label">🇨🇳 China:</span> ${escapeHtml(cues.china_market)}</div>
     </div>
   </div>`;
+}
+
+function getCachedFundamentals(ticker) {
+  const raw = localStorage.getItem(`ml_fund_${ticker}`);
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (cached.date !== new Date().toDateString()) return null;
+    return cached.fundamentals;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setCachedFundamentals(ticker, fundamentals) {
+  localStorage.setItem(`ml_fund_${ticker}`, JSON.stringify({
+    date: new Date().toDateString(),
+    fundamentals,
+  }));
+}
+
+function getCachedRoce(ticker) {
+  const raw = localStorage.getItem(`ml_roce_${ticker}`);
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (cached.date !== new Date().toDateString()) return null;
+    return cached.roce;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setCachedRoce(ticker, roceData) {
+  localStorage.setItem(`ml_roce_${ticker}`, JSON.stringify({
+    date: new Date().toDateString(),
+    roce: roceData,
+  }));
+}
+
+function formatFundamentalsError(rawError) {
+  const lower = (rawError || '').toLowerCase();
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return "Yahoo Finance is rate-limiting this type of data right now — try again shortly.";
+  }
+  return rawError || 'Could not fetch fundamentals';
 }
 
 async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, btnTarget, tier = 'Watch') {
@@ -980,7 +1067,7 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
         fundamentals = data.fundamentals;
         setCachedFundamentals(cleanTickerForFund, fundamentals);
       }
-    } catch(e) {}
+    } catch (e) {}
   }
 
   try {
@@ -1016,7 +1103,7 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
         btn.disabled = false;
       }
     }
-  } catch(e) {
+  } catch (e) {
     panel.innerHTML = `<div class="quiet" style="color:var(--clay)">AI error: ${escapeHtml(String(e))}</div>`;
     if (btn) {
       btn.textContent = '✨ AI 1-Min Briefing';
@@ -1050,17 +1137,16 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     const result = await fetchNewsViaBackend(searchTerm, 5);
     articles = result.articles;
     lookupError = result.error;
-  } catch (e) { lookupError = e.message || String(e); }
+  } catch (e) {
+    lookupError = e.message || String(e);
+  }
 
   const stockObj = { ticker: displayTicker, company: searchTerm, tier: stockTier, qty, avgPrice, articles };
   const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn">✨ Generate AI 1-Minute Briefing</button>`;
-
-  const diagnoseLink = articles.length === 0
-    ? `<button id="diagnose-btn" style="margin-top:10px;font-family:-apple-system,system-ui,sans-serif;font-size:11px;color:var(--ink-soft);background:none;border:1px solid var(--rule-strong);border-radius:6px;padding:5px 10px">🔍 See raw backend response (diagnose why)</button>`
-    : '';
   const errorNote = lookupError
     ? `<div class="quiet" style="color:var(--clay)">Backend error: ${escapeHtml(lookupError)}</div>`
     : '';
+
   lookupResult.innerHTML = `<div class="lookup-result-card">
     <div class="lookup-result-head">
       <span class="lookup-result-title">${escapeHtml(searchTerm)} <span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--ink-soft)">${escapeHtml(displayTicker)}</span></span>
@@ -1072,54 +1158,13 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (PE, P/B, ROE...)</button>
     <div id="fundamentals-panel"></div>
     ${errorNote}
-    ${diagnoseLink}
   </div>`;
+
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
-  const diagBtn = document.getElementById('diagnose-btn');
-  if (diagBtn) diagBtn.addEventListener('click', () => runDiagnosticCheck(searchTerm));
   const fundBtn = document.getElementById('fundamentals-btn');
   if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
   const aiBtn = document.getElementById('ai-briefing-btn');
   if (aiBtn) aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
-}
-
-function getCachedFundamentals(ticker) {
-  const raw = localStorage.getItem(`ml_fund_${ticker}`);
-  if (!raw) return null;
-  try {
-    const cached = JSON.parse(raw);
-    if (cached.date !== new Date().toDateString()) return null;
-    return cached.fundamentals;
-  } catch (e) {
-    return null;
-  }
-}
-function setCachedFundamentals(ticker, fundamentals) {
-  localStorage.setItem(`ml_fund_${ticker}`, JSON.stringify({
-    date: new Date().toDateString(),
-    fundamentals,
-  }));
-}
-
-function getCachedRoce(ticker) {
-  const raw = localStorage.getItem(`ml_roce_${ticker}`);
-  if (!raw) return null;
-  try {
-    const cached = JSON.parse(raw);
-    if (cached.date !== new Date().toDateString()) return null;
-    return cached.roce;
-  } catch (e) { return null; }
-}
-function setCachedRoce(ticker, roceData) {
-  localStorage.setItem(`ml_roce_${ticker}`, JSON.stringify({ date: new Date().toDateString(), roce: roceData }));
-}
-
-function formatFundamentalsError(rawError) {
-  const lower = (rawError || '').toLowerCase();
-  if (lower.includes('rate limit') || lower.includes('too many requests')) {
-    return "Yahoo Finance is rate-limiting this type of data right now — a known, temporary limit on their side. Try again in a few minutes.";
-  }
-  return rawError || 'Could not fetch fundamentals';
 }
 
 async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
@@ -1127,7 +1172,7 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
   const row = document.getElementById(targetId);
   if (!row || !btn) return;
   if (!backendUrl) {
-    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="Set your backend URL in Settings first">⚠ backend not set</span>`;
+    btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="Set backend URL in Settings">⚠ backend not set</span>`;
     return;
   }
 
@@ -1168,21 +1213,29 @@ async function fetchAndShowInlineRoce(ticker, targetId, btn) {
     btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error">backend not set</span>`;
     return;
   }
+
   const cached = getCachedRoce(ticker);
-  if (cached) { btn.outerHTML = renderCompactRocePills(cached); return; }
+  if (cached) {
+    btn.outerHTML = renderCompactRocePills(cached);
+    return;
+  }
+
   btn.textContent = 'Loading…';
   btn.disabled = true;
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
     const resp = await fetch(`${backendUrl}/api/fundamentals/roce?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
+
     if (!resp.ok || data.status !== 'success') {
       const shortMsg = (data.error || '').toLowerCase().includes('rate limit') ? 'rate limited' : 'unavailable';
-      btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(data.error||'')}">⚠ ${shortMsg}</span>`;
+      btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(data.error || '')}">⚠ ${shortMsg}</span>`;
       return;
     }
+
     const roceData = { roce: data.roce, debt_ratio: data.debt_ratio };
     setCachedRoce(ticker, roceData);
     btn.outerHTML = renderCompactRocePills(roceData);
@@ -1193,8 +1246,8 @@ async function fetchAndShowInlineRoce(ticker, targetId, btn) {
 
 function renderCompactRocePills(r) {
   const pills = [];
-  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated">ROCE ${(Number(r.roce)*100).toFixed(1)}%</span>`);
-  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated">DR ${(Number(r.debt_ratio)*100).toFixed(1)}%</span>`);
+  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated">ROCE ${(Number(r.roce) * 100).toFixed(1)}%</span>`);
+  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated">DR ${(Number(r.debt_ratio) * 100).toFixed(1)}%</span>`);
   return pills.length ? pills.join('') : `<span class="ribbon-fund-pill" style="opacity:0.75">No ROCE data</span>`;
 }
 
@@ -1211,7 +1264,7 @@ async function fetchAndShowFundamentals(ticker) {
   const cached = getCachedFundamentals(ticker);
   if (cached) {
     panel.innerHTML = renderFundamentalsPanel(cached) +
-      `<div class="fund-note">📦 From earlier today's lookup — not re-fetched, to avoid Yahoo's rate limit.</div>`;
+      `<div class="fund-note">📦 Cached to avoid Yahoo rate limits.</div>`;
     if (btn) btn.style.display = 'none';
     return;
   }
@@ -1245,6 +1298,7 @@ function fmtRatio(v, suffix) {
   if (v == null) return '—';
   return `${Number(v).toFixed(2)}${suffix || ''}`;
 }
+
 function fmtPct(v) {
   if (v == null) return '—';
   return `${(Number(v) * 100).toFixed(1)}%`;
@@ -1282,58 +1336,6 @@ function clearLookupResult() {
   lookupResult.innerHTML = '';
   lookupInput.value = '';
   lookupSuggestions.classList.remove('open');
-}
-
-async function runDiagnosticCheck(company) {
-  lookupResult.innerHTML = `<div class="lookup-result-card">
-    <div class="lookup-result-head">
-      <span class="lookup-result-title">Diagnostic: ${escapeHtml(company)}</span>
-      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
-    </div>
-    <div class="lookup-loading">Checking your backend directly…</div>
-  </div>`;
-  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
-
-  const backendUrl = getBackendUrl();
-  let statusLine, snippet, requestUrl;
-
-  if (!backendUrl) {
-    statusLine = 'No backend URL configured';
-    snippet = 'Set your backend URL in Settings before fetching news.';
-    requestUrl = '(none)';
-  } else {
-    requestUrl = `${backendUrl}/api/news?company=${encodeURIComponent(company)}`;
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
-      const resp = await fetch(requestUrl, { signal: controller.signal });
-      clearTimeout(timer);
-      const text = await resp.text();
-      let articleCount = 'n/a';
-      try {
-        const json = JSON.parse(text);
-        articleCount = (json.articles || []).length;
-      } catch (e) {}
-      statusLine = `HTTP ${resp.status} · ${text.length} chars received · ${articleCount} articles parsed`;
-      snippet = text.slice(0, 600);
-    } catch (e) {
-      statusLine = `Failed: ${e.message || e}`;
-      snippet = '(no response from server)';
-    }
-  }
-
-  lookupResult.innerHTML = `<div class="lookup-result-card">
-    <div class="lookup-result-head">
-      <span class="lookup-result-title">Diagnostic: ${escapeHtml(company)}</span>
-      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
-    </div>
-    <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px">Request: ${escapeHtml(requestUrl)}</div>
-    <div style="margin-bottom:14px">
-      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">${escapeHtml(statusLine)}</div>
-      <pre style="font-size:10px;background:var(--paper-dim);padding:8px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto">${escapeHtml(snippet)}</pre>
-    </div>
-  </div>`;
-  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
 }
 
 function renderLoadingSkeleton(count) {
@@ -1532,19 +1534,19 @@ function renderEntry(stock) {
       const pnl = currentVal - invested;
       const pnlSign = pnl >= 0 ? '+' : '';
       const pnlClass = pnl >= 0 ? 'price-up' : 'price-down';
-      currValHtml = ` &nbsp; Value: ₹${currentVal.toLocaleString('en-IN', {maximumFractionDigits:0})} (<span class="${pnlClass}">${pnlSign}₹${pnl.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>)`;
+      currValHtml = ` &nbsp; Value: ₹${currentVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (<span class="${pnlClass}">${pnlSign}₹${pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>)`;
     }
     
     holdingsHtml = `
       <div style="background: #F8F9FA; border: 1px solid #E9ECEF; border-radius: 6px; padding: 6px 10px; margin-top: 6px; font-family: 'SF Mono', monospace; font-size: 11px; color: var(--ink-soft);">
-        💼 Qty: ${stock.qty} &nbsp; Avg: ₹${stock.avgPrice.toFixed(2)} &nbsp; Inv: ₹${invested.toLocaleString('en-IN', {maximumFractionDigits:0})}${currValHtml}
+        💼 Qty: ${stock.qty} &nbsp; Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} &nbsp; Inv: ₹${invested.toLocaleString('en-IN', { maximumFractionDigits: 0 })}${currValHtml}
       </div>
     `;
   }
 
   const aiBriefingHtml = `
     <div>
-      <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ Generate AI 1-Min Briefing</button>
+      <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI 1-Min Briefing</button>
       <div id="ai-panel-entry-${escapeHtml(stock.ticker)}"></div>
     </div>
   `;
