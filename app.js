@@ -56,10 +56,19 @@ const TIER_LABELS = {
   "Top51-75": "🟡 Trim",
   "Watch":    "🔴 Exit",
 };
-const TIER_ORDER = ["Top30", "Top31-50", "Top51-75", "Watch"];
+const TIER_COLORS = {
+  "Top30":    "#5B7553", /* Sage green */
+  "Top31-50": "#B8923F", /* Gold */
+  "Top51-75": "#C45A3E", /* Sunrise coral */
+  "Watch":    "#A4453A", /* Clay red */
+};
+const TOP_STOCK_PALETTE = [
+  "#29577C", "#5B7553", "#C45A3E", "#B8923F", "#7A5C9B",
+  "#3A7D7E", "#A4453A", "#D9822B", "#4A6FA5", "#8E735B"
+];
 
 function getCleanTicker(ticker) {
-  return ticker.replace(/-BE$/, '');
+  return ticker.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
 }
 
 const Store = {
@@ -90,7 +99,8 @@ const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'default';
-let newsData = null; 
+let newsData = null;
+let currentAnalyticsMode = 'tier'; // 'tier' or 'stocks'
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 
 const $ = (sel) => document.querySelector(sel);
@@ -103,6 +113,7 @@ const datelineStatus = $('#dateline-status');
 const lookupInput = $('#lookup-input');
 const lookupSuggestions = $('#lookup-suggestions');
 const lookupResult = $('#lookup-result');
+const analyticsContainer = $('#portfolio-analytics-container');
 
 function todayLabel() {
   return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -126,12 +137,27 @@ function init() {
   if (cached && cached.results) {
     newsData = cached;
     renderContent();
+    renderPortfolioAnalytics();
     updateStatusBar();
   }
 
   const cuesBtn = $('#global-cues-btn');
   if (cuesBtn) {
     cuesBtn.addEventListener('click', fetchAndRenderGlobalCues);
+  }
+
+  const analyticsChip = $('#analytics-toggle-chip');
+  if (analyticsChip) {
+    analyticsChip.addEventListener('click', () => {
+      if (analyticsContainer.style.display === 'block') {
+        analyticsContainer.style.display = 'none';
+        analyticsChip.classList.remove('active');
+      } else {
+        analyticsContainer.style.display = 'block';
+        analyticsChip.classList.add('active');
+        renderPortfolioAnalytics();
+      }
+    });
   }
 
   contentEl.addEventListener('click', (e) => {
@@ -252,6 +278,201 @@ function init() {
   }
 }
 
+/* ==========================================================================
+   PORTFOLIO PIE CHART & ALLOCATION ANALYTICS ENGINE (PURE SVG & VANILLA JS)
+   ========================================================================== */
+function renderPortfolioAnalytics() {
+  if (!analyticsContainer || analyticsContainer.style.display !== 'block') return;
+
+  const stocks = Store.getStocks();
+  if (!stocks || stocks.length === 0) {
+    analyticsContainer.innerHTML = `<div class="analytics-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
+    return;
+  }
+
+  // Calculate live value & invested amounts
+  let totalInvested = 0;
+  let totalCurrentVal = 0;
+  let holdingsWithQty = 0;
+
+  const enriched = stocks.map(([ticker, company, tier, qty = 0, avgPrice = 0]) => {
+    const q = Number(qty) || 0;
+    const avg = Number(avgPrice) || 0;
+    const invested = q * avg;
+    totalInvested += invested;
+
+    const cachedEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null;
+    let ltp = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote.last_price : avg;
+    const currentVal = q > 0 ? (q * ltp) : 0;
+    if (q > 0) {
+      holdingsWithQty++;
+      totalCurrentVal += currentVal;
+    }
+
+    return { ticker, company, tier, qty: q, avgPrice: avg, invested, currentVal, ltp };
+  });
+
+  const totalPnL = totalCurrentVal - totalInvested;
+  const totalPnLPct = totalInvested > 0 ? ((totalPnL / totalInvested) * 100).toFixed(2) : '0.00';
+  const pnlClass = totalPnL >= 0 ? 'pos' : 'neg';
+  const pnlSign = totalPnL >= 0 ? '+' : '';
+
+  // Determine active slice aggregation: 'tier' vs 'stocks'
+  let slices = [];
+  const denominator = totalCurrentVal > 0 ? totalCurrentVal : (totalInvested > 0 ? totalInvested : 1);
+
+  if (currentAnalyticsMode === 'tier') {
+    const tierMap = {
+      "Top30": { name: "✅ Accumulate", val: 0, count: 0, color: TIER_COLORS["Top30"] },
+      "Top31-50": { name: "🔵 Hold", val: 0, count: 0, color: TIER_COLORS["Top31-50"] },
+      "Top51-75": { name: "🟡 Trim", val: 0, count: 0, color: TIER_COLORS["Top51-75"] },
+      "Watch": { name: "🔴 Exit", val: 0, count: 0, color: TIER_COLORS["Watch"] },
+    };
+
+    enriched.forEach(item => {
+      const t = tierMap[item.tier] ? item.tier : 'Watch';
+      const weightVal = totalCurrentVal > 0 ? item.currentVal : item.invested;
+      tierMap[t].val += weightVal;
+      tierMap[t].count += 1;
+    });
+
+    slices = Object.keys(tierMap).map(k => ({
+      key: k,
+      name: tierMap[k].name,
+      val: tierMap[k].val,
+      count: tierMap[k].count,
+      pct: (tierMap[k].val / denominator) * 100,
+      color: tierMap[k].color
+    })).filter(s => s.val > 0 || s.count > 0);
+  } else {
+    // Mode: 'stocks' (Top 7 concentrated holdings + Others)
+    const sorted = [...enriched].filter(s => (s.currentVal || s.invested) > 0)
+      .sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
+
+    const topN = sorted.slice(0, 7);
+    const rest = sorted.slice(7);
+
+    topN.forEach((s, idx) => {
+      const v = totalCurrentVal > 0 ? s.currentVal : s.invested;
+      slices.push({
+        key: s.ticker,
+        name: s.ticker,
+        val: v,
+        count: 1,
+        pct: (v / denominator) * 100,
+        color: TOP_STOCK_PALETTE[idx % TOP_STOCK_PALETTE.length]
+      });
+    });
+
+    if (rest.length > 0) {
+      const restVal = rest.reduce((acc, r) => acc + (totalCurrentVal > 0 ? r.currentVal : r.invested), 0);
+      slices.push({
+        key: "Others",
+        name: `Others (${rest.length})`,
+        val: restVal,
+        count: rest.length,
+        pct: (restVal / denominator) * 100,
+        color: "#8E735B"
+      });
+    }
+  }
+
+  // Generate SVG Donut Path Geometry
+  const svgSize = 190;
+  const strokeWidth = 32;
+  const radius = (svgSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  let accumulatedOffset = 0;
+
+  const circlesHtml = slices.map(slice => {
+    const strokeDash = (slice.pct / 100) * circumference;
+    const strokeOffset = -accumulatedOffset;
+    accumulatedOffset += strokeDash;
+
+    return `<circle cx="95" cy="95" r="${radius}" fill="transparent"
+      stroke="${slice.color}" stroke-width="${strokeWidth}"
+      stroke-dasharray="${strokeDash} ${circumference}"
+      stroke-dashoffset="${strokeOffset}"
+      style="transition: stroke-dasharray 0.5s ease; cursor: pointer;">
+      <title>${slice.name}: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%)</title>
+    </circle>`;
+  }).join('');
+
+  const legendHtml = slices.map(slice => `
+    <div class="legend-row">
+      <div class="legend-left">
+        <span class="legend-swatch" style="background: ${slice.color}"></span>
+        <div>
+          <span class="legend-name">${escapeHtml(slice.name)}</span>
+          <span class="legend-count">${slice.count ? ` · ${slice.count} stocks` : ''}</span>
+        </div>
+      </div>
+      <div class="legend-right">
+        <span class="legend-amt">₹${Math.round(slice.val).toLocaleString('en-IN')}</span>
+        <span>${slice.pct.toFixed(1)}%</span>
+      </div>
+    </div>
+  `).join('');
+
+  analyticsContainer.innerHTML = `
+    <div class="analytics-card">
+      <div class="analytics-head">
+        <span class="analytics-title">Portfolio Capital Allocation</span>
+        <div class="analytics-toggle-group">
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'stocks' ? 'active' : ''}" id="btn-chart-stocks">By Holdings</button>
+        </div>
+      </div>
+
+      <div class="portfolio-stats-summary">
+        <div class="p-stat-box">
+          <div class="p-stat-lbl">Portfolio Value</div>
+          <div class="p-stat-val">₹${Math.round(totalCurrentVal).toLocaleString('en-IN')}</div>
+        </div>
+        <div class="p-stat-box">
+          <div class="p-stat-lbl">Total Invested</div>
+          <div class="p-stat-val">₹${Math.round(totalInvested).toLocaleString('en-IN')}</div>
+        </div>
+        <div class="p-stat-box">
+          <div class="p-stat-lbl">Overall P&amp;L</div>
+          <div class="p-stat-val ${pnlClass}">${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)</div>
+        </div>
+      </div>
+
+      <div class="chart-flex-wrap">
+        <div class="pie-svg-container">
+          <svg viewBox="0 0 190 190">
+            ${circlesHtml}
+          </svg>
+          <div class="pie-center-hole">
+            <span class="pie-center-lbl">${currentAnalyticsMode === 'tier' ? 'Holdings' : 'Total'}</span>
+            <span class="pie-center-val">${stocks.length}</span>
+          </div>
+        </div>
+        <div class="chart-legend">
+          ${legendHtml}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Attach toggle listeners
+  const btnTier = $('#btn-chart-tier');
+  const btnStocks = $('#btn-chart-stocks');
+  if (btnTier) {
+    btnTier.addEventListener('click', () => {
+      currentAnalyticsMode = 'tier';
+      renderPortfolioAnalytics();
+    });
+  }
+  if (btnStocks) {
+    btnStocks.addEventListener('click', () => {
+      currentAnalyticsMode = 'stocks';
+      renderPortfolioAnalytics();
+    });
+  }
+}
+
 function updateStatusBar() {
   if (!newsData) {
     refreshStatus.textContent = 'Not yet fetched today';
@@ -275,6 +496,7 @@ function updateStatusBar() {
   datelineStatus.classList.toggle('fresh', fresh);
 
   updatePriceStatus();
+  renderPortfolioAnalytics();
 }
 
 function updatePriceStatus() {
@@ -321,6 +543,7 @@ function saveSettings() {
 
   if (parsed.length) Store.setStocks(parsed);
   closeSettings();
+  renderPortfolioAnalytics();
 }
 
 const VALID_TIERS = ['Top30', 'Top31-50', 'Top51-75', 'Watch'];
@@ -436,6 +659,7 @@ async function handleSpreadsheetUpload(event) {
       $('#stocklist-input').value = parsed.map(r => r.join(',')).join('\n');
       filenameEl.textContent = `✓ ${file.name} — ${parsed.length} stocks loaded`;
       filenameEl.style.color = 'var(--sage)';
+      renderPortfolioAnalytics();
     } catch (err) {
       filenameEl.textContent = `Could not read "${file.name}"`;
       filenameEl.style.color = 'var(--clay)';
@@ -482,6 +706,7 @@ async function fetchLatestPrices() {
     applyFetchedQuotes(data.quotes || {});
     const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
     priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
+    renderPortfolioAnalytics();
   } catch (e) {
     if (priceBtn) priceBtn.classList.remove('spinning');
     priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
@@ -648,7 +873,7 @@ function renderImportedHoldingsPreview(stocksList, userName) {
   const rows = stocksList.map(([ticker, company, tier, qty, avgPrice]) =>
     `<div class="entry"><div class="entry-head"><div><span class="entry-name">${escapeHtml(company)}</span><span class="entry-ticker">${escapeHtml(ticker)}</span>${qty ? ` <span style="font-size:11px;color:var(--ink-soft)">(Qty: ${qty})</span>` : ''}</div><span class="entry-badge fresh">${escapeHtml(tier)}</span></div></div>`
   ).join('');
-  
+
   contentEl.innerHTML = `<div class="section">
     <div class="section-head"><span class="section-label">✓ Imported from ${escapeHtml(userName)}'s Kite account</span><div class="rule"></div></div>
     <div class="quiet" style="margin-bottom:8px">Fetching today's news for these now…</div>
@@ -870,6 +1095,7 @@ function applyFetchedQuotes(quotes) {
   }
   updateStatusBar();
   renderContent();
+  renderPortfolioAnalytics();
 }
 
 function getStockSuggestions(query) {
@@ -925,7 +1151,6 @@ async function fetchAndRenderGlobalCues() {
     return;
   }
 
-  // If container is already visible and populated, allow toggling it closed
   if (container.style.display === 'block' && container.innerHTML.trim() !== '') {
     container.style.display = 'none';
     if (btn) btn.textContent = '🌐 Global Cues';
@@ -1403,7 +1628,7 @@ function renderContent() {
   renderMoversSummary();
   if (!newsData) {
     contentEl.innerHTML = `<div class="empty-state">
-      <div class="glyph">☀︎︎</div>
+      <div class="glyph">☀</div>
       <h3>Good morning.</h3>
       <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
     </div>`;
