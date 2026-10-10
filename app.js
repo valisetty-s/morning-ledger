@@ -50,22 +50,139 @@ const DEFAULT_STOCKS = [
   ["IDEA","Vodafone Idea","Watch",0,0],["HFCL","HFCL Ltd","Watch",0,0],
 ];
 
-const TIER_LABELS = {
-  "Top30":    "✅ Accumulate",
-  "Top31-50": "🔵 Hold",
-  "Top51-75": "🟡 Trim",
-  "Watch":    "🔴 Exit",
-};
 const TIER_COLORS = {
   "Top30":    "#5B7553", /* Sage green */
   "Top31-50": "#B8923F", /* Gold */
   "Top51-75": "#C45A3E", /* Sunrise coral */
   "Watch":    "#A4453A", /* Clay red */
 };
-const TOP_STOCK_PALETTE = [
+
+const SECTOR_COLORS = {
+  "Aerospace & Defense": "#2E4057",
+  "Capital Goods & Power Grid": "#048A81",
+  "Specialty & Green Chemistry": "#5B7553",
+  "AI Cooling, Data Center & IT": "#7A5C9B",
+  "Healthcare & Pharma": "#B8923F",
+  "Financial Tollbooths": "#C45A3E",
+  "Auto Ancillary & EV": "#D9822B",
+  "Clean Energy & Renewables": "#3A7D7E",
+  "Commodity Converters & Distressed": "#A4453A",
+  "Other": "#8E735B"
+};
+
+const PALETTE = [
   "#29577C", "#5B7553", "#C45A3E", "#B8923F", "#7A5C9B",
-  "#3A7D7E", "#A4453A", "#D9822B", "#4A6FA5", "#8E735B"
+  "#3A7D7E", "#A4453A", "#D9822B", "#4A6FA5", "#048A81",
+  "#5D576B", "#F19953", "#8E735B", "#6C5B7B", "#355C7D"
 ];
+
+// Exact sectoral and economic niche taxonomy
+const SECTOR_MAP = {
+  "ACUTAAS": "Specialty & Green Chemistry",
+  "AEQUS": "Aerospace & Defense",
+  "AEROFLEX": "AI Cooling, Data Center & IT",
+  "AETHER": "Specialty & Green Chemistry",
+  "AFFLE": "AI Cooling, Data Center & IT",
+  "APLAPOLLO": "Capital Goods & Power Grid",
+  "APOLLO": "Aerospace & Defense",
+  "ARROWGREEN": "Specialty & Green Chemistry",
+  "ASTRAMICRO": "Aerospace & Defense",
+  "ATHERENERG": "Auto Ancillary & EV",
+  "AVALON": "Commodity Converters & Distressed",
+  "AXISCADES": "Aerospace & Defense",
+  "AZAD": "Aerospace & Defense",
+  "BORORENEW": "Clean Energy & Renewables",
+  "BSE": "Financial Tollbooths",
+  "CAMS": "Financial Tollbooths",
+  "CGPOWER": "Capital Goods & Power Grid",
+  "CPPLUS": "AI Cooling, Data Center & IT",
+  "CUPID": "Healthcare & Pharma",
+  "CYIENTDLM": "Aerospace & Defense",
+  "DATAPATTNS": "Aerospace & Defense",
+  "DEEPINDS": "Capital Goods & Power Grid",
+  "DHOOTTRANS": "Commodity Converters & Distressed",
+  "E2E": "AI Cooling, Data Center & IT",
+  "ELGIEQUIP": "Capital Goods & Power Grid",
+  "FCL": "Commodity Converters & Distressed",
+  "GRAVITA": "Commodity Converters & Distressed",
+  "GRSE": "Aerospace & Defense",
+  "HBLENGINE": "Capital Goods & Power Grid",
+  "HFCL-BE": "AI Cooling, Data Center & IT",
+  "IDEA": "Commodity Converters & Distressed",
+  "IKS": "AI Cooling, Data Center & IT",
+  "INDOMIM": "Aerospace & Defense",
+  "INOXINDIA": "Capital Goods & Power Grid",
+  "KANOHAR": "Capital Goods & Power Grid",
+  "KAYNES": "AI Cooling, Data Center & IT",
+  "KRN": "AI Cooling, Data Center & IT",
+  "KSHINTL": "Commodity Converters & Distressed",
+  "KUSUMGAR": "Commodity Converters & Distressed",
+  "LALPATHLAB": "Healthcare & Pharma",
+  "LAURUSLABS": "Healthcare & Pharma",
+  "LENSKART": "Healthcare & Pharma",
+  "MACPOWER": "Commodity Converters & Distressed",
+  "MANINDS": "Commodity Converters & Distressed",
+  "MARINE": "Commodity Converters & Distressed",
+  "MARKSANS": "Healthcare & Pharma",
+  "MAXHEALTH": "Healthcare & Pharma",
+  "MILKYMIST-BE": "Auto Ancillary & EV",
+  "MOLBIO": "Healthcare & Pharma",
+  "MTARTECH-BE": "Aerospace & Defense",
+  "NEOGEN": "Specialty & Green Chemistry",
+  "NETWEB": "AI Cooling, Data Center & IT",
+  "NITTAGELA": "Commodity Converters & Distressed",
+  "NSE": "Financial Tollbooths",
+  "OSWALPUMPS": "Commodity Converters & Distressed",
+  "PACEDIGITK": "Commodity Converters & Distressed",
+  "PARAS": "Aerospace & Defense",
+  "PRICOLLTD": "Commodity Converters & Distressed",
+  "QPOWER": "Capital Goods & Power Grid",
+  "RAINBOW": "Healthcare & Pharma",
+  "RAYMOND": "Aerospace & Defense",
+  "RPEL": "Specialty & Green Chemistry",
+  "RRKABEL": "Capital Goods & Power Grid",
+  "SAILIFE": "Healthcare & Pharma",
+  "SANSERA": "Aerospace & Defense",
+  "SBCL": "Auto Ancillary & EV",
+  "SEDEMAC": "Auto Ancillary & EV",
+  "SETL": "Capital Goods & Power Grid",
+  "SHILPAMED": "Commodity Converters & Distressed",
+  "SHRIRAMFIN": "Commodity Converters & Distressed",
+  "SIGMAADV-BE": "Aerospace & Defense",
+  "SJS": "Auto Ancillary & EV",
+  "SKYGOLD": "Commodity Converters & Distressed",
+  "SONACOMS": "Auto Ancillary & EV",
+  "SPICEJET": "Commodity Converters & Distressed",
+  "SRF": "Specialty & Green Chemistry",
+  "STALLION": "Specialty & Green Chemistry",
+  "STLTECH-BE": "AI Cooling, Data Center & IT",
+  "SUDEEPPHRM": "Specialty & Green Chemistry",
+  "SUZLON": "Clean Energy & Renewables",
+  "SYRMA": "AI Cooling, Data Center & IT",
+  "TANFACIND": "Specialty & Green Chemistry",
+  "TDPOWERSYS": "Capital Goods & Power Grid",
+  "TEMPSENS": "Commodity Converters & Distressed",
+  "TIPSMUSIC": "Financial Tollbooths",
+  "UNIMECH": "Aerospace & Defense",
+  "UNOMINDA": "Auto Ancillary & EV",
+  "VENUSPIPES": "Capital Goods & Power Grid",
+  "VIKRAMTH": "Specialty & Green Chemistry",
+  "VIMTALABS": "Commodity Converters & Distressed",
+  "VISHNU": "Commodity Converters & Distressed",
+  "WAAREEENER": "Clean Energy & Renewables",
+  "WABAG": "Capital Goods & Power Grid",
+  "WELCORP": "Commodity Converters & Distressed",
+  "YATHARTH": "Healthcare & Pharma",
+  "ZENTEC": "Aerospace & Defense",
+  "ZYDUSLIFE": "Healthcare & Pharma"
+};
+
+// Known Sub-12% growth list
+const SUB_12_GROWTH_SET = new Set([
+  "SPICEJET", "IDEA", "WELCORP", "MANINDS", "GRAVITA", "SKYGOLD", "AVALON", "MARINE",
+  "APOLLO", "PRICOLLTD", "DHOOTTRANS", "MACPOWER", "OSWALPUMPS", "KSHINTL", "KUSUMGAR",
+  "SHILPAMED", "PACEDIGITK", "NITTAGELA", "VIMTALABS", "TEMPSENS", "FCL", "VISHNU", "SHRIRAMFIN"
+]);
 
 function getCleanTicker(ticker) {
   return ticker.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
@@ -100,7 +217,8 @@ let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'default';
 let newsData = null;
-let currentAnalyticsMode = 'tier'; // 'tier' or 'stocks'
+let currentAnalyticsMode = 'tier'; // 'tier', 'sector', 'top50', 'bottom30', 'bottom20', 'sub12'
+let selectedSliceKey = null; // for drilldown
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 
 const $ = (sel) => document.querySelector(sel);
@@ -114,6 +232,7 @@ const lookupInput = $('#lookup-input');
 const lookupSuggestions = $('#lookup-suggestions');
 const lookupResult = $('#lookup-result');
 const analyticsContainer = $('#portfolio-analytics-container');
+const drilldownContainer = $('#portfolio-drilldown-container');
 
 function todayLabel() {
   return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -133,6 +252,9 @@ function timeLabel(isoString) {
 function init() {
   datelineDate.textContent = todayLabel();
 
+  // Render initial analytics immediately
+  renderPortfolioAnalytics();
+
   const cached = Store.getCache();
   if (cached && cached.results) {
     newsData = cached;
@@ -151,6 +273,7 @@ function init() {
     analyticsChip.addEventListener('click', () => {
       if (analyticsContainer.style.display === 'block') {
         analyticsContainer.style.display = 'none';
+        if (drilldownContainer) drilldownContainer.style.display = 'none';
         analyticsChip.classList.remove('active');
       } else {
         analyticsContainer.style.display = 'block';
@@ -279,21 +402,20 @@ function init() {
 }
 
 /* ==========================================================================
-   PORTFOLIO PIE CHART & ALLOCATION ANALYTICS ENGINE (PURE SVG & VANILLA JS)
+   PORTFOLIO PIE CHART & ADVANCED DRILLDOWN ENGINE (PURE SVG & VANILLA JS)
    ========================================================================== */
 function renderPortfolioAnalytics() {
-  if (!analyticsContainer || analyticsContainer.style.display !== 'block') return;
+  const container = document.getElementById('portfolio-analytics-container');
+  if (!container) return;
 
   const stocks = Store.getStocks();
   if (!stocks || stocks.length === 0) {
-    analyticsContainer.innerHTML = `<div class="analytics-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
+    container.innerHTML = `<div class="analytics-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
     return;
   }
 
-  // Calculate live value & invested amounts
   let totalInvested = 0;
   let totalCurrentVal = 0;
-  let holdingsWithQty = 0;
 
   const enriched = stocks.map(([ticker, company, tier, qty = 0, avgPrice = 0]) => {
     const q = Number(qty) || 0;
@@ -301,15 +423,18 @@ function renderPortfolioAnalytics() {
     const invested = q * avg;
     totalInvested += invested;
 
-    const cachedEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null;
+    const cleanT = getCleanTicker(ticker);
+    const cachedEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker || r.ticker === cleanT) : null;
     let ltp = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote.last_price : avg;
     const currentVal = q > 0 ? (q * ltp) : 0;
     if (q > 0) {
-      holdingsWithQty++;
       totalCurrentVal += currentVal;
     }
+    const sector = SECTOR_MAP[cleanT] || SECTOR_MAP[ticker] || "Other";
+    const pnl = currentVal - invested;
+    const pnlPct = invested > 0 ? ((pnl / invested) * 100) : 0;
 
-    return { ticker, company, tier, qty: q, avgPrice: avg, invested, currentVal, ltp };
+    return { ticker, company, tier, qty: q, avgPrice: avg, invested, currentVal, ltp, sector, pnl, pnlPct };
   });
 
   const totalPnL = totalCurrentVal - totalInvested;
@@ -317,23 +442,24 @@ function renderPortfolioAnalytics() {
   const pnlClass = totalPnL >= 0 ? 'pos' : 'neg';
   const pnlSign = totalPnL >= 0 ? '+' : '';
 
-  // Determine active slice aggregation: 'tier' vs 'stocks'
+  // Mode Selection: 'tier', 'sector', 'top50', 'bottom30', 'bottom20', 'sub12'
   let slices = [];
   const denominator = totalCurrentVal > 0 ? totalCurrentVal : (totalInvested > 0 ? totalInvested : 1);
 
   if (currentAnalyticsMode === 'tier') {
     const tierMap = {
-      "Top30": { name: "✅ Accumulate", val: 0, count: 0, color: TIER_COLORS["Top30"] },
-      "Top31-50": { name: "🔵 Hold", val: 0, count: 0, color: TIER_COLORS["Top31-50"] },
-      "Top51-75": { name: "🟡 Trim", val: 0, count: 0, color: TIER_COLORS["Top51-75"] },
-      "Watch": { name: "🔴 Exit", val: 0, count: 0, color: TIER_COLORS["Watch"] },
+      "Top30": { name: "✅ Accumulate", val: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
+      "Top31-50": { name: "🔵 Hold", val: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
+      "Top51-75": { name: "🟡 Trim", val: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
+      "Watch": { name: "🔴 Exit", val: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
     };
 
     enriched.forEach(item => {
       const t = tierMap[item.tier] ? item.tier : 'Watch';
-      const weightVal = totalCurrentVal > 0 ? item.currentVal : item.invested;
+      const weightVal = totalCurrentVal > 0 ? (item.currentVal || item.invested) : item.invested;
       tierMap[t].val += weightVal;
       tierMap[t].count += 1;
+      tierMap[t].items.push(item);
     });
 
     slices = Object.keys(tierMap).map(k => ({
@@ -342,49 +468,93 @@ function renderPortfolioAnalytics() {
       val: tierMap[k].val,
       count: tierMap[k].count,
       pct: (tierMap[k].val / denominator) * 100,
-      color: tierMap[k].color
+      color: tierMap[k].color,
+      items: tierMap[k].items
     })).filter(s => s.val > 0 || s.count > 0);
-  } else {
-    // Mode: 'stocks' (Top 7 concentrated holdings + Others)
-    const sorted = [...enriched].filter(s => (s.currentVal || s.invested) > 0)
-      .sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
 
-    const topN = sorted.slice(0, 7);
-    const rest = sorted.slice(7);
-
-    topN.forEach((s, idx) => {
-      const v = totalCurrentVal > 0 ? s.currentVal : s.invested;
-      slices.push({
-        key: s.ticker,
-        name: s.ticker,
-        val: v,
-        count: 1,
-        pct: (v / denominator) * 100,
-        color: TOP_STOCK_PALETTE[idx % TOP_STOCK_PALETTE.length]
-      });
+  } else if (currentAnalyticsMode === 'sector') {
+    const secMap = {};
+    enriched.forEach(item => {
+      const s = item.sector;
+      if (!secMap[s]) {
+        secMap[s] = { name: s, val: 0, count: 0, color: SECTOR_COLORS[s] || "#8E735B", items: [] };
+      }
+      const weightVal = totalCurrentVal > 0 ? (item.currentVal || item.invested) : item.invested;
+      secMap[s].val += weightVal;
+      secMap[s].count += 1;
+      secMap[s].items.push(item);
     });
 
-    if (rest.length > 0) {
-      const restVal = rest.reduce((acc, r) => acc + (totalCurrentVal > 0 ? r.currentVal : r.invested), 0);
-      slices.push({
-        key: "Others",
-        name: `Others (${rest.length})`,
-        val: restVal,
-        count: rest.length,
-        pct: (restVal / denominator) * 100,
-        color: "#8E735B"
-      });
-    }
+    slices = Object.keys(secMap).map(k => ({
+      key: k,
+      name: secMap[k].name,
+      val: secMap[k].val,
+      count: secMap[k].count,
+      pct: (secMap[k].val / denominator) * 100,
+      color: secMap[k].color,
+      items: secMap[k].items
+    })).sort((a, b) => b.val - a.val);
+
+  } else if (currentAnalyticsMode === 'top50') {
+    const sorted = [...enriched].sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
+    const top50 = sorted.slice(0, 50);
+    const rest = sorted.slice(50);
+
+    const top50Val = top50.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+
+    slices = [
+      { key: "Top50", name: "Top 50 Holdings", val: top50Val, count: top50.length, pct: (top50Val / denominator) * 100, color: "#2E4057", items: top50 },
+      { key: "Rest", name: `Remaining (${rest.length})`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest }
+    ];
+
+  } else if (currentAnalyticsMode === 'bottom30') {
+    const sorted = [...enriched].sort((a, b) => (a.currentVal || a.invested) - (b.currentVal || b.invested));
+    const bot30 = sorted.slice(0, 30);
+    const rest = sorted.slice(30);
+
+    const botVal = bot30.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+
+    slices = [
+      { key: "Bot30", name: "Bottom 30 Smallest", val: botVal, count: bot30.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot30 },
+      { key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#5B7553", items: rest }
+    ];
+
+  } else if (currentAnalyticsMode === 'bottom20') {
+    const sorted = [...enriched].sort((a, b) => (a.currentVal || a.invested) - (b.currentVal || b.invested));
+    const bot20 = sorted.slice(0, 20);
+    const rest = sorted.slice(20);
+
+    const botVal = bot20.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+
+    slices = [
+      { key: "Bot20", name: "Bottom 20 Stubs", val: botVal, count: bot20.length, pct: (botVal / denominator) * 100, color: "#C45A3E", items: bot20 },
+      { key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#29577C", items: rest }
+    ];
+
+  } else if (currentAnalyticsMode === 'sub12') {
+    const sub12 = enriched.filter(i => SUB_12_GROWTH_SET.has(getCleanTicker(i.ticker)) || SUB_12_GROWTH_SET.has(i.ticker));
+    const above12 = enriched.filter(i => !SUB_12_GROWTH_SET.has(getCleanTicker(i.ticker)) && !SUB_12_GROWTH_SET.has(i.ticker));
+
+    const subVal = sub12.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const aboveVal = above12.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+
+    slices = [
+      { key: "Sub12", name: "Sub-12% Growth Laggards", val: subVal, count: sub12.length, pct: (subVal / denominator) * 100, color: "#A4453A", items: sub12 },
+      { key: "Above12", name: ">12% Secular Compounders", val: aboveVal, count: above12.length, pct: (aboveVal / denominator) * 100, color: "#5B7553", items: above12 }
+    ];
   }
 
-  // Generate SVG Donut Path Geometry
+  // SVG Geometry Calculation
   const svgSize = 190;
   const strokeWidth = 32;
   const radius = (svgSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   let accumulatedOffset = 0;
 
-  const circlesHtml = slices.map(slice => {
+  const circlesHtml = slices.map((slice, idx) => {
     const strokeDash = (slice.pct / 100) * circumference;
     const strokeOffset = -accumulatedOffset;
     accumulatedOffset += strokeDash;
@@ -393,18 +563,19 @@ function renderPortfolioAnalytics() {
       stroke="${slice.color}" stroke-width="${strokeWidth}"
       stroke-dasharray="${strokeDash} ${circumference}"
       stroke-dashoffset="${strokeOffset}"
+      data-slice-key="${escapeHtml(slice.key)}"
       style="transition: stroke-dasharray 0.5s ease; cursor: pointer;">
-      <title>${slice.name}: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%)</title>
+      <title>${slice.name}: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%) — Tap to reveal stocks</title>
     </circle>`;
   }).join('');
 
   const legendHtml = slices.map(slice => `
-    <div class="legend-row">
+    <div class="legend-row" data-slice-key="${escapeHtml(slice.key)}" style="cursor: pointer;">
       <div class="legend-left">
         <span class="legend-swatch" style="background: ${slice.color}"></span>
         <div>
           <span class="legend-name">${escapeHtml(slice.name)}</span>
-          <span class="legend-count">${slice.count ? ` · ${slice.count} stocks` : ''}</span>
+          <span class="legend-count">${slice.count ? ` · ${slice.count} stocks (tap)` : ''}</span>
         </div>
       </div>
       <div class="legend-right">
@@ -414,13 +585,17 @@ function renderPortfolioAnalytics() {
     </div>
   `).join('');
 
-  analyticsContainer.innerHTML = `
+  container.innerHTML = `
     <div class="analytics-card">
-      <div class="analytics-head">
-        <span class="analytics-title">Portfolio Capital Allocation</span>
-        <div class="analytics-toggle-group">
+      <div class="analytics-head" style="flex-wrap: wrap; gap: 8px;">
+        <span class="analytics-title">Portfolio Allocation Analytics</span>
+        <div class="analytics-toggle-group" style="flex-wrap: wrap; gap: 4px;">
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'stocks' ? 'active' : ''}" id="btn-chart-stocks">By Holdings</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top50' ? 'active' : ''}" id="btn-chart-top50">Top 50</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'bottom30' ? 'active' : ''}" id="btn-chart-bot30">Bottom 30</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'bottom20' ? 'active' : ''}" id="btn-chart-bot20">Bottom 20</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'sub12' ? 'active' : ''}" id="btn-chart-sub12">Sub-12% Growth</button>
         </div>
       </div>
 
@@ -445,7 +620,7 @@ function renderPortfolioAnalytics() {
             ${circlesHtml}
           </svg>
           <div class="pie-center-hole">
-            <span class="pie-center-lbl">${currentAnalyticsMode === 'tier' ? 'Holdings' : 'Total'}</span>
+            <span class="pie-center-lbl">Total</span>
             <span class="pie-center-val">${stocks.length}</span>
           </div>
         </div>
@@ -456,21 +631,114 @@ function renderPortfolioAnalytics() {
     </div>
   `;
 
-  // Attach toggle listeners
-  const btnTier = $('#btn-chart-tier');
-  const btnStocks = $('#btn-chart-stocks');
-  if (btnTier) {
-    btnTier.addEventListener('click', () => {
-      currentAnalyticsMode = 'tier';
+  // Attach Mode Listeners
+  const bindMode = (id, mode) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', () => {
+      currentAnalyticsMode = mode;
+      selectedSliceKey = null;
       renderPortfolioAnalytics();
+      if (drilldownContainer) drilldownContainer.style.display = 'none';
     });
+  };
+
+  bindMode('btn-chart-tier', 'tier');
+  bindMode('btn-chart-sector', 'sector');
+  bindMode('btn-chart-top50', 'top50');
+  bindMode('btn-chart-bot30', 'bottom30');
+  bindMode('btn-chart-bot20', 'bottom20');
+  bindMode('btn-chart-sub12', 'sub12');
+
+  // Attach Drill-down click handlers to both circles & legend items
+  const handleSliceClick = (key) => {
+    const foundSlice = slices.find(s => s.key === key);
+    if (!foundSlice) return;
+    renderDrilldownTable(foundSlice);
+  };
+
+  container.querySelectorAll('circle[data-slice-key]').forEach(c => {
+    c.addEventListener('click', () => handleSliceClick(c.dataset.sliceKey));
+  });
+
+  container.querySelectorAll('.legend-row[data-slice-key]').forEach(r => {
+    r.addEventListener('click', () => handleSliceClick(r.dataset.sliceKey));
+  });
+
+  // Re-render open drilldown if key exists
+  if (selectedSliceKey) {
+    const currentSlice = slices.find(s => s.key === selectedSliceKey);
+    if (currentSlice) renderDrilldownTable(currentSlice);
   }
-  if (btnStocks) {
-    btnStocks.addEventListener('click', () => {
-      currentAnalyticsMode = 'stocks';
-      renderPortfolioAnalytics();
-    });
-  }
+}
+
+function renderDrilldownTable(slice) {
+  selectedSliceKey = slice.key;
+  if (!drilldownContainer) return;
+
+  const sortedItems = [...(slice.items || [])].sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
+
+  const rowsHtml = sortedItems.map((item, idx) => {
+    const pnlSign = item.pnl >= 0 ? '+' : '';
+    const pnlClass = item.pnl >= 0 ? 'price-up' : 'price-down';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--rule); font-size: 12px;">
+        <td style="padding: 8px 6px; font-weight: 700;">
+          <span style="font-family:'SF Mono',monospace; color:var(--ink);">${escapeHtml(item.ticker)}</span>
+          <div style="font-size: 11px; font-weight: 400; color:var(--ink-soft); font-family: -apple-system, sans-serif;">${escapeHtml(item.company)}</div>
+        </td>
+        <td style="padding: 8px 6px; color:var(--ink-soft); font-size: 11px;">${escapeHtml(item.sector)}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: center;">${item.qty}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;">₹${item.avgPrice ? item.avgPrice.toFixed(1) : '—'}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${item.ltp ? item.ltp.toFixed(1) : '—'}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${Math.round(item.currentVal || item.invested).toLocaleString('en-IN')}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;" class="${pnlClass}">
+          ${pnlSign}₹${Math.abs(Math.round(item.pnl)).toLocaleString('en-IN')} (${pnlSign}${item.pnlPct.toFixed(1)}%)
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  drilldownContainer.style.display = 'block';
+  drilldownContainer.innerHTML = `
+    <div style="background: var(--paper); border: 2px solid ${slice.color}; border-radius: 12px; padding: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--rule); padding-bottom: 8px;">
+        <div>
+          <span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:${slice.color}; margin-right:6px;"></span>
+          <strong style="font-size: 14px; text-transform: uppercase;">${escapeHtml(slice.name)} (${slice.count} Stocks)</strong>
+          <span style="font-size: 12px; color: var(--ink-soft); margin-left: 8px;">— Total Value: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%)</span>
+        </div>
+        <button id="close-drilldown-btn" style="background:none; border:none; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer;">✕ Close</button>
+      </div>
+      <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--rule-strong); font-size: 10.5px; text-transform: uppercase; color: var(--ink-soft); letter-spacing: 0.5px;">
+              <th style="padding: 6px;">Stock</th>
+              <th style="padding: 6px;">Sector Niche</th>
+              <th style="padding: 6px; text-align: center;">Qty</th>
+              <th style="padding: 6px; text-align: right;">Avg Buy</th>
+              <th style="padding: 6px; text-align: right;">LTP</th>
+              <th style="padding: 6px; text-align: right;">Current Value</th>
+              <th style="padding: 6px; text-align: right;">P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const closeBtn = document.getElementById('close-drilldown-btn');
+  if (closeBtn) closeBtn.addEventListener('click', () => {
+    drilldownContainer.style.display = 'none';
+    selectedSliceKey = null;
+  });
+
+  // Smooth scroll to table
+  drilldownContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function updateStatusBar() {
