@@ -51,10 +51,10 @@ const DEFAULT_STOCKS = [
 ];
 
 const TIER_COLORS = {
-  "Top30":    "#5B7553", /* Sage green */
-  "Top31-50": "#B8923F", /* Gold */
-  "Top51-75": "#C45A3E", /* Sunrise coral */
-  "Watch":    "#A4453A", /* Clay red */
+  "Top30":    "#5B7553",
+  "Top31-50": "#B8923F",
+  "Top51-75": "#C45A3E",
+  "Watch":    "#A4453A",
 };
 
 const SECTOR_COLORS = {
@@ -70,13 +70,6 @@ const SECTOR_COLORS = {
   "Other": "#8E735B"
 };
 
-const PALETTE = [
-  "#29577C", "#5B7553", "#C45A3E", "#B8923F", "#7A5C9B",
-  "#3A7D7E", "#A4453A", "#D9822B", "#4A6FA5", "#048A81",
-  "#5D576B", "#F19953", "#8E735B", "#6C5B7B", "#355C7D"
-];
-
-// Exact sectoral and economic niche taxonomy
 const SECTOR_MAP = {
   "ACUTAAS": "Specialty & Green Chemistry",
   "AEQUS": "Aerospace & Defense",
@@ -177,7 +170,6 @@ const SECTOR_MAP = {
   "ZYDUSLIFE": "Healthcare & Pharma"
 };
 
-// Known Sub-12% growth list
 const SUB_12_GROWTH_SET = new Set([
   "SPICEJET", "IDEA", "WELCORP", "MANINDS", "GRAVITA", "SKYGOLD", "AVALON", "MARINE",
   "APOLLO", "PRICOLLTD", "DHOOTTRANS", "MACPOWER", "OSWALPUMPS", "KSHINTL", "KUSUMGAR",
@@ -217,8 +209,8 @@ let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'default';
 let newsData = null;
-let currentAnalyticsMode = 'tier'; // 'tier', 'sector', 'top50', 'bottom30', 'bottom20', 'sub12'
-let selectedSliceKey = null; // for drilldown
+let currentAnalyticsMode = 'tier';
+let selectedSliceKey = null;
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 
 const $ = (sel) => document.querySelector(sel);
@@ -251,8 +243,6 @@ function timeLabel(isoString) {
 
 function init() {
   datelineDate.textContent = todayLabel();
-
-  // Render initial analytics immediately
   renderPortfolioAnalytics();
 
   const cached = Store.getCache();
@@ -264,9 +254,7 @@ function init() {
   }
 
   const cuesBtn = $('#global-cues-btn');
-  if (cuesBtn) {
-    cuesBtn.addEventListener('click', fetchAndRenderGlobalCues);
-  }
+  if (cuesBtn) cuesBtn.addEventListener('click', fetchAndRenderGlobalCues);
 
   const analyticsChip = $('#analytics-toggle-chip');
   if (analyticsChip) {
@@ -372,7 +360,6 @@ function init() {
 
   $('#csv-upload-btn').addEventListener('click', () => $('#csv-file-input').click());
   $('#csv-file-input').addEventListener('change', handleSpreadsheetUpload);
-
   $('#kite-import-btn').addEventListener('click', importFromKite);
 
   let deferredPrompt = null;
@@ -402,7 +389,7 @@ function init() {
 }
 
 /* ==========================================================================
-   PORTFOLIO PIE CHART & ADVANCED DRILLDOWN ENGINE (PURE SVG & VANILLA JS)
+   PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
    ========================================================================== */
 function renderPortfolioAnalytics() {
   const container = document.getElementById('portfolio-analytics-container');
@@ -427,9 +414,8 @@ function renderPortfolioAnalytics() {
     const cachedEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker || r.ticker === cleanT) : null;
     let ltp = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote.last_price : avg;
     const currentVal = q > 0 ? (q * ltp) : 0;
-    if (q > 0) {
-      totalCurrentVal += currentVal;
-    }
+    if (q > 0) totalCurrentVal += currentVal;
+    
     const sector = SECTOR_MAP[cleanT] || SECTOR_MAP[ticker] || "Other";
     const pnl = currentVal - invested;
     const pnlPct = invested > 0 ? ((pnl / invested) * 100) : 0;
@@ -442,58 +428,61 @@ function renderPortfolioAnalytics() {
   const pnlClass = totalPnL >= 0 ? 'pos' : 'neg';
   const pnlSign = totalPnL >= 0 ? '+' : '';
 
-  // Mode Selection: 'tier', 'sector', 'top50', 'bottom30', 'bottom20', 'sub12'
   let slices = [];
   const denominator = totalCurrentVal > 0 ? totalCurrentVal : (totalInvested > 0 ? totalInvested : 1);
 
   if (currentAnalyticsMode === 'tier') {
     const tierMap = {
-      "Top30": { name: "✅ Accumulate", val: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
-      "Top31-50": { name: "🔵 Hold", val: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
-      "Top51-75": { name: "🟡 Trim", val: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
-      "Watch": { name: "🔴 Exit", val: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
+      "Top30": { name: "✅ Accumulate", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
+      "Top31-50": { name: "🔵 Hold", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
+      "Top51-75": { name: "🟡 Trim", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
+      "Watch": { name: "🔴 Exit", val: 0, inv: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
     };
 
     enriched.forEach(item => {
       const t = tierMap[item.tier] ? item.tier : 'Watch';
       const weightVal = totalCurrentVal > 0 ? (item.currentVal || item.invested) : item.invested;
       tierMap[t].val += weightVal;
+      tierMap[t].inv += item.invested;
       tierMap[t].count += 1;
       tierMap[t].items.push(item);
     });
 
-    slices = Object.keys(tierMap).map(k => ({
-      key: k,
-      name: tierMap[k].name,
-      val: tierMap[k].val,
-      count: tierMap[k].count,
-      pct: (tierMap[k].val / denominator) * 100,
-      color: tierMap[k].color,
-      items: tierMap[k].items
-    })).filter(s => s.val > 0 || s.count > 0);
+    slices = Object.keys(tierMap).map(k => {
+      const pnl = tierMap[k].val - tierMap[k].inv;
+      const pnlPct = tierMap[k].inv > 0 ? (pnl / tierMap[k].inv) * 100 : 0;
+      const pnlContribution = totalPnL !== 0 ? (pnl / totalPnL) * 100 : 0;
+      return {
+        key: k, name: tierMap[k].name, val: tierMap[k].val, inv: tierMap[k].inv,
+        pnl, pnlPct, pnlContribution, count: tierMap[k].count,
+        pct: (tierMap[k].val / denominator) * 100, color: tierMap[k].color, items: tierMap[k].items
+      };
+    }).filter(s => s.val > 0 || s.count > 0);
 
   } else if (currentAnalyticsMode === 'sector') {
     const secMap = {};
     enriched.forEach(item => {
       const s = item.sector;
       if (!secMap[s]) {
-        secMap[s] = { name: s, val: 0, count: 0, color: SECTOR_COLORS[s] || "#8E735B", items: [] };
+        secMap[s] = { name: s, val: 0, inv: 0, count: 0, color: SECTOR_COLORS[s] || "#8E735B", items: [] };
       }
       const weightVal = totalCurrentVal > 0 ? (item.currentVal || item.invested) : item.invested;
       secMap[s].val += weightVal;
+      secMap[s].inv += item.invested;
       secMap[s].count += 1;
       secMap[s].items.push(item);
     });
 
-    slices = Object.keys(secMap).map(k => ({
-      key: k,
-      name: secMap[k].name,
-      val: secMap[k].val,
-      count: secMap[k].count,
-      pct: (secMap[k].val / denominator) * 100,
-      color: secMap[k].color,
-      items: secMap[k].items
-    })).sort((a, b) => b.val - a.val);
+    slices = Object.keys(secMap).map(k => {
+      const pnl = secMap[k].val - secMap[k].inv;
+      const pnlPct = secMap[k].inv > 0 ? (pnl / secMap[k].inv) * 100 : 0;
+      const pnlContribution = totalPnL !== 0 ? (pnl / totalPnL) * 100 : 0;
+      return {
+        key: k, name: secMap[k].name, val: secMap[k].val, inv: secMap[k].inv,
+        pnl, pnlPct, pnlContribution, count: secMap[k].count,
+        pct: (secMap[k].val / denominator) * 100, color: secMap[k].color, items: secMap[k].items
+      };
+    }).sort((a, b) => b.val - a.val);
 
   } else if (currentAnalyticsMode === 'top50') {
     const sorted = [...enriched].sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
@@ -501,11 +490,26 @@ function renderPortfolioAnalytics() {
     const rest = sorted.slice(50);
 
     const top50Val = top50.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const top50Inv = top50.reduce((acc, r) => acc + r.invested, 0);
+    const top50Pnl = top50Val - top50Inv;
+    const top50PnlPct = top50Inv > 0 ? (top50Pnl / top50Inv) * 100 : 0;
+
     const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restInv = rest.reduce((acc, r) => acc + r.invested, 0);
+    const restPnl = restVal - restInv;
+    const restPnlPct = restInv > 0 ? (restPnl / restInv) * 100 : 0;
 
     slices = [
-      { key: "Top50", name: "Top 50 Holdings", val: top50Val, count: top50.length, pct: (top50Val / denominator) * 100, color: "#2E4057", items: top50 },
-      { key: "Rest", name: `Remaining (${rest.length})`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest }
+      {
+        key: "Top50", name: "Top 50 Holdings", val: top50Val, inv: top50Inv,
+        pnl: top50Pnl, pnlPct: top50PnlPct, pnlContribution: (top50Pnl / totalPnL) * 100,
+        count: top50.length, pct: (top50Val / denominator) * 100, color: "#2E4057", items: top50
+      },
+      {
+        key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
+      }
     ];
 
   } else if (currentAnalyticsMode === 'bottom30') {
@@ -514,11 +518,26 @@ function renderPortfolioAnalytics() {
     const rest = sorted.slice(30);
 
     const botVal = bot30.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const botInv = bot30.reduce((acc, r) => acc + r.invested, 0);
+    const botPnl = botVal - botInv;
+    const botPnlPct = botInv > 0 ? (botPnl / botInv) * 100 : 0;
+
     const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restInv = rest.reduce((acc, r) => acc + r.invested, 0);
+    const restPnl = restVal - restInv;
+    const restPnlPct = restInv > 0 ? (restPnl / restInv) * 100 : 0;
 
     slices = [
-      { key: "Bot30", name: "Bottom 30 Smallest", val: botVal, count: bot30.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot30 },
-      { key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#5B7553", items: rest }
+      {
+        key: "Bot30", name: "Bottom 30 Smallest", val: botVal, inv: botInv,
+        pnl: botPnl, pnlPct: botPnlPct, pnlContribution: (botPnl / totalPnL) * 100,
+        count: bot30.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot30
+      },
+      {
+        key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#5B7553", items: rest
+      }
     ];
 
   } else if (currentAnalyticsMode === 'bottom20') {
@@ -527,11 +546,26 @@ function renderPortfolioAnalytics() {
     const rest = sorted.slice(20);
 
     const botVal = bot20.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const botInv = bot20.reduce((acc, r) => acc + r.invested, 0);
+    const botPnl = botVal - botInv;
+    const botPnlPct = botInv > 0 ? (botPnl / botInv) * 100 : 0;
+
     const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restInv = rest.reduce((acc, r) => acc + r.invested, 0);
+    const restPnl = restVal - restInv;
+    const restPnlPct = restInv > 0 ? (restPnl / restInv) * 100 : 0;
 
     slices = [
-      { key: "Bot20", name: "Bottom 20 Stubs", val: botVal, count: bot20.length, pct: (botVal / denominator) * 100, color: "#C45A3E", items: bot20 },
-      { key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, count: rest.length, pct: (restVal / denominator) * 100, color: "#29577C", items: rest }
+      {
+        key: "Bot20", name: "Bottom 20 Stubs", val: botVal, inv: botInv,
+        pnl: botPnl, pnlPct: botPnlPct, pnlContribution: (botPnl / totalPnL) * 100,
+        count: bot20.length, pct: (botVal / denominator) * 100, color: "#C45A3E", items: bot20
+      },
+      {
+        key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#29577C", items: rest
+      }
     ];
 
   } else if (currentAnalyticsMode === 'sub12') {
@@ -539,22 +573,36 @@ function renderPortfolioAnalytics() {
     const above12 = enriched.filter(i => !SUB_12_GROWTH_SET.has(getCleanTicker(i.ticker)) && !SUB_12_GROWTH_SET.has(i.ticker));
 
     const subVal = sub12.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const subInv = sub12.reduce((acc, r) => acc + r.invested, 0);
+    const subPnl = subVal - subInv;
+    const subPnlPct = subInv > 0 ? (subPnl / subInv) * 100 : 0;
+
     const aboveVal = above12.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const aboveInv = above12.reduce((acc, r) => acc + r.invested, 0);
+    const abovePnl = aboveVal - aboveInv;
+    const abovePnlPct = aboveInv > 0 ? (abovePnl / aboveInv) * 100 : 0;
 
     slices = [
-      { key: "Sub12", name: "Sub-12% Growth Laggards", val: subVal, count: sub12.length, pct: (subVal / denominator) * 100, color: "#A4453A", items: sub12 },
-      { key: "Above12", name: ">12% Secular Compounders", val: aboveVal, count: above12.length, pct: (aboveVal / denominator) * 100, color: "#5B7553", items: above12 }
+      {
+        key: "Sub12", name: "Sub-12% Growth Laggards", val: subVal, inv: subInv,
+        pnl: subPnl, pnlPct: subPnlPct, pnlContribution: (subPnl / totalPnL) * 100,
+        count: sub12.length, pct: (subVal / denominator) * 100, color: "#A4453A", items: sub12
+      },
+      {
+        key: "Above12", name: ">12% Secular Compounders", val: aboveVal, inv: aboveInv,
+        pnl: abovePnl, pnlPct: abovePnlPct, pnlContribution: (abovePnl / totalPnL) * 100,
+        count: above12.length, pct: (aboveVal / denominator) * 100, color: "#5B7553", items: above12
+      }
     ];
   }
 
-  // SVG Geometry Calculation
   const svgSize = 190;
   const strokeWidth = 32;
   const radius = (svgSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   let accumulatedOffset = 0;
 
-  const circlesHtml = slices.map((slice, idx) => {
+  const circlesHtml = slices.map((slice) => {
     const strokeDash = (slice.pct / 100) * circumference;
     const strokeOffset = -accumulatedOffset;
     accumulatedOffset += strokeDash;
@@ -585,10 +633,37 @@ function renderPortfolioAnalytics() {
     </div>
   `).join('');
 
+  const pnlCardsHtml = slices.map(slice => {
+    const isPos = slice.pnl >= 0;
+    const sign = isPos ? '+' : '';
+    const colorClass = isPos ? 'price-up' : 'price-down';
+
+    return `
+      <div class="pnl-stat-card" data-slice-key="${escapeHtml(slice.key)}">
+        <div class="pnl-card-title">
+          <span class="legend-swatch" style="background: ${slice.color}"></span>
+          <span>${escapeHtml(slice.name)}</span>
+        </div>
+        <div class="pnl-card-metrics">
+          <div class="pnl-card-val ${colorClass}">
+            ${sign}₹${Math.abs(Math.round(slice.pnl)).toLocaleString('en-IN')}
+          </div>
+          <div class="pnl-card-sub ${colorClass}">
+            ${sign}${slice.pnlPct.toFixed(1)}% ROI
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-soft); margin-top: 5px; border-top: 1px dotted var(--rule); padding-top: 4px;">
+          <span>P&amp;L Share: <strong>${slice.pnlContribution ? slice.pnlContribution.toFixed(1) : '0.0'}%</strong></span>
+          <span>Val: <strong>${slice.pct.toFixed(1)}%</strong></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
   container.innerHTML = `
     <div class="analytics-card">
       <div class="analytics-head" style="flex-wrap: wrap; gap: 8px;">
-        <span class="analytics-title">Portfolio Allocation Analytics</span>
+        <span class="analytics-title">Portfolio Allocation &amp; P&amp;L Stats</span>
         <div class="analytics-toggle-group" style="flex-wrap: wrap; gap: 4px;">
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
@@ -628,10 +703,16 @@ function renderPortfolioAnalytics() {
           ${legendHtml}
         </div>
       </div>
+
+      <div class="pnl-stats-panel">
+        <div class="pnl-stats-header">📊 Segregated P&amp;L Contribution by Active Filter</div>
+        <div class="pnl-stats-grid">
+          ${pnlCardsHtml}
+        </div>
+      </div>
     </div>
   `;
 
-  // Attach Mode Listeners
   const bindMode = (id, mode) => {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', () => {
@@ -649,7 +730,6 @@ function renderPortfolioAnalytics() {
   bindMode('btn-chart-bot20', 'bottom20');
   bindMode('btn-chart-sub12', 'sub12');
 
-  // Attach Drill-down click handlers to both circles & legend items
   const handleSliceClick = (key) => {
     const foundSlice = slices.find(s => s.key === key);
     if (!foundSlice) return;
@@ -664,7 +744,10 @@ function renderPortfolioAnalytics() {
     r.addEventListener('click', () => handleSliceClick(r.dataset.sliceKey));
   });
 
-  // Re-render open drilldown if key exists
+  container.querySelectorAll('.pnl-stat-card[data-slice-key]').forEach(card => {
+    card.addEventListener('click', () => handleSliceClick(card.dataset.sliceKey));
+  });
+
   if (selectedSliceKey) {
     const currentSlice = slices.find(s => s.key === selectedSliceKey);
     if (currentSlice) renderDrilldownTable(currentSlice);
@@ -677,7 +760,7 @@ function renderDrilldownTable(slice) {
 
   const sortedItems = [...(slice.items || [])].sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
 
-  const rowsHtml = sortedItems.map((item, idx) => {
+  const rowsHtml = sortedItems.map((item) => {
     const pnlSign = item.pnl >= 0 ? '+' : '';
     const pnlClass = item.pnl >= 0 ? 'price-up' : 'price-down';
 
@@ -699,6 +782,10 @@ function renderDrilldownTable(slice) {
     `;
   }).join('');
 
+  const isPos = slice.pnl >= 0;
+  const pnlSign = isPos ? '+' : '';
+  const pnlClass = isPos ? 'price-up' : 'price-down';
+
   drilldownContainer.style.display = 'block';
   drilldownContainer.innerHTML = `
     <div style="background: var(--paper); border: 2px solid ${slice.color}; border-radius: 12px; padding: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
@@ -706,7 +793,9 @@ function renderDrilldownTable(slice) {
         <div>
           <span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:${slice.color}; margin-right:6px;"></span>
           <strong style="font-size: 14px; text-transform: uppercase;">${escapeHtml(slice.name)} (${slice.count} Stocks)</strong>
-          <span style="font-size: 12px; color: var(--ink-soft); margin-left: 8px;">— Total Value: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%)</span>
+          <span style="font-size: 12px; margin-left: 8px;" class="${pnlClass}">
+            ${pnlSign}₹${Math.abs(Math.round(slice.pnl)).toLocaleString('en-IN')} (${pnlSign}${slice.pnlPct.toFixed(1)}%)
+          </span>
         </div>
         <button id="close-drilldown-btn" style="background:none; border:none; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer;">✕ Close</button>
       </div>
@@ -737,8 +826,60 @@ function renderDrilldownTable(slice) {
     selectedSliceKey = null;
   });
 
-  // Smooth scroll to table
   drilldownContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ==========================================================================
+   PART 2: DATA FETCHING, QUOTES, SETTINGS & DOM RENDERING PIPELINE
+   ========================================================================== */
+
+function fmtRatio(v, suffix) {
+  if (v == null) return '—';
+  return `${Number(v).toFixed(2)}${suffix || ''}`;
+}
+
+function fmtPct(v) {
+  if (v == null) return '—';
+  return `${(Number(v) * 100).toFixed(1)}%`;
+}
+
+function renderFundamentalsPanel(f) {
+  return `<div class="fundamentals-panel">
+    <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
+    <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
+    <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
+    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
+    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data.</div>
+  </div>`;
+}
+
+function renderCompactFundamentalPills(f) {
+  const pills = [];
+  if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
+  if (f.price_to_book != null) pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
+  if (f.peg_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
+  if (f.return_on_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
+  if (f.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
+  if (f.debt_to_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
+  if (f.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
+  if (pills.length === 0) return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
+  return pills.join('');
+}
+
+function renderCompactRocePills(r) {
+  const pills = [];
+  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated">ROCE ${(Number(r.roce) * 100).toFixed(1)}%</span>`);
+  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated">DR ${(Number(r.debt_ratio) * 100).toFixed(1)}%</span>`);
+  return pills.length ? pills.join('') : `<span class="ribbon-fund-pill" style="opacity:0.75">No ROCE data</span>`;
+}
+
+function getBackendUrl() {
+  return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
 }
 
 function updateStatusBar() {
@@ -1250,10 +1391,6 @@ function applySorting(stocks, sortType) {
   return sorted;
 }
 
-function getBackendUrl() {
-  return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
-}
-
 function sortArticlesByDateDesc(articles) {
   return [...articles].sort((a, b) => {
     const ta = a.published ? new Date(a.published).getTime() : NaN;
@@ -1314,7 +1451,7 @@ async function fetchAllNews() {
 
     const batchPromises = batch.map(async ([ticker, company, tier, qty = 0, avgPrice = 0], batchIdx) => {
       const { articles, error } = await fetchStockNews(ticker, company);
-      const prevEntry = newsData && newsData.results && newsData.results.find(r => r.ticker === ticker);
+      const prevEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null;
       const existingQuote = prevEntry ? prevEntry.quote : null;
       results[batchStart + batchIdx] = { ticker, company, tier, qty, avgPrice, articles, quote: existingQuote || null };
       if (articles.length === 0) {
@@ -1727,13 +1864,6 @@ async function fetchAndShowInlineRoce(ticker, targetId, btn) {
   }
 }
 
-function renderCompactRocePills(r) {
-  const pills = [];
-  if (r.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE - calculated">ROCE ${(Number(r.roce) * 100).toFixed(1)}%</span>`);
-  if (r.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio - calculated">DR ${(Number(r.debt_ratio) * 100).toFixed(1)}%</span>`);
-  return pills.length ? pills.join('') : `<span class="ribbon-fund-pill" style="opacity:0.75">No ROCE data</span>`;
-}
-
 async function fetchAndShowFundamentals(ticker) {
   const backendUrl = getBackendUrl();
   const panel = document.getElementById('fundamentals-panel');
@@ -1775,44 +1905,6 @@ async function fetchAndShowFundamentals(ticker) {
     panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
     if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
   }
-}
-
-function fmtRatio(v, suffix) {
-  if (v == null) return '—';
-  return `${Number(v).toFixed(2)}${suffix || ''}`;
-}
-
-function fmtPct(v) {
-  if (v == null) return '—';
-  return `${(Number(v) * 100).toFixed(1)}%`;
-}
-
-function renderFundamentalsPanel(f) {
-  return `<div class="fundamentals-panel">
-    <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
-    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
-    <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
-    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
-    <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
-    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
-    <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
-    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data.</div>
-  </div>`;
-}
-
-function renderCompactFundamentalPills(f) {
-  const pills = [];
-  if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
-  if (f.price_to_book != null) pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
-  if (f.peg_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
-  if (f.return_on_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
-  if (f.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
-  if (f.debt_to_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
-  if (f.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
-  if (pills.length === 0) return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
-  return pills.join('');
 }
 
 function clearLookupResult() {
