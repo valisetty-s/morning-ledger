@@ -1173,7 +1173,62 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
     </div>
   </div>
 </div>
+<!-- GARP Engine Modal Overlay -->
+<div id="garp-overlay" class="overlay">
+  <div class="modal" style="max-width: 500px;">
+    <h2 id="garp-modal-title">GARP Audit Engine</h2>
+    <div class="quiet" style="margin-bottom:15px;">Evaluate fundamental gates to calculate Health Score</div>
+    
+    <div id="garp-checklist" style="display:flex; flex-direction:column; gap:10px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+      <!-- Gate 1 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>1. RoCE (≥ 18%)</label>
+        <select id="garp-g1" class="garp-input"><option value="10">Pass (10 pts)</option><option value="0">Fail (0 pts)</option></select>
+      </div>
+      <!-- Gate 2 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>2. OPM Floor</label>
+        <select id="garp-g2" class="garp-input"><option value="10">> 18% (10 pts)</option><option value="5">12-18% (5 pts)</option><option value="0">< 12% (0 pts)</option></select>
+      </div>
+      <!-- Gate 3 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>3. D/E Solvency</label>
+        <select id="garp-g3" class="garp-input"><option value="10">Debt Free (10 pts)</option><option value="5">< 0.5x (5 pts)</option><option value="0">Breach (0 pts)</option></select>
+      </div>
+      <!-- Gate 4 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>4. Order Book QoQ</label>
+        <select id="garp-g4" class="garp-input"><option value="10">Expanding (10 pts)</option><option value="5">Stagnant (5 pts)</option><option value="0">Depleting (0 pts)</option></select>
+      </div>
+      <!-- Gate 5 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>5. Book-to-Bill</label>
+        <select id="garp-g5" class="garp-input"><option value="10">Strong ≥2x (10 pts)</option><option value="5">Mod 1.2-2x (5 pts)</option><option value="0">Low <1.2x (0 pts)</option></select>
+      </div>
+      <!-- Gate 6-10 (Simplified for space, add as needed) -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>6-10. Other Core Gates (Aggregate)</label>
+        <select id="garp-g6" class="garp-input"><option value="45">All Pass (45 pts)</option><option value="25">Mixed (25 pts)</option><option value="0">Fail (0 pts)</option></select>
+      </div>
+      <!-- FII/DII Flow -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>11. FII / DII Flow</label>
+        <select id="garp-g7" class="garp-input"><option value="5">Accumulating (5 pts)</option><option value="3">Domestic Absorbed (3 pts)</option><option value="0">Dumping (0 pts)</option></select>
+      </div>
+    </div>
 
+    <div style="margin-top:20px; padding:10px; background:var(--bg-card); border-radius:8px; text-align:center;">
+      <div style="font-size:12px; color:var(--ink-soft);">LIVE SCORE</div>
+      <div id="garp-live-score" style="font-size:24px; font-weight:bold; color:var(--sage);">100 / 100</div>
+      <div id="garp-status-label" style="font-size:14px; font-weight:bold; margin-top:5px;">ACCUMULATE_CORE</div>
+    </div>
+
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button id="garp-save-btn">Save Score</button>
+      <button id="garp-close-btn" style="background:var(--rule); color:var(--ink);">Cancel</button>
+    </div>
+  </div>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

@@ -148,14 +148,14 @@ const SECTOR_MAP = {
   "SPICEJET": "Commodity Converters & Distressed",
   "SRF": "Specialty & Green Chemistry",
   "STALLION": "Specialty & Green Chemistry",
-  "STLTECH-BE": "AI Cooling, Data Center & IT",
+  "STLTECH-BE": "Fibre Optic Cables",
   "SUDEEPPHRM": "Specialty & Green Chemistry",
   "SUZLON": "Clean Energy & Renewables",
   "SYRMA": "AI Cooling, Data Center & IT",
   "TANFACIND": "Specialty & Green Chemistry",
   "TDPOWERSYS": "Capital Goods & Power Grid",
   "TEMPSENS": "Commodity Converters & Distressed",
-  "TIPSMUSIC": "Financial Tollbooths",
+  "TIPSMUSIC": "Digital IP, Media & Consumer",
   "UNIMECH": "Aerospace & Defense",
   "UNOMINDA": "Auto Ancillary & EV",
   "VENUSPIPES": "Capital Goods & Power Grid",
@@ -212,6 +212,7 @@ let newsData = null;
 let currentAnalyticsMode = 'tier';
 let selectedSliceKey = null;
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
+let activeGarpTicker = null; // New GARP state variable
 
 const $ = (sel) => document.querySelector(sel);
 const contentEl = $('#content');
@@ -292,6 +293,24 @@ function init() {
       fetchAndShowAIBriefing(ticker, company, articles, `ai-panel-entry-${ticker}`, aiBtn, tier);
       return;
     }
+    // GARP Trigger Listener
+    if (e.target.closest('.garp-trigger-btn')) {
+      const garpBtn = e.target.closest('.garp-trigger-btn');
+      activeGarpTicker = garpBtn.dataset.ticker;
+      if ($('#garp-modal-title')) $('#garp-modal-title').textContent = `GARP Audit: ${activeGarpTicker}`;
+      
+      const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+      const savedData = savedScores[activeGarpTicker];
+      if (savedData && savedData.inputs) {
+        document.querySelectorAll('.garp-input').forEach(select => {
+          if (savedData.inputs[select.id] !== undefined) select.value = savedData.inputs[select.id];
+        });
+      }
+      
+      updateLiveGarpScore();
+      if ($('#garp-overlay')) $('#garp-overlay').classList.add('open');
+      return;
+    }
   });
 
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
@@ -320,6 +339,33 @@ function init() {
       renderContent();
     });
   });
+
+  // GARP Modal Event Listeners
+  document.querySelectorAll('.garp-input').forEach(select => {
+    select.addEventListener('change', updateLiveGarpScore);
+  });
+  if ($('#garp-close-btn')) {
+    $('#garp-close-btn').addEventListener('click', () => {
+      if ($('#garp-overlay')) $('#garp-overlay').classList.remove('open');
+    });
+  }
+  if ($('#garp-save-btn')) {
+    $('#garp-save-btn').addEventListener('click', () => {
+      let total = 0;
+      let inputs = {};
+      document.querySelectorAll('.garp-input').forEach(select => {
+        total += parseInt(select.value) || 0;
+        inputs[select.id] = select.value;
+      });
+      
+      const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+      savedScores[activeGarpTicker] = { score: total, status: $('#garp-status-label').textContent, inputs: inputs };
+      localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
+      
+      if ($('#garp-overlay')) $('#garp-overlay').classList.remove('open');
+      renderContent();
+    });
+  }
 
   refreshBtn.addEventListener('click', fetchAllNews);
   const priceBtn = $('#price-refresh-btn');
@@ -385,6 +431,34 @@ function init() {
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+// GARP Live Score Updater
+function updateLiveGarpScore() {
+  let total = 0;
+  document.querySelectorAll('.garp-input').forEach(select => {
+    total += parseInt(select.value) || 0;
+  });
+  
+  const scoreEl = $('#garp-live-score');
+  const labelEl = $('#garp-status-label');
+  if (!scoreEl || !labelEl) return;
+  
+  scoreEl.textContent = `${total} / 100`;
+  
+  if (total >= 85) {
+    scoreEl.style.color = '#5B7553';
+    labelEl.textContent = 'ACCUMULATE_CORE';
+  } else if (total >= 70) {
+    scoreEl.style.color = '#B8923F';
+    labelEl.textContent = 'HOLD_SATELLITE';
+  } else if (total >= 50) {
+    scoreEl.style.color = '#B8923F';
+    labelEl.textContent = 'MONITOR_WATCHLIST';
+  } else {
+    scoreEl.style.color = '#A4453A';
+    labelEl.textContent = 'PRUNE_GTT_EXIT';
   }
 }
 
@@ -2027,6 +2101,13 @@ function renderEntry(stock) {
   const rest = hasNews ? stock.articles.slice(1) : [];
   const overallSentiment = hasNews ? classifyStockOverallSentiment(stock.articles) : null;
 
+  // Retrieve saved GARP score
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  const scoreData = savedScores[stock.ticker];
+  const scoreBadge = scoreData 
+    ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;">GARP: ${scoreData.score}</span>` 
+    : '';
+
   let body = '';
   if (hasNews) {
     const leadSentiment = classifySentiment(lead.title);
@@ -2093,10 +2174,20 @@ function renderEntry(stock) {
   }
 
   const headHtml = hasQuote
-    ? `<div class="entry-head-badge-only">${badgeHtml}</div>`
-    : `<div class="entry-head">
-        <div><span class="entry-name">${escapeHtml(stock.company)}</span><span class="entry-ticker">${escapeHtml(getCleanTicker(stock.ticker))}</span></div>
-        ${badgeHtml}
+    ? `<div class="entry-head-badge-only" style="display:flex; justify-content:space-between; width:100%;">
+         <div>${badgeHtml} ${scoreBadge}</div>
+         <button class="action-btn garp-trigger-btn" data-ticker="${stock.ticker}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer;">Audit</button>
+       </div>`
+    : `<div class="entry-head" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div style="display:flex; align-items:center;">
+          <span class="entry-name">${escapeHtml(stock.company)}</span>
+          <span class="entry-ticker" style="margin-left:5px;">${escapeHtml(getCleanTicker(stock.ticker))}</span>
+          ${scoreBadge}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${badgeHtml}
+          <button class="action-btn garp-trigger-btn" data-ticker="${stock.ticker}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer;">Audit</button>
+        </div>
       </div>`;
 
   let holdingsHtml = '';
