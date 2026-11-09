@@ -2159,9 +2159,9 @@ function renderEntry(stock) {
 
     let flagsHtml = '';
     if (stock.quote.near_52wk_flag === 'near-high') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week high of ₹${stock.quote.fifty_two_wk_high}">52WK HIGH</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week high">52WK HIGH</span>`;
     } else if (stock.quote.near_52wk_flag === 'near-low') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low of ₹${stock.quote.fifty_two_wk_low}">52WK LOW</span>`;
+      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low">52WK LOW</span>`;
     }
 
     const cleanTickerForFund = getCleanTicker(stock.ticker);
@@ -2189,10 +2189,13 @@ function renderEntry(stock) {
     </div>`;
   }
 
+  // THE FIX: The GARP Button is moved here so it is always rendered!
+  const garpAuditBtn = `<button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer; margin-left:8px;">📋 GARP Audit</button>`;
+
   const headHtml = hasQuote
-    ? `<div class="entry-head-badge-only" style="display:flex; justify-content:space-between; width:100%;">
-         <div>${badgeHtml} ${scoreBadge}</div>
-         <button class="action-btn garp-trigger-btn" data-ticker="${stock.ticker}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer;">Audit</button>
+    ? `<div class="entry-head-badge-only" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+         <div style="display:flex; align-items:center;">${badgeHtml} ${scoreBadge}</div>
+         <div>${garpAuditBtn}</div>
        </div>`
     : `<div class="entry-head" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
         <div style="display:flex; align-items:center;">
@@ -2202,7 +2205,7 @@ function renderEntry(stock) {
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           ${badgeHtml}
-          <button class="action-btn garp-trigger-btn" data-ticker="${stock.ticker}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer;">Audit</button>
+          ${garpAuditBtn}
         </div>
       </div>`;
 
@@ -2241,6 +2244,5 @@ function renderEntry(stock) {
     ${aiBriefingHtml}
   </div>`;
 }
-
 checkKiteOAuthCallback();
 init();

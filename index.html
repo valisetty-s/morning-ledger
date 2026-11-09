@@ -1058,16 +1058,22 @@
 </div>
 
 <div class="refresh-bar" style="padding-top:0">
-  <span class="status">Global Cues: tap to load overnight market impact</span>
-  <button class="refresh-btn" id="global-cues-btn">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="2" y1="12" x2="22" y2="12"></line>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-    </svg>
-    <span>Global Cues</span>
-  </button>
-</div>
+    <span class="status">Market & Portfolio: Tap to load analysis</span>
+    <div style="display:flex; gap:8px;">
+      <button class="refresh-btn" id="global-cues-btn">
+        <span>🌐 Global Cues</span>
+      </button>
+      <!-- ID restored to analytics-toggle-chip -->
+      <button class="refresh-btn" id="analytics-toggle-chip">
+        <span>📊 Portfolio Analysis</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Dynamic Containers matching your custom JS engine IDs -->
+  <div id="global-cues-container" style="display:none; padding:15px; border-bottom:1px solid var(--rule);"></div>
+  <div id="portfolio-analytics-container" style="display:none; padding:15px; border-bottom:1px solid var(--rule);"></div>
+  <div id="portfolio-drilldown-container" style="display:none; padding:15px;"></div>
 
 <div class="refresh-bar">
   <span class="status" id="refresh-status">Not yet fetched today</span>
