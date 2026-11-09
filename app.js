@@ -465,6 +465,9 @@ function updateLiveGarpScore() {
 /* ==========================================================================
    PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
    ========================================================================== */
+/* ==========================================================================
+   PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
+   ========================================================================== */
 function renderPortfolioAnalytics() {
   const container = document.getElementById('portfolio-analytics-container');
   if (!container) return;
@@ -475,10 +478,23 @@ function renderPortfolioAnalytics() {
     return;
   }
 
+  // Fetch saved GARP scores to dynamically override static tiers
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+
   let totalInvested = 0;
   let totalCurrentVal = 0;
 
-  const enriched = stocks.map(([ticker, company, tier, qty = 0, avgPrice = 0]) => {
+  const enriched = stocks.map(([ticker, company, originalTier, qty = 0, avgPrice = 0]) => {
+    // Dynamically apply GARP Audit Status if one exists
+    let tier = originalTier;
+    if (savedScores[ticker] && savedScores[ticker].status) {
+      const status = savedScores[ticker].status;
+      if (status === 'ACCUMULATE_CORE') tier = 'Top30';
+      else if (status === 'HOLD_SATELLITE') tier = 'Top31-50';
+      else if (status === 'MONITOR_WATCHLIST') tier = 'Top51-75';
+      else if (status === 'PRUNE_GTT_EXIT') tier = 'Watch';
+    }
+
     const q = Number(qty) || 0;
     const avg = Number(avgPrice) || 0;
     const invested = q * avg;
