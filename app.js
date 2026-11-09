@@ -2246,3 +2246,100 @@ function renderEntry(stock) {
 }
 checkKiteOAuthCallback();
 init();
+/* ==========================================================================
+   BULK GARP AUTO-AUDIT ENGINE
+   ========================================================================== */
+const bulkGarpBtn = $('#bulk-garp-btn');
+if (bulkGarpBtn) {
+  bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
+}
+
+async function runBulkGarpAudit() {
+  const backendUrl = getBackendUrl();
+  const btn = $('#bulk-garp-btn');
+  
+  if (!backendUrl) {
+    openSettings();
+    showKiteStatus('Set Backend URL first in settings to run the Auto Audit.', 'error');
+    return;
+  }
+  
+  if (btn) {
+    btn.classList.add('spinning');
+    btn.innerHTML = '<span>⏳ Starting Audit...</span>';
+  }
+
+  const stocks = Store.getStocks();
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  
+  for (let i = 0; i < stocks.length; i++) {
+    const [ticker] = stocks[i];
+    const cleanT = getCleanTicker(ticker);
+    
+    if (btn) btn.innerHTML = `<span>⏳ Auditing ${i + 1} of ${stocks.length}...</span>`;
+    
+    // Check cache first to avoid slamming the API
+    let fundamentals = getCachedFundamentals(cleanT);
+    
+    if (!fundamentals) {
+      try {
+        // 800ms delay so Yahoo Finance doesn't block us for rate-limiting
+        await new Promise(r => setTimeout(r, 800));
+        const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
+        const data = await resp.json();
+        if (data.status === 'success') {
+          fundamentals = data.fundamentals;
+          setCachedFundamentals(cleanT, fundamentals);
+        }
+      } catch(e) { console.warn('Failed fetching fundamentals for', cleanT); }
+    }
+    
+    // Default Base Score of 40 for qualitative metrics we can't easily fetch (like order book flow)
+    let score = 40; 
+    let inputs = {
+      'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0", 
+      'garp-g4': "5", 'garp-g5': "5", 'garp-g6': "25", 'garp-g7': "3" 
+    };
+
+    if (fundamentals) {
+       // Gate 1: RoCE (>= 18% -> 10 pts)
+       const roce = fundamentals.roce ? fundamentals.roce * 100 : 0;
+       if (roce >= 18) { score += 10; inputs['garp-g1'] = "10"; }
+       
+       // Gate 2: OPM Floor (>= 18% -> 10 pts, >= 12% -> 5 pts)
+       const opm = fundamentals.profit_margin ? fundamentals.profit_margin * 100 : 0;
+       if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
+       else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
+       
+       // Gate 3: D/E Solvency (<= 0.1 -> 10 pts, <= 0.5 -> 5 pts)
+       const de = fundamentals.debt_to_equity != null ? fundamentals.debt_to_equity : 1.0;
+       if (de <= 0.1) { score += 10; inputs['garp-g3'] = "10"; }
+       else if (de <= 0.5) { score += 5; inputs['garp-g3'] = "5"; }
+       
+       // Gate Valuation: Reasonable P/E (< 30 gets bonus points)
+       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : 100;
+       if (pe > 0 && pe <= 30) { score += 10; inputs['garp-g6'] = "45"; }
+    }
+    
+    // Assign final categorical verdict based on final score
+    let status = 'PRUNE_GTT_EXIT';
+    if (score >= 85) status = 'ACCUMULATE_CORE';
+    else if (score >= 70) status = 'HOLD_SATELLITE';
+    else if (score >= 50) status = 'MONITOR_WATCHLIST';
+
+    // Save to local storage
+    savedScores[ticker] = { score, status, inputs };
+  }
+  
+  // Persist all scores at once
+  localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
+  
+  if (btn) {
+    btn.classList.remove('spinning');
+    btn.innerHTML = '<span>🤖 Auto-Audit All</span>';
+  }
+  
+  // Refresh the UI to display the new badges and reorganize pie charts instantly
+  renderContent();
+  renderPortfolioAnalytics();
+}
