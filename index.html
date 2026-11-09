@@ -1219,7 +1219,17 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
       <!-- Gate 6-10 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>6-10. Core Gates (Aggregated)</label>
-        <select id="garp-g6" class="garp-input" style="padding:4px; border-radius:4px;"><option value="45">All Pass (45 pts)</option><option value="25">Mixed (25 pts)</option><option value="0">Fail (0 pts)</option></select>
+        <!-- Gate 6-10 -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label>6-10. Core Gates (Aggregated)</label>
+        <select id="garp-g6" class="garp-input" style="padding:4px; border-radius:4px;">
+            <option value="45">All Pass & P/E < 50 (45 pts)</option>
+            <option value="40">All Pass & P/E 50-75 (40 pts)</option>
+            <option value="35">Core Pass & P/E > 75 (35 pts)</option>
+            <option value="25">Mixed (25 pts)</option>
+            <option value="0">Fail (0 pts)</option>
+        </select>
+      </div>
       </div>
       <!-- FII/DII Flow -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
