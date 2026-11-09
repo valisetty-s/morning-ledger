@@ -2336,7 +2336,7 @@ async function runBulkGarpAudit() {
   
   if (btn) {
     btn.classList.remove('spinning');
-    btn.innerHTML = '<span>🤖 Auto-Audit All</span>';
+    btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
   }
   
   // Refresh the UI to display the new badges and reorganize pie charts instantly
