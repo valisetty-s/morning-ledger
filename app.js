@@ -1452,7 +1452,24 @@ function classifyStockOverallSentiment(articles) {
 function applySorting(stocks, sortType) {
   if (!stocks || stocks.length === 0) return stocks;
   const sorted = [...stocks];
+  
+  // Fetch scores so the sorting engine can read them
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+
   switch (sortType) {
+    case 'garp-desc':
+      sorted.sort((a, b) => {
+        // Unrated stocks get a -1 so they safely sink to the bottom
+        const scoreA = savedScores[a.ticker] ? savedScores[a.ticker].score : -1;
+        const scoreB = savedScores[b.ticker] ? savedScores[b.ticker].score : -1;
+        
+        // Sort highest score to the top
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        
+        // Alphabetical tie-breaker if scores are identical
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
     case 'change-desc':
       sorted.sort((a, b) => {
         const hasA = a.quote && a.quote.change_pct != null;
