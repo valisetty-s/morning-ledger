@@ -1131,8 +1131,6 @@
   <div class="settings-panel">
     <button class="close-x" id="settings-close">✕</button>
     <h2>Settings</h2>
-    <div class="hint">News comes from Google News (Moneycontrol, Economic Times, LiveMint, Business Standard and others)</div>
-
     <label class="field-label">Your stock list</label>
     <div class="csv-upload-row">
       <button class="btn-upload" id="csv-upload-btn">
@@ -1142,7 +1140,7 @@
       <input type="file" id="csv-file-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none">
       <span class="csv-filename" id="csv-filename"></span>
     </div>
-    <div class="csv-hint">Accepts .xlsx, .xls, or .csv. Needs 3 columns: ticker, company name, tier (Top30 / Top31-50 / Top51-75 / Watch). Header row optional. Also auto-detects Kite Holdings export — sets all to Watch tier.</div>
+    <div class="csv-hint">Needs 3 columns: ticker, company name, tier (Top30 / Top31-50 / Top51-75 / Watch)</div>
 
     <label class="field-label" style="margin-top:18px">Or edit as text (one per line)</label>
     <textarea class="field-textarea" id="stocklist-input" placeholder="VBL,Varun Beverages,Top30
@@ -1153,18 +1151,13 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
       <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
       <div class="hint" style="margin-bottom:12px">
         News fetching and Kite login both go through a small backend you host for free
-        See <code>kite_backend/README.md</code>
-        in the project files for a 10-minute setup if you haven't done this yet.
+        See <code>kite_backend/README.md</code> for setup
       </div>
       <label class="field-label">Your backend URL</label>
       <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
     </div>
 
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
-      <div class="field-label" style="margin-top:0">Import from Kite (Zerodha) — optional</div>
-      <div class="hint" style="margin-bottom:12px">
-        Enter your Kite Connect API key and tap the button.
-      </div>
       <label class="field-label">Kite Connect API Key</label>
       <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="off" style="margin-bottom:10px">
       <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
@@ -1212,7 +1205,7 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
         <label>5. Book-to-Bill</label>
         <select id="garp-g5" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">Strong ≥2x (10 pts)</option><option value="5">Mod 1.2-2x (5 pts)</option><option value="0">Low <1.2x (0 pts)</option></select>
       </div>
-      <!-- Gate 6-10 -->
+<!-- Gate 6-10 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>6-10. Core Gates (Aggregated)</label>
         <select id="garp-g6" class="garp-input" style="padding:4px; border-radius:4px;">
@@ -1223,11 +1216,15 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
             <option value="0">Fail (0 pts)</option>
         </select>
       </div>
-      </div>
+
       <!-- FII/DII Flow -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>11. FII / DII Flow</label>
-        <select id="garp-g7" class="garp-input" style="padding:4px; border-radius:4px;"><option value="5">Accumulating (5 pts)</option><option value="3">Domestic Absorbed (3 pts)</option><option value="0">Dumping (0 pts)</option></select>
+        <select id="garp-g7" class="garp-input" style="padding:4px; border-radius:4px;">
+          <option value="5">Accumulating (5 pts)</option>
+          <option value="3">Domestic Absorbed (3 pts)</option>
+          <option value="0">Dumping (0 pts)</option>
+        </select>
       </div>
     </div>
 
