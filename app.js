@@ -47,7 +47,7 @@ const DEFAULT_STOCKS = [
   ["PRECWIRE","Precision Wires","Watch",0,0],["PACEDIGITK","Pace Digital","Watch",0,0],
   ["ADFFOODS","ADF Foods","Watch",0,0],["QPOWER-BE","Q Power","Watch",0,0],
   ["AEROFLEX","Aeroflex Industries","Watch",0,0],["SPICEJET","SpiceJet","Watch",0,0],
-  ["IDEA","Vodafone Idea","Watch",0,0],["HFCL","HFCL Ltd","Watch",0,0],
+  ["IDEA","Vodafone Idea","Watch",0,0],["HFCL","HFCL Ltd","Watch",0,0]
 ];
 
 const TIER_COLORS = {
@@ -71,102 +71,38 @@ const SECTOR_COLORS = {
 };
 
 const SECTOR_MAP = {
-  "ACUTAAS": "Specialty & Green Chemistry",
-  "AEQUS": "Aerospace & Defense",
-  "AEROFLEX": "AI Cooling, Data Center & IT",
-  "AETHER": "Specialty & Green Chemistry",
-  "AFFLE": "AI Cooling, Data Center & IT",
-  "APLAPOLLO": "Capital Goods & Power Grid",
-  "APOLLO": "Aerospace & Defense",
-  "ARROWGREEN": "Specialty & Green Chemistry",
-  "ASTRAMICRO": "Aerospace & Defense",
-  "ATHERENERG": "Auto Ancillary & EV",
-  "AVALON": "Commodity Converters & Distressed",
-  "AXISCADES": "Aerospace & Defense",
-  "AZAD": "Aerospace & Defense",
-  "BORORENEW": "Clean Energy & Renewables",
-  "BSE": "Financial Tollbooths",
-  "CAMS": "Financial Tollbooths",
-  "CGPOWER": "Capital Goods & Power Grid",
-  "CPPLUS": "AI Cooling, Data Center & IT",
-  "CUPID": "Healthcare & Pharma",
-  "CYIENTDLM": "Aerospace & Defense",
-  "DATAPATTNS": "Aerospace & Defense",
-  "DEEPINDS": "Capital Goods & Power Grid",
-  "DHOOTTRANS": "Commodity Converters & Distressed",
-  "E2E": "AI Cooling, Data Center & IT",
-  "ELGIEQUIP": "Capital Goods & Power Grid",
-  "FCL": "Commodity Converters & Distressed",
-  "GRAVITA": "Commodity Converters & Distressed",
-  "GRSE": "Aerospace & Defense",
-  "HBLENGINE": "Capital Goods & Power Grid",
-  "HFCL-BE": "AI Cooling, Data Center & IT",
-  "IDEA": "Commodity Converters & Distressed",
-  "IKS": "AI Cooling, Data Center & IT",
-  "INDOMIM": "Aerospace & Defense",
-  "INOXINDIA": "Capital Goods & Power Grid",
-  "KANOHAR": "Capital Goods & Power Grid",
-  "KAYNES": "AI Cooling, Data Center & IT",
-  "KRN": "AI Cooling, Data Center & IT",
-  "KSHINTL": "Commodity Converters & Distressed",
-  "KUSUMGAR": "Commodity Converters & Distressed",
-  "LALPATHLAB": "Healthcare & Pharma",
-  "LAURUSLABS": "Healthcare & Pharma",
-  "LENSKART": "Healthcare & Pharma",
-  "MACPOWER": "Commodity Converters & Distressed",
-  "MANINDS": "Commodity Converters & Distressed",
-  "MARINE": "Commodity Converters & Distressed",
-  "MARKSANS": "Healthcare & Pharma",
-  "MAXHEALTH": "Healthcare & Pharma",
-  "MILKYMIST-BE": "Auto Ancillary & EV",
-  "MOLBIO": "Healthcare & Pharma",
-  "MTARTECH-BE": "Aerospace & Defense",
-  "NEOGEN": "Specialty & Green Chemistry",
-  "NETWEB": "AI Cooling, Data Center & IT",
-  "NITTAGELA": "Commodity Converters & Distressed",
-  "NSE": "Financial Tollbooths",
-  "OSWALPUMPS": "Commodity Converters & Distressed",
-  "PACEDIGITK": "Commodity Converters & Distressed",
-  "PARAS": "Aerospace & Defense",
-  "PRICOLLTD": "Commodity Converters & Distressed",
-  "QPOWER": "Capital Goods & Power Grid",
-  "RAINBOW": "Healthcare & Pharma",
-  "RAYMOND": "Aerospace & Defense",
-  "RPEL": "Specialty & Green Chemistry",
-  "RRKABEL": "Capital Goods & Power Grid",
-  "SAILIFE": "Healthcare & Pharma",
-  "SANSERA": "Aerospace & Defense",
-  "SBCL": "Auto Ancillary & EV",
-  "SEDEMAC": "Auto Ancillary & EV",
-  "SETL": "Capital Goods & Power Grid",
-  "SHILPAMED": "Commodity Converters & Distressed",
-  "SHRIRAMFIN": "Commodity Converters & Distressed",
-  "SIGMAADV-BE": "Aerospace & Defense",
-  "SJS": "Auto Ancillary & EV",
-  "SKYGOLD": "Commodity Converters & Distressed",
-  "SONACOMS": "Auto Ancillary & EV",
-  "SPICEJET": "Commodity Converters & Distressed",
-  "SRF": "Specialty & Green Chemistry",
-  "STALLION": "Specialty & Green Chemistry",
-  "STLTECH-BE": "Fibre Optic Cables",
-  "SUDEEPPHRM": "Specialty & Green Chemistry",
-  "SUZLON": "Clean Energy & Renewables",
-  "SYRMA": "AI Cooling, Data Center & IT",
-  "TANFACIND": "Specialty & Green Chemistry",
-  "TDPOWERSYS": "Capital Goods & Power Grid",
-  "TEMPSENS": "Commodity Converters & Distressed",
-  "TIPSMUSIC": "Digital IP, Media & Consumer",
-  "UNIMECH": "Aerospace & Defense",
-  "UNOMINDA": "Auto Ancillary & EV",
-  "VENUSPIPES": "Capital Goods & Power Grid",
-  "VIKRAMTH": "Specialty & Green Chemistry",
-  "VIMTALABS": "Commodity Converters & Distressed",
-  "VISHNU": "Commodity Converters & Distressed",
-  "WAAREEENER": "Clean Energy & Renewables",
-  "WABAG": "Capital Goods & Power Grid",
-  "WELCORP": "Commodity Converters & Distressed",
-  "YATHARTH": "Healthcare & Pharma",
-  "ZENTEC": "Aerospace & Defense",
+  "ACUTAAS": "Specialty & Green Chemistry", "AEQUS": "Aerospace & Defense", "AEROFLEX": "AI Cooling, Data Center & IT",
+  "AETHER": "Specialty & Green Chemistry", "AFFLE": "AI Cooling, Data Center & IT", "APLAPOLLO": "Capital Goods & Power Grid",
+  "APOLLO": "Aerospace & Defense", "ARROWGREEN": "Specialty & Green Chemistry", "ASTRAMICRO": "Aerospace & Defense",
+  "ATHERENERG": "Auto Ancillary & EV", "AVALON": "Commodity Converters & Distressed", "AXISCADES": "Aerospace & Defense",
+  "AZAD": "Aerospace & Defense", "BORORENEW": "Clean Energy & Renewables", "BSE": "Financial Tollbooths",
+  "CAMS": "Financial Tollbooths", "CGPOWER": "Capital Goods & Power Grid", "CPPLUS": "AI Cooling, Data Center & IT",
+  "CUPID": "Healthcare & Pharma", "CYIENTDLM": "Aerospace & Defense", "DATAPATTNS": "Aerospace & Defense",
+  "DEEPINDS": "Capital Goods & Power Grid", "DHOOTTRANS": "Commodity Converters & Distressed", "E2E": "AI Cooling, Data Center & IT",
+  "ELGIEQUIP": "Capital Goods & Power Grid", "FCL": "Commodity Converters & Distressed", "GRAVITA": "Commodity Converters & Distressed",
+  "GRSE": "Aerospace & Defense", "HBLENGINE": "Capital Goods & Power Grid", "HFCL-BE": "AI Cooling, Data Center & IT",
+  "IDEA": "Commodity Converters & Distressed", "IKS": "AI Cooling, Data Center & IT", "INDOMIM": "Aerospace & Defense",
+  "INOXINDIA": "Capital Goods & Power Grid", "KANOHAR": "Capital Goods & Power Grid", "KAYNES": "AI Cooling, Data Center & IT",
+  "KRN": "AI Cooling, Data Center & IT", "KSHINTL": "Commodity Converters & Distressed", "KUSUMGAR": "Commodity Converters & Distressed",
+  "LALPATHLAB": "Healthcare & Pharma", "LAURUSLABS": "Healthcare & Pharma", "LENSKART": "Healthcare & Pharma",
+  "MACPOWER": "Commodity Converters & Distressed", "MANINDS": "Commodity Converters & Distressed", "MARINE": "Commodity Converters & Distressed",
+  "MARKSANS": "Healthcare & Pharma", "MAXHEALTH": "Healthcare & Pharma", "MILKYMIST-BE": "Auto Ancillary & EV",
+  "MOLBIO": "Healthcare & Pharma", "MTARTECH-BE": "Aerospace & Defense", "NEOGEN": "Specialty & Green Chemistry",
+  "NETWEB": "AI Cooling, Data Center & IT", "NITTAGELA": "Commodity Converters & Distressed", "NSE": "Financial Tollbooths",
+  "OSWALPUMPS": "Commodity Converters & Distressed", "PACEDIGITK": "Commodity Converters & Distressed", "PARAS": "Aerospace & Defense",
+  "PRICOLLTD": "Commodity Converters & Distressed", "QPOWER": "Capital Goods & Power Grid", "RAINBOW": "Healthcare & Pharma",
+  "RAYMOND": "Aerospace & Defense", "RPEL": "Specialty & Green Chemistry", "RRKABEL": "Capital Goods & Power Grid",
+  "SAILIFE": "Healthcare & Pharma", "SANSERA": "Aerospace & Defense", "SBCL": "Auto Ancillary & EV",
+  "SEDEMAC": "Auto Ancillary & EV", "SETL": "Capital Goods & Power Grid", "SHILPAMED": "Commodity Converters & Distressed",
+  "SHRIRAMFIN": "Commodity Converters & Distressed", "SIGMAADV-BE": "Aerospace & Defense", "SJS": "Auto Ancillary & EV",
+  "SKYGOLD": "Commodity Converters & Distressed", "SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
+  "SRF": "Specialty & Green Chemistry", "STALLION": "Specialty & Green Chemistry", "STLTECH-BE": "Fibre Optic Cables",
+  "SUDEEPPHRM": "Specialty & Green Chemistry", "SUZLON": "Clean Energy & Renewables", "SYRMA": "AI Cooling, Data Center & IT",
+  "TANFACIND": "Specialty & Green Chemistry", "TDPOWERSYS": "Capital Goods & Power Grid", "TEMPSENS": "Commodity Converters & Distressed",
+  "TIPSMUSIC": "Digital IP, Media & Consumer", "UNIMECH": "Aerospace & Defense", "UNOMINDA": "Auto Ancillary & EV",
+  "VENUSPIPES": "Capital Goods & Power Grid", "VIKRAMTH": "Specialty & Green Chemistry", "VIMTALABS": "Commodity Converters & Distressed",
+  "VISHNU": "Commodity Converters & Distressed", "WAAREEENER": "Clean Energy & Renewables", "WABAG": "Capital Goods & Power Grid",
+  "WELCORP": "Commodity Converters & Distressed", "YATHARTH": "Healthcare & Pharma", "ZENTEC": "Aerospace & Defense",
   "ZYDUSLIFE": "Healthcare & Pharma"
 };
 
@@ -212,7 +148,7 @@ let newsData = null;
 let currentAnalyticsMode = 'tier';
 let selectedSliceKey = null;
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
-let activeGarpTicker = null; // New GARP state variable
+let activeGarpTicker = null; 
 
 const $ = (sel) => document.querySelector(sel);
 const contentEl = $('#content');
@@ -293,24 +229,6 @@ function init() {
       fetchAndShowAIBriefing(ticker, company, articles, `ai-panel-entry-${ticker}`, aiBtn, tier);
       return;
     }
-    // GARP Trigger Listener
-    if (e.target.closest('.garp-trigger-btn')) {
-      const garpBtn = e.target.closest('.garp-trigger-btn');
-      activeGarpTicker = garpBtn.dataset.ticker;
-      if ($('#garp-modal-title')) $('#garp-modal-title').textContent = `GARP Audit: ${activeGarpTicker}`;
-      
-      const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
-      const savedData = savedScores[activeGarpTicker];
-      if (savedData && savedData.inputs) {
-        document.querySelectorAll('.garp-input').forEach(select => {
-          if (savedData.inputs[select.id] !== undefined) select.value = savedData.inputs[select.id];
-        });
-      }
-      
-      updateLiveGarpScore();
-      if ($('#garp-overlay')) $('#garp-overlay').classList.add('open');
-      return;
-    }
   });
 
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
@@ -339,33 +257,6 @@ function init() {
       renderContent();
     });
   });
-
-  // GARP Modal Event Listeners
-  document.querySelectorAll('.garp-input').forEach(select => {
-    select.addEventListener('change', updateLiveGarpScore);
-  });
-  if ($('#garp-close-btn')) {
-    $('#garp-close-btn').addEventListener('click', () => {
-      if ($('#garp-overlay')) $('#garp-overlay').classList.remove('open');
-    });
-  }
-  if ($('#garp-save-btn')) {
-    $('#garp-save-btn').addEventListener('click', () => {
-      let total = 0;
-      let inputs = {};
-      document.querySelectorAll('.garp-input').forEach(select => {
-        total += parseInt(select.value) || 0;
-        inputs[select.id] = select.value;
-      });
-      
-      const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
-      savedScores[activeGarpTicker] = { score: total, status: $('#garp-status-label').textContent, inputs: inputs };
-      localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
-      
-      if ($('#garp-overlay')) $('#garp-overlay').classList.remove('open');
-      renderContent();
-    });
-  }
 
   refreshBtn.addEventListener('click', fetchAllNews);
   const priceBtn = $('#price-refresh-btn');
@@ -429,42 +320,14 @@ function init() {
     $('#install-banner').classList.remove('show');
   });
 
+  const bulkGarpBtn = $('#bulk-garp-btn');
+  if (bulkGarpBtn) bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
 
-// GARP Live Score Updater
-function updateLiveGarpScore() {
-  let total = 0;
-  document.querySelectorAll('.garp-input').forEach(select => {
-    total += parseInt(select.value) || 0;
-  });
-  
-  const scoreEl = $('#garp-live-score');
-  const labelEl = $('#garp-status-label');
-  if (!scoreEl || !labelEl) return;
-  
-  scoreEl.textContent = `${total} / 100`;
-  
-  if (total >= 85) {
-    scoreEl.style.color = '#5B7553';
-    labelEl.textContent = 'ACCUMULATE_CORE';
-  } else if (total >= 70) {
-    scoreEl.style.color = '#B8923F';
-    labelEl.textContent = 'HOLD_SATELLITE';
-  } else if (total >= 50) {
-    scoreEl.style.color = '#B8923F';
-    labelEl.textContent = 'MONITOR_WATCHLIST';
-  } else {
-    scoreEl.style.color = '#A4453A';
-    labelEl.textContent = 'PRUNE_GTT_EXIT';
-  }
-}
-
-/* ==========================================================================
-   PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
-   ========================================================================== */
 /* ==========================================================================
    PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
    ========================================================================== */
@@ -478,14 +341,12 @@ function renderPortfolioAnalytics() {
     return;
   }
 
-  // Fetch saved GARP scores to dynamically override static tiers
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
 
   let totalInvested = 0;
   let totalCurrentVal = 0;
 
   const enriched = stocks.map(([ticker, company, originalTier, qty = 0, avgPrice = 0]) => {
-    // Dynamically apply GARP Audit Status if one exists
     let tier = originalTier;
     if (savedScores[ticker] && savedScores[ticker].status) {
       const status = savedScores[ticker].status;
@@ -1452,21 +1313,14 @@ function classifyStockOverallSentiment(articles) {
 function applySorting(stocks, sortType) {
   if (!stocks || stocks.length === 0) return stocks;
   const sorted = [...stocks];
-  
-  // Fetch scores so the sorting engine can read them
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
 
   switch (sortType) {
     case 'garp-desc':
       sorted.sort((a, b) => {
-        // Unrated stocks get a -1 so they safely sink to the bottom
         const scoreA = savedScores[a.ticker] ? savedScores[a.ticker].score : -1;
         const scoreB = savedScores[b.ticker] ? savedScores[b.ticker].score : -1;
-        
-        // Sort highest score to the top
         if (scoreB !== scoreA) return scoreB - scoreA;
-        
-        // Alphabetical tie-breaker if scores are identical
         return (a.company || '').localeCompare(b.company || '');
       });
       break;
@@ -2206,7 +2060,6 @@ function renderEntry(stock) {
     </div>`;
   }
 
-  // THE FIX: The GARP Button is moved here so it is always rendered!
   const garpAuditBtn = `<button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer; margin-left:8px;">📋 GARP Audit</button>`;
 
   const headHtml = hasQuote
@@ -2261,16 +2114,10 @@ function renderEntry(stock) {
     ${aiBriefingHtml}
   </div>`;
 }
-checkKiteOAuthCallback();
-init();
+
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE
    ========================================================================== */
-const bulkGarpBtn = $('#bulk-garp-btn');
-if (bulkGarpBtn) {
-  bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
-}
-
 async function runBulkGarpAudit() {
   const backendUrl = getBackendUrl();
   const btn = $('#bulk-garp-btn');
@@ -2295,13 +2142,10 @@ async function runBulkGarpAudit() {
     
     if (btn) btn.innerHTML = `<span>⏳ Auditing ${i + 1} of ${stocks.length}...</span>`;
     
-    // Check cache first to avoid slamming the Yahoo API
     let fundamentals = getCachedFundamentals(cleanT);
-    
     if (!fundamentals) {
       try {
-        // 800ms delay to prevent Yahoo Finance Rate Limiting
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 800)); // 800ms delay to prevent Yahoo Rate Limiting
         const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
         const data = await resp.json();
         if (data.status === 'success') {
@@ -2311,55 +2155,44 @@ async function runBulkGarpAudit() {
       } catch(e) { console.warn('Failed fetching fundamentals for', cleanT); }
     }
     
-    // 1. Base Qualitative Score (60 base points)
-    // Order Book (10), Book-to-Bill (10), FII Base (5), Core Gates Base (35)
-    let score = 60; 
+    let score = 60; // 60 Base points
     let inputs = {
       'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0", 
       'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5" 
     };
 
-    // 2. Quantitative API Additions (Max 40 points)
     if (fundamentals) {
-       // Gate 1: RoCE / ROE proxy (>= 18% -> 10 pts)
        const returnMetric = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
        const rocePct = returnMetric * 100;
        if (rocePct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
        
-       // Gate 2: Margin Floor (YF returns Net Profit Margin. ~12% Net is roughly ~18% OPM)
        const pm = fundamentals.profit_margin ? fundamentals.profit_margin * 100 : 0;
        if (pm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
        else if (pm >= 8) { score += 5; inputs['garp-g2'] = "5"; }
        
-       // Gate 3: D/E Solvency (Fixing YF scaling: YF returns 40.0 for 0.4x)
        const deRaw = fundamentals.debt_to_equity;
        const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio || 1.0);
        if (de <= 0.1) { score += 10; inputs['garp-g3'] = "10"; }
        else if (de <= 0.5) { score += 5; inputs['garp-g3'] = "5"; }
        
-       // GARP Valuation Bonus (Max 10 points based on updated P/E bands)
        const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : 100;
        if (pe > 0 && pe < 50) { 
          score += 10; 
-         inputs['garp-g6'] = "45"; // 35 base + 10 points
+         inputs['garp-g6'] = "45"; 
        } else if (pe >= 50 && pe <= 75) {
          score += 5;
-         inputs['garp-g6'] = "40"; // 35 base + 5 points
+         inputs['garp-g6'] = "40"; 
        }
-       // P/E > 75 or negative gets 0 bonus points (stays at base 35)
     }
     
-    // 3. Assign Final Tier
     let status = 'PRUNE_GTT_EXIT';
     if (score >= 85) status = 'ACCUMULATE_CORE';
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
-    // Save to local storage cache
     savedScores[ticker] = { score, status, inputs };
   }
   
-  // Persist all audited scores at once
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
   
   if (btn) {
@@ -2367,7 +2200,103 @@ async function runBulkGarpAudit() {
     btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
   }
   
-  // Refresh the UI to display the new badges and reorganize pie charts instantly
   renderContent();
   renderPortfolioAnalytics();
 }
+
+/* ==========================================================================
+   GLOBAL EVENT LISTENERS (MODAL & UI CONTROLS)
+   ========================================================================== */
+document.addEventListener('click', (e) => {
+  // 1. OPEN MANUAL GARP MODAL
+  const garpBtn = e.target.closest('.garp-trigger-btn');
+  if (garpBtn) {
+    activeGarpTicker = garpBtn.dataset.ticker;
+    if ($('#garp-modal-title')) $('#garp-modal-title').textContent = `GARP Audit: ${activeGarpTicker}`;
+    
+    const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+    const savedData = savedScores[activeGarpTicker];
+    
+    if (savedData && savedData.inputs) {
+      document.querySelectorAll('.garp-input').forEach(select => {
+        if (savedData.inputs[select.id] !== undefined) {
+          select.value = savedData.inputs[select.id];
+        }
+      });
+    } else {
+      document.querySelectorAll('.garp-input').forEach(select => select.selectedIndex = 0);
+    }
+    
+    updateLiveGarpScore();
+    if ($('#garp-overlay')) $('#garp-overlay').style.display = 'flex';
+  }
+  
+  // 2. CLOSE MANUAL MODAL
+  if (e.target.closest('#garp-close-btn')) {
+    if ($('#garp-overlay')) $('#garp-overlay').style.display = 'none';
+  }
+  
+  // 3. SAVE MANUAL MODAL SCORE
+  if (e.target.closest('#garp-save-btn')) {
+    if (!activeGarpTicker) return;
+    
+    let total = 0;
+    let inputs = {};
+    document.querySelectorAll('.garp-input').forEach(select => {
+      total += parseInt(select.value) || 0;
+      inputs[select.id] = select.value;
+    });
+    
+    const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+    savedScores[activeGarpTicker] = { 
+      score: total, 
+      status: $('#garp-status-label').textContent, 
+      inputs: inputs 
+    };
+    localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
+    
+    if ($('#garp-overlay')) $('#garp-overlay').style.display = 'none';
+    
+    renderContent();
+    if (typeof renderPortfolioAnalytics === 'function') {
+      renderPortfolioAnalytics();
+    }
+  }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('garp-input')) {
+    updateLiveGarpScore();
+  }
+});
+
+function updateLiveGarpScore() {
+  let total = 0;
+  document.querySelectorAll('.garp-input').forEach(select => {
+    total += parseInt(select.value) || 0;
+  });
+  
+  const scoreEl = $('#garp-live-score');
+  const labelEl = $('#garp-status-label');
+  if (!scoreEl || !labelEl) return;
+  
+  scoreEl.textContent = `${total} / 100`;
+  
+  if (total >= 85) {
+    scoreEl.style.color = '#5B7553';
+    labelEl.textContent = 'ACCUMULATE_CORE';
+  } else if (total >= 70) {
+    scoreEl.style.color = '#B8923F';
+    labelEl.textContent = 'HOLD_SATELLITE';
+  } else if (total >= 50) {
+    scoreEl.style.color = '#B8923F';
+    labelEl.textContent = 'MONITOR_WATCHLIST';
+  } else {
+    scoreEl.style.color = '#A4453A';
+    labelEl.textContent = 'PRUNE_GTT_EXIT';
+  }
+}
+
+// Ensure init is called after everything is defined
+checkKiteOAuthCallback();
+init();
