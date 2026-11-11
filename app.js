@@ -1240,7 +1240,7 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
 
   const userName = (data.user && data.user.user_name) || 'your account';
   showKiteStatus(
-    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account. Closing settings and fetching today's news now…`,
+    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account.`,
     'success'
   );
 
