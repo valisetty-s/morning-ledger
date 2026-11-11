@@ -1150,14 +1150,12 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
       <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
       <div class="hint" style="margin-bottom:12px">
-        News fetching and Kite login both go through a small backend you host for free
-        See <code>kite_backend/README.md</code> for setup
+        News fetching & Kite login both handled by backend you host for free. See <code>kite_backend/README.md</code> for setup
       </div>
       <label class="field-label">Your backend URL</label>
       <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
     </div>
 
-    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
       <label class="field-label">Kite Connect API Key</label>
       <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="off" style="margin-bottom:10px">
       <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
@@ -1165,7 +1163,6 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
         Log in to Kite &amp; import holdings
       </button>
       <div id="kite-status" class="kite-status" style="display:none"></div>
-    </div>
     <div class="btn-row">
       <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
       <button class="btn btn-primary" id="settings-save">Save</button>
