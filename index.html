@@ -1140,7 +1140,7 @@
       <input type="file" id="csv-file-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none">
       <span class="csv-filename" id="csv-filename"></span>
     </div>
-    <div class="csv-hint">Needs 3 columns: ticker, company name, tier (Top30 / Top31-50 / Top51-75 / Watch)</div>
+    <div class="csv-hint">Excel columns: ticker, company name, tier, qty, price</div>
 
     <label class="field-label" style="margin-top:18px">Or edit as text (one per line)</label>
     <textarea class="field-textarea" id="stocklist-input" placeholder="VBL,Varun Beverages,Top30
@@ -1150,7 +1150,7 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
       <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
       <div class="hint" style="margin-bottom:12px">
-        News fetching & Kite login both handled by backend you host for free. See <code>kite_backend/README.md</code> for setup
+       See <code>kite_backend/README.md</code> for setup
       </div>
       <label class="field-label">Your backend URL</label>
       <input type="text" id="kite-backend-url-input" class="field-input" placeholder="e.g. https://your-app.onrender.com" autocomplete="off" style="margin-bottom:10px">
