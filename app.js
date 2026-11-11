@@ -106,12 +106,6 @@ const SECTOR_MAP = {
   "ZYDUSLIFE": "Healthcare & Pharma"
 };
 
-const SUB_12_GROWTH_SET = new Set([
-  "SPICEJET", "IDEA", "WELCORP", "MANINDS", "GRAVITA", "SKYGOLD", "AVALON", "MARINE",
-  "APOLLO", "PRICOLLTD", "DHOOTTRANS", "MACPOWER", "OSWALPUMPS", "KSHINTL", "KUSUMGAR",
-  "SHILPAMED", "PACEDIGITK", "NITTAGELA", "VIMTALABS", "TEMPSENS", "FCL", "VISHNU", "SHRIRAMFIN"
-]);
-
 function getCleanTicker(ticker) {
   return ticker.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
 }
@@ -143,7 +137,7 @@ const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 
 let currentFilter = 'all';
 let currentSentiment = 'all';
-let currentSort = 'default';
+let currentSort = 'garp-desc'; 
 let newsData = null;
 let currentAnalyticsMode = 'tier';
 let selectedSliceKey = null;
@@ -453,25 +447,25 @@ function renderPortfolioAnalytics() {
     slices = [
       {
         key: "Top50", name: "Top 50 Holdings", val: top50Val, inv: top50Inv,
-        pnl: top50Pnl, pnlPct: top50PnlPct, pnlContribution: (top50Pnl / totalPnL) * 100,
+        pnl: top50Pnl, pnlPct: top50PnlPct, pnlContribution: totalPnL !== 0 ? (top50Pnl / totalPnL) * 100 : 0,
         count: top50.length, pct: (top50Val / denominator) * 100, color: "#2E4057", items: top50
       },
       {
         key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
-        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
         count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
       }
     ];
 
-  } else if (currentAnalyticsMode === 'bottom30') {
-    const sorted = [...enriched].sort((a, b) => (a.currentVal || a.invested) - (b.currentVal || b.invested));
-    const bot30 = sorted.slice(0, 30);
-    const rest = sorted.slice(30);
+  } else if (currentAnalyticsMode === 'top20gainers') {
+    const sorted = [...enriched].sort((a, b) => b.pnlPct - a.pnlPct);
+    const top20 = sorted.slice(0, 20);
+    const rest = sorted.slice(20);
 
-    const botVal = bot30.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
-    const botInv = bot30.reduce((acc, r) => acc + r.invested, 0);
-    const botPnl = botVal - botInv;
-    const botPnlPct = botInv > 0 ? (botPnl / botInv) * 100 : 0;
+    const topVal = top20.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const topInv = top20.reduce((acc, r) => acc + r.invested, 0);
+    const topPnl = topVal - topInv;
+    const topPnlPct = topInv > 0 ? (topPnl / topInv) * 100 : 0;
 
     const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
     const restInv = rest.reduce((acc, r) => acc + r.invested, 0);
@@ -480,19 +474,19 @@ function renderPortfolioAnalytics() {
 
     slices = [
       {
-        key: "Bot30", name: "Bottom 30 Smallest", val: botVal, inv: botInv,
-        pnl: botPnl, pnlPct: botPnlPct, pnlContribution: (botPnl / totalPnL) * 100,
-        count: bot30.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot30
+        key: "Top20Gainers", name: "Top 20 Gainers", val: topVal, inv: topInv,
+        pnl: topPnl, pnlPct: topPnlPct, pnlContribution: totalPnL !== 0 ? (topPnl / totalPnL) * 100 : 0,
+        count: top20.length, pct: (topVal / denominator) * 100, color: "#5B7553", items: top20
       },
       {
-        key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, inv: restInv,
-        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#5B7553", items: rest
+        key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
       }
     ];
 
-  } else if (currentAnalyticsMode === 'bottom20') {
-    const sorted = [...enriched].sort((a, b) => (a.currentVal || a.invested) - (b.currentVal || b.invested));
+  } else if (currentAnalyticsMode === 'top20losers') {
+    const sorted = [...enriched].sort((a, b) => a.pnlPct - b.pnlPct);
     const bot20 = sorted.slice(0, 20);
     const rest = sorted.slice(20);
 
@@ -508,20 +502,20 @@ function renderPortfolioAnalytics() {
 
     slices = [
       {
-        key: "Bot20", name: "Bottom 20 Stubs", val: botVal, inv: botInv,
-        pnl: botPnl, pnlPct: botPnlPct, pnlContribution: (botPnl / totalPnL) * 100,
-        count: bot20.length, pct: (botVal / denominator) * 100, color: "#C45A3E", items: bot20
+        key: "Top20Losers", name: "Top 20 Losers", val: botVal, inv: botInv,
+        pnl: botPnl, pnlPct: botPnlPct, pnlContribution: totalPnL !== 0 ? (botPnl / totalPnL) * 100 : 0,
+        count: bot20.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot20
       },
       {
-        key: "Upper", name: `Top ${rest.length} Holdings`, val: restVal, inv: restInv,
-        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: (restPnl / totalPnL) * 100,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#29577C", items: rest
+        key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
       }
     ];
 
   } else if (currentAnalyticsMode === 'sub12') {
-    const sub12 = enriched.filter(i => SUB_12_GROWTH_SET.has(getCleanTicker(i.ticker)) || SUB_12_GROWTH_SET.has(i.ticker));
-    const above12 = enriched.filter(i => !SUB_12_GROWTH_SET.has(getCleanTicker(i.ticker)) && !SUB_12_GROWTH_SET.has(i.ticker));
+    const sub12 = enriched.filter(i => savedScores[i.ticker] && savedScores[i.ticker].isSub12 === true);
+    const above12 = enriched.filter(i => !savedScores[i.ticker] || savedScores[i.ticker].isSub12 !== true);
 
     const subVal = sub12.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
     const subInv = sub12.reduce((acc, r) => acc + r.invested, 0);
@@ -535,14 +529,41 @@ function renderPortfolioAnalytics() {
 
     slices = [
       {
-        key: "Sub12", name: "Sub-12% Growth Laggards", val: subVal, inv: subInv,
-        pnl: subPnl, pnlPct: subPnlPct, pnlContribution: (subPnl / totalPnL) * 100,
+        key: "Sub12", name: "⚠️ Sub-12% Growth Laggards", val: subVal, inv: subInv,
+        pnl: subPnl, pnlPct: subPnlPct, pnlContribution: totalPnL !== 0 ? (subPnl / totalPnL) * 100 : 0,
         count: sub12.length, pct: (subVal / denominator) * 100, color: "#A4453A", items: sub12
       },
       {
-        key: "Above12", name: ">12% Secular Compounders", val: aboveVal, inv: aboveInv,
-        pnl: abovePnl, pnlPct: abovePnlPct, pnlContribution: (abovePnl / totalPnL) * 100,
-        count: above12.length, pct: (aboveVal / denominator) * 100, color: "#5B7553", items: above12
+        key: "Above12", name: "Normal/High Growth", val: aboveVal, inv: aboveInv,
+        pnl: abovePnl, pnlPct: abovePnlPct, pnlContribution: totalPnL !== 0 ? (abovePnl / totalPnL) * 100 : 0,
+        count: above12.length, pct: (aboveVal / denominator) * 100, color: "#8E735B", items: above12
+      }
+    ];
+
+  } else if (currentAnalyticsMode === 'super18') {
+    const super18 = enriched.filter(i => savedScores[i.ticker] && savedScores[i.ticker].isSuper18 === true);
+    const rest = enriched.filter(i => !savedScores[i.ticker] || savedScores[i.ticker].isSuper18 !== true);
+
+    const supVal = super18.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const supInv = super18.reduce((acc, r) => acc + r.invested, 0);
+    const supPnl = supVal - supInv;
+    const supPnlPct = supInv > 0 ? (supPnl / supInv) * 100 : 0;
+
+    const restVal = rest.reduce((acc, r) => acc + (r.currentVal || r.invested), 0);
+    const restInv = rest.reduce((acc, r) => acc + r.invested, 0);
+    const restPnl = restVal - restInv;
+    const restPnlPct = restInv > 0 ? (restPnl / restInv) * 100 : 0;
+
+    slices = [
+      {
+        key: "Super18", name: "🚀 Super Growth (>18%)", val: supVal, inv: supInv,
+        pnl: supPnl, pnlPct: supPnlPct, pnlContribution: totalPnL !== 0 ? (supPnl / totalPnL) * 100 : 0,
+        count: super18.length, pct: (supVal / denominator) * 100, color: "#048A81", items: super18
+      },
+      {
+        key: "Rest", name: `Other Holdings (${rest.length})`, val: restVal, inv: restInv,
+        pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
       }
     ];
   }
@@ -619,9 +640,10 @@ function renderPortfolioAnalytics() {
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'top50' ? 'active' : ''}" id="btn-chart-top50">Top 50</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'bottom30' ? 'active' : ''}" id="btn-chart-bot30">Bottom 30</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'bottom20' ? 'active' : ''}" id="btn-chart-bot20">Bottom 20</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20gainers' ? 'active' : ''}" id="btn-chart-top20gainers">Top 20 Gainers</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20losers' ? 'active' : ''}" id="btn-chart-top20losers">Top 20 Losers</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'sub12' ? 'active' : ''}" id="btn-chart-sub12">Sub-12% Growth</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'super18' ? 'active' : ''}" id="btn-chart-super18">Super Growth >18%</button>
         </div>
       </div>
 
@@ -677,9 +699,10 @@ function renderPortfolioAnalytics() {
   bindMode('btn-chart-tier', 'tier');
   bindMode('btn-chart-sector', 'sector');
   bindMode('btn-chart-top50', 'top50');
-  bindMode('btn-chart-bot30', 'bottom30');
-  bindMode('btn-chart-bot20', 'bottom20');
+  bindMode('btn-chart-top20gainers', 'top20gainers');
+  bindMode('btn-chart-top20losers', 'top20losers');
   bindMode('btn-chart-sub12', 'sub12');
+  bindMode('btn-chart-super18', 'super18');
 
   const handleSliceClick = (key) => {
     const foundSlice = slices.find(s => s.key === key);
@@ -2161,6 +2184,10 @@ async function runBulkGarpAudit() {
       'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5" 
     };
 
+    // DYNAMIC GROWTH FLAGS: Flag for Laggard (<12%) and Super Growth (>=18%)
+    let isSub12 = false;
+    let isSuper18 = false;
+
     if (fundamentals) {
        const returnMetric = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
        const rocePct = returnMetric * 100;
@@ -2183,6 +2210,21 @@ async function runBulkGarpAudit() {
          score += 5;
          inputs['garp-g6'] = "40"; 
        }
+
+       // Calculate Dynamic Growth Filters
+       const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
+       const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
+       
+       let primaryGrowth = null;
+       if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
+       else if (revGrowth != null) primaryGrowth = revGrowth;
+       else if (earnGrowth != null) primaryGrowth = earnGrowth;
+       else {
+           primaryGrowth = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
+       }
+       
+       isSub12 = (primaryGrowth < 0.12);
+       isSuper18 = (primaryGrowth >= 0.18);
     }
     
     let status = 'PRUNE_GTT_EXIT';
@@ -2190,7 +2232,7 @@ async function runBulkGarpAudit() {
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
-    savedScores[ticker] = { score, status, inputs };
+    savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
   }
   
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
@@ -2248,10 +2290,14 @@ document.addEventListener('click', (e) => {
     });
     
     const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+    const oldData = savedScores[activeGarpTicker] || {};
+    
     savedScores[activeGarpTicker] = { 
       score: total, 
       status: $('#garp-status-label').textContent, 
-      inputs: inputs 
+      inputs: inputs,
+      isSub12: oldData.isSub12,     // Preserve dynamic growth flag from auto-audit
+      isSuper18: oldData.isSuper18  // Preserve dynamic growth flag from auto-audit
     };
     localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
     
