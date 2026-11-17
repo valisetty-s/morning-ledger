@@ -1240,7 +1240,7 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
 
   const userName = (data.user && data.user.user_name) || 'your account';
   showKiteStatus(
-    `✓ Imported ${holdings.length} holdings - ${userName}'s acc.`,
+    `✓ Imported ${holdings.length} holdings from ${userName}'s Kite account. Closing settings and fetching today's news now…`,
     'success'
   );
 
@@ -1338,12 +1338,51 @@ function applySorting(stocks, sortType) {
   const sorted = [...stocks];
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
 
+  // Helper to extract cached PEG ratio
+  const getPeg = (t) => {
+    const clean = getCleanTicker(t);
+    const raw = localStorage.getItem(`ml_fund_${clean}`);
+    if (!raw) return null;
+    try { 
+      const parsed = JSON.parse(raw).fundamentals; 
+      return parsed.peg_ratio != null ? parsed.peg_ratio : null;
+    } catch { return null; }
+  };
+
   switch (sortType) {
     case 'garp-desc':
       sorted.sort((a, b) => {
         const scoreA = savedScores[a.ticker] ? savedScores[a.ticker].score : -1;
         const scoreB = savedScores[b.ticker] ? savedScores[b.ticker].score : -1;
         if (scoreB !== scoreA) return scoreB - scoreA;
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
+    case 'garp-asc':
+      sorted.sort((a, b) => {
+        const scoreA = savedScores[a.ticker] ? savedScores[a.ticker].score : 999;
+        const scoreB = savedScores[b.ticker] ? savedScores[b.ticker].score : 999;
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
+    case 'peg-asc':
+      sorted.sort((a, b) => {
+        const pegA = getPeg(a.ticker);
+        const pegB = getPeg(b.ticker);
+        const valA = pegA != null ? pegA : 9999;
+        const valB = pegB != null ? pegB : 9999;
+        if (valA !== valB) return valA - valB;
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
+    case 'peg-desc':
+      sorted.sort((a, b) => {
+        const pegA = getPeg(a.ticker);
+        const pegB = getPeg(b.ticker);
+        const valA = pegA != null ? pegA : -9999;
+        const valB = pegB != null ? pegB : -9999;
+        if (valA !== valB) return valB - valA;
         return (a.company || '').localeCompare(b.company || '');
       });
       break;
@@ -2018,6 +2057,20 @@ function renderEntry(stock) {
     ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;">GARP: ${scoreData.score}</span>` 
     : '';
 
+  // Extract and format the PEG ratio badge dynamically
+  const cleanTickerForFund = getCleanTicker(stock.ticker);
+  const cachedFund = getCachedFundamentals(cleanTickerForFund);
+  const pegRatio = cachedFund && cachedFund.peg_ratio != null ? Number(cachedFund.peg_ratio).toFixed(2) : null;
+  
+  let pegColor = '#8E735B'; // Neutral fallback
+  if (pegRatio && pegRatio > 0 && pegRatio <= 1.5) pegColor = '#5B7553'; // Green for high-value PEG
+  else if (pegRatio > 1.5 && pegRatio <= 2.5) pegColor = '#B8923F'; // Amber for moderate
+  else if (pegRatio > 2.5 || pegRatio < 0) pegColor = '#A4453A'; // Red for expensive or negative growth
+  
+  const pegBadge = pegRatio 
+    ? `<span style="background:${pegColor}; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegRatio}</span>` 
+    : '';
+
   let body = '';
   if (hasNews) {
     const leadSentiment = classifySentiment(lead.title);
@@ -2058,8 +2111,6 @@ function renderEntry(stock) {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low">52WK LOW</span>`;
     }
 
-    const cleanTickerForFund = getCleanTicker(stock.ticker);
-    const cachedFund = getCachedFundamentals(cleanTickerForFund);
     const fundHtml = cachedFund
       ? renderCompactFundamentalPills(cachedFund)
       : `<button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>`;
@@ -2087,14 +2138,14 @@ function renderEntry(stock) {
 
   const headHtml = hasQuote
     ? `<div class="entry-head-badge-only" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-         <div style="display:flex; align-items:center;">${badgeHtml} ${scoreBadge}</div>
+         <div style="display:flex; align-items:center;">${badgeHtml} ${scoreBadge} ${pegBadge}</div>
          <div>${garpAuditBtn}</div>
        </div>`
     : `<div class="entry-head" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
         <div style="display:flex; align-items:center;">
           <span class="entry-name">${escapeHtml(stock.company)}</span>
           <span class="entry-ticker" style="margin-left:5px;">${escapeHtml(getCleanTicker(stock.ticker))}</span>
-          ${scoreBadge}
+          ${scoreBadge} ${pegBadge}
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           ${badgeHtml}
@@ -2141,9 +2192,6 @@ function renderEntry(stock) {
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE
    ========================================================================== */
-/* ==========================================================================
-   BULK GARP AUTO-AUDIT ENGINE
-   ========================================================================== */
 async function runBulkGarpAudit() {
   const backendUrl = getBackendUrl();
   const btn = $('#bulk-garp-btn');
@@ -2162,7 +2210,7 @@ async function runBulkGarpAudit() {
   const stocks = Store.getStocks();
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
   
-  let failedCount = 0; // Track how many stocks Yahoo blocked
+  let failedCount = 0; 
 
   for (let i = 0; i < stocks.length; i++) {
     const [ticker] = stocks[i];
@@ -2173,7 +2221,6 @@ async function runBulkGarpAudit() {
     let fundamentals = getCachedFundamentals(cleanT);
     if (!fundamentals) {
       try {
-        // Increased delay to 1.5 seconds to prevent Yahoo Rate Limiting on 90+ stocks
         await new Promise(r => setTimeout(r, 1500)); 
         const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
         const data = await resp.json();
@@ -2191,7 +2238,7 @@ async function runBulkGarpAudit() {
       }
     }
     
-    let score = 60; // 60 Base points
+    let score = 60; 
     let inputs = {
       'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0", 
       'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5" 
@@ -2200,7 +2247,6 @@ async function runBulkGarpAudit() {
     let isSub12 = false;
     let isSuper18 = false;
 
-    // Only add quantitative points if we actually successfully retrieved the fundamentals
     if (fundamentals) {
        const returnMetric = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
        const rocePct = returnMetric * 100;
@@ -2242,7 +2288,6 @@ async function runBulkGarpAudit() {
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
-    // IMPORTANT: If fundamentals failed, don't overwrite a previously good cached score with a 60!
     if (fundamentals || !savedScores[ticker]) {
       savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
     }
@@ -2252,7 +2297,6 @@ async function runBulkGarpAudit() {
   
   if (btn) {
     btn.classList.remove('spinning');
-    // Alert the user if Yahoo aggressively rate-limited the batch
     if (failedCount > 0) {
       btn.innerHTML = `<span style="color:var(--clay);">⚠ Blocked by Yahoo (${failedCount}). Try again later.</span>`;
       setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 5000);
@@ -2264,6 +2308,7 @@ async function runBulkGarpAudit() {
   renderContent();
   renderPortfolioAnalytics();
 }
+
 /* ==========================================================================
    GLOBAL EVENT LISTENERS (MODAL & UI CONTROLS)
    ========================================================================== */
@@ -2314,8 +2359,8 @@ document.addEventListener('click', (e) => {
       score: total, 
       status: $('#garp-status-label').textContent, 
       inputs: inputs,
-      isSub12: oldData.isSub12,     // Preserve dynamic growth flag from auto-audit
-      isSuper18: oldData.isSuper18  // Preserve dynamic growth flag from auto-audit
+      isSub12: oldData.isSub12,
+      isSuper18: oldData.isSuper18
     };
     localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
     
@@ -2361,6 +2406,5 @@ function updateLiveGarpScore() {
   }
 }
 
-// Ensure init is called after everything is defined
 checkKiteOAuthCallback();
 init();
