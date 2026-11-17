@@ -2141,6 +2141,9 @@ function renderEntry(stock) {
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE
    ========================================================================== */
+/* ==========================================================================
+   BULK GARP AUTO-AUDIT ENGINE
+   ========================================================================== */
 async function runBulkGarpAudit() {
   const backendUrl = getBackendUrl();
   const btn = $('#bulk-garp-btn');
@@ -2159,6 +2162,8 @@ async function runBulkGarpAudit() {
   const stocks = Store.getStocks();
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
   
+  let failedCount = 0; // Track how many stocks Yahoo blocked
+
   for (let i = 0; i < stocks.length; i++) {
     const [ticker] = stocks[i];
     const cleanT = getCleanTicker(ticker);
@@ -2168,14 +2173,22 @@ async function runBulkGarpAudit() {
     let fundamentals = getCachedFundamentals(cleanT);
     if (!fundamentals) {
       try {
-        await new Promise(r => setTimeout(r, 800)); // 800ms delay to prevent Yahoo Rate Limiting
+        // Increased delay to 1.5 seconds to prevent Yahoo Rate Limiting on 90+ stocks
+        await new Promise(r => setTimeout(r, 1500)); 
         const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
         const data = await resp.json();
+        
         if (data.status === 'success') {
           fundamentals = data.fundamentals;
           setCachedFundamentals(cleanT, fundamentals);
+        } else {
+          console.warn(`Yahoo blocked data for ${cleanT}: ${data.error}`);
+          failedCount++;
         }
-      } catch(e) { console.warn('Failed fetching fundamentals for', cleanT); }
+      } catch(e) { 
+        console.warn('Network error fetching fundamentals for', cleanT); 
+        failedCount++;
+      }
     }
     
     let score = 60; // 60 Base points
@@ -2184,10 +2197,10 @@ async function runBulkGarpAudit() {
       'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5" 
     };
 
-    // DYNAMIC GROWTH FLAGS: Flag for Laggard (<12%) and Super Growth (>=18%)
     let isSub12 = false;
     let isSuper18 = false;
 
+    // Only add quantitative points if we actually successfully retrieved the fundamentals
     if (fundamentals) {
        const returnMetric = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
        const rocePct = returnMetric * 100;
@@ -2211,7 +2224,6 @@ async function runBulkGarpAudit() {
          inputs['garp-g6'] = "40"; 
        }
 
-       // Calculate Dynamic Growth Filters
        const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
        const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
        
@@ -2219,9 +2231,7 @@ async function runBulkGarpAudit() {
        if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
        else if (revGrowth != null) primaryGrowth = revGrowth;
        else if (earnGrowth != null) primaryGrowth = earnGrowth;
-       else {
-           primaryGrowth = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
-       }
+       else primaryGrowth = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
        
        isSub12 = (primaryGrowth < 0.12);
        isSuper18 = (primaryGrowth >= 0.18);
@@ -2232,20 +2242,28 @@ async function runBulkGarpAudit() {
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
-    savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
+    // IMPORTANT: If fundamentals failed, don't overwrite a previously good cached score with a 60!
+    if (fundamentals || !savedScores[ticker]) {
+      savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
+    }
   }
   
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
   
   if (btn) {
     btn.classList.remove('spinning');
-    btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
+    // Alert the user if Yahoo aggressively rate-limited the batch
+    if (failedCount > 0) {
+      btn.innerHTML = `<span style="color:var(--clay);">⚠ Blocked by Yahoo (${failedCount}). Try again later.</span>`;
+      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 5000);
+    } else {
+      btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
+    }
   }
   
   renderContent();
   renderPortfolioAnalytics();
 }
-
 /* ==========================================================================
    GLOBAL EVENT LISTENERS (MODAL & UI CONTROLS)
    ========================================================================== */
