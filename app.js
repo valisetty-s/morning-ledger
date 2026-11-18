@@ -818,11 +818,13 @@ function fmtPct(v) {
 }
 
 function renderFundamentalsPanel(f) {
+  const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
   return `<div class="fundamentals-panel">
     <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
+    <div class="fund-row"><span class="fund-label">Industry P/E</span><span class="fund-val">${fmtRatio(f.industry_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
-    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(f.peg_ratio)}</span></div>
+    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(peg)}</span></div>
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
     <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
     <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
@@ -834,9 +836,10 @@ function renderFundamentalsPanel(f) {
 
 function renderCompactFundamentalPills(f) {
   const pills = [];
+  const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
   if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
   if (f.price_to_book != null) pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
-  if (f.peg_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(f.peg_ratio).toFixed(1)}⚠</span>`);
+  if (peg != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(peg).toFixed(1)}⚠</span>`);
   if (f.return_on_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
   if (f.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
   if (f.debt_to_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
@@ -1338,14 +1341,15 @@ function applySorting(stocks, sortType) {
   const sorted = [...stocks];
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
 
-  // Helper to extract cached PEG ratio
+  // Helper to extract cached PEG ratio securely from either API casing
   const getPeg = (t) => {
     const clean = getCleanTicker(t);
     const raw = localStorage.getItem(`ml_fund_${clean}`);
     if (!raw) return null;
     try { 
       const parsed = JSON.parse(raw).fundamentals; 
-      return parsed.peg_ratio != null ? parsed.peg_ratio : null;
+      const peg = parsed.pegRatio != null ? parsed.pegRatio : parsed.peg_ratio;
+      return peg != null ? Number(peg) : null;
     } catch { return null; }
   };
 
@@ -1368,20 +1372,16 @@ function applySorting(stocks, sortType) {
       break;
     case 'peg-asc':
       sorted.sort((a, b) => {
-        const pegA = getPeg(a.ticker);
-        const pegB = getPeg(b.ticker);
-        const valA = pegA != null ? pegA : 9999;
-        const valB = pegB != null ? pegB : 9999;
+        const valA = getPeg(a.ticker) != null ? getPeg(a.ticker) : 9999;
+        const valB = getPeg(b.ticker) != null ? getPeg(b.ticker) : 9999;
         if (valA !== valB) return valA - valB;
         return (a.company || '').localeCompare(b.company || '');
       });
       break;
     case 'peg-desc':
       sorted.sort((a, b) => {
-        const pegA = getPeg(a.ticker);
-        const pegB = getPeg(b.ticker);
-        const valA = pegA != null ? pegA : -9999;
-        const valB = pegB != null ? pegB : -9999;
+        const valA = getPeg(a.ticker) != null ? getPeg(a.ticker) : -9999;
+        const valB = getPeg(b.ticker) != null ? getPeg(b.ticker) : -9999;
         if (valA !== valB) return valB - valA;
         return (a.company || '').localeCompare(b.company || '');
       });
@@ -2050,26 +2050,34 @@ function renderEntry(stock) {
   const rest = hasNews ? stock.articles.slice(1) : [];
   const overallSentiment = hasNews ? classifyStockOverallSentiment(stock.articles) : null;
 
-  // Retrieve saved GARP score
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
   const scoreData = savedScores[stock.ticker];
   const scoreBadge = scoreData 
     ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;">GARP: ${scoreData.score}</span>` 
     : '';
 
-  // Extract and format the PEG ratio badge dynamically
+  // Extract and format the PEG ratio dynamically, checking both API variations
   const cleanTickerForFund = getCleanTicker(stock.ticker);
   const cachedFund = getCachedFundamentals(cleanTickerForFund);
-  const pegRatio = cachedFund && cachedFund.peg_ratio != null ? Number(cachedFund.peg_ratio).toFixed(2) : null;
+  
+  let rawPeg = null;
+  if (cachedFund) {
+      rawPeg = cachedFund.pegRatio != null ? cachedFund.pegRatio : cachedFund.peg_ratio;
+  }
+  
+  const pegRatio = rawPeg != null ? Number(rawPeg).toFixed(2) : null;
   
   let pegColor = '#8E735B'; // Neutral fallback
-  if (pegRatio && pegRatio > 0 && pegRatio <= 1.5) pegColor = '#5B7553'; // Green for high-value PEG
-  else if (pegRatio > 1.5 && pegRatio <= 2.5) pegColor = '#B8923F'; // Amber for moderate
-  else if (pegRatio > 2.5 || pegRatio < 0) pegColor = '#A4453A'; // Red for expensive or negative growth
+  let pegText = 'N/A';
   
-  const pegBadge = pegRatio 
-    ? `<span style="background:${pegColor}; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegRatio}</span>` 
-    : '';
+  if (pegRatio) {
+      pegText = pegRatio;
+      if (rawPeg > 0 && rawPeg <= 1.5) pegColor = '#5B7553'; // Green for high-value PEG
+      else if (rawPeg > 1.5 && rawPeg <= 2.5) pegColor = '#B8923F'; // Amber for moderate
+      else if (rawPeg > 2.5 || rawPeg < 0) pegColor = '#A4453A'; // Red for expensive or negative growth
+  }
+  
+  const pegBadge = `<span style="background:${pegColor}; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
 
   let body = '';
   if (hasNews) {
@@ -2261,13 +2269,17 @@ async function runBulkGarpAudit() {
        if (de <= 0.1) { score += 10; inputs['garp-g3'] = "10"; }
        else if (de <= 0.5) { score += 5; inputs['garp-g3'] = "5"; }
        
-       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : 100;
-       if (pe > 0 && pe < 50) { 
-         score += 10; 
-         inputs['garp-g6'] = "45"; 
-       } else if (pe >= 50 && pe <= 75) {
-         score += 5;
-         inputs['garp-g6'] = "40"; 
+       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
+       const industryPE = fundamentals.industry_pe || 40; // Fallback to 40 if backend lacks peer data
+       
+       if (pe != null && pe > 0) {
+           if (pe <= (industryPE * 1.2)) { 
+             score += 10; 
+             inputs['garp-g6'] = "45"; 
+           } else if (pe <= (industryPE * 1.8)) {
+             score += 5;
+             inputs['garp-g6'] = "40"; 
+           }
        }
 
        const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
@@ -2313,7 +2325,6 @@ async function runBulkGarpAudit() {
    GLOBAL EVENT LISTENERS (MODAL & UI CONTROLS)
    ========================================================================== */
 document.addEventListener('click', (e) => {
-  // 1. OPEN MANUAL GARP MODAL
   const garpBtn = e.target.closest('.garp-trigger-btn');
   if (garpBtn) {
     activeGarpTicker = garpBtn.dataset.ticker;
@@ -2336,12 +2347,10 @@ document.addEventListener('click', (e) => {
     if ($('#garp-overlay')) $('#garp-overlay').style.display = 'flex';
   }
   
-  // 2. CLOSE MANUAL MODAL
   if (e.target.closest('#garp-close-btn')) {
     if ($('#garp-overlay')) $('#garp-overlay').style.display = 'none';
   }
   
-  // 3. SAVE MANUAL MODAL SCORE
   if (e.target.closest('#garp-save-btn')) {
     if (!activeGarpTicker) return;
     
