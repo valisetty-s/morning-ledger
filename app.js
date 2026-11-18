@@ -39,7 +39,7 @@ const DEFAULT_STOCKS = [
   ["INOXINDIA","Inox India","Top51-75",0,0],["GROWW","Groww","Top51-75",0,0],
   ["DCXINDIA","DCX Systems","Top51-75",0,0],
   ["ATHERENERG","Ather Energy","Watch",0,0],["SHARDACROP","Sharda Cropchem","Watch",0,0],
-  ["SIGMAADV","Sigma Solve","Watch",0,0],["SHAKTIPUMP","Shakti Pumps","Watch",0,0],
+  ["SIGMAADV","Sigma Adv","Watch",0,0],["SHAKTIPUMP","Shakti Pumps","Watch",0,0],
   ["OSWALPUMPS","Oswal Pumps","Watch",0,0],["PREMEXPLN","Premier Explosives","Watch",0,0],
   ["TRAVELFOOD","Travel Food Services","Watch",0,0],["GMDCLTD","GMDC","Watch",0,0],
   ["ETERNAL","Eternal (Zomato)","Watch",0,0],["TRIVENI","Triveni Engineering","Watch",0,0],
