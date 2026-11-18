@@ -823,27 +823,30 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">Industry P/E</span><span class="fund-val">${fmtRatio(f.industry_pe)}</span></div>
     <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">P/B</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
     <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(peg)}</span></div>
+    <div class="fund-row"><span class="fund-label">Revenue Growth</span><span class="fund-val">${fmtPct(f.revenue_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">PAT Growth</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
     <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
-    <div class="fund-row"><span class="fund-label">Debt/Equity</span><span class="fund-val">${fmtRatio(f.debt_to_equity)}</span></div>
     <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
     <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
-    <div class="fund-note">ROCE and Debt Ratio are calculated from raw balance sheet/income statement data.</div>
   </div>`;
 }
 
 function renderCompactFundamentalPills(f) {
   const pills = [];
   const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
+  
   if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
-  if (f.price_to_book != null) pills.push(`<span class="ribbon-fund-pill" title="Price to Book">P/B ${Number(f.price_to_book).toFixed(1)}</span>`);
-  if (peg != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(peg).toFixed(1)}⚠</span>`);
-  if (f.return_on_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Return on Equity">ROE ${(Number(f.return_on_equity) * 100).toFixed(1)}%</span>`);
-  if (f.roce != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE">ROCE ${(Number(f.roce) * 100).toFixed(1)}%</span>`);
-  if (f.debt_to_equity != null) pills.push(`<span class="ribbon-fund-pill" title="Debt to Equity">D/E ${Number(f.debt_to_equity).toFixed(1)}</span>`);
-  if (f.debt_ratio != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(f.debt_ratio) * 100).toFixed(1)}%</span>`);
+  if (peg != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(peg).toFixed(1)}</span>`);
+  
+  // We now pull ROCE and Debt directly into this main pill, removing the need for a separate ROCE button
+  const roceMetric = f.roce != null ? f.roce : f.return_on_equity;
+  if (roceMetric != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE/ROE">ROCE ${(Number(roceMetric) * 100).toFixed(1)}%</span>`);
+  
+  const debtMetric = f.debt_ratio != null ? f.debt_ratio : (f.debt_to_equity != null ? (f.debt_to_equity / 100) : null);
+  if (debtMetric != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(debtMetric) * 100).toFixed(1)}%</span>`);
+  
   if (pills.length === 0) return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
   return pills.join('');
 }
@@ -2067,18 +2070,19 @@ function renderEntry(stock) {
   
   const pegRatio = rawPeg != null ? Number(rawPeg).toFixed(2) : null;
   
-  let pegColor = '#8E735B'; // Neutral fallback
+  let pegColor = '#E9ECEF'; // Neutral Gray fallback for N/A
+  let pegTextColor = 'var(--ink-soft)';
   let pegText = 'N/A';
   
   if (pegRatio) {
       pegText = pegRatio;
+      pegTextColor = 'white';
       if (rawPeg > 0 && rawPeg <= 1.5) pegColor = '#5B7553'; // Green for high-value PEG
       else if (rawPeg > 1.5 && rawPeg <= 2.5) pegColor = '#B8923F'; // Amber for moderate
       else if (rawPeg > 2.5 || rawPeg < 0) pegColor = '#A4453A'; // Red for expensive or negative growth
   }
   
-  const pegBadge = `<span style="background:${pegColor}; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
-
+  const pegBadge = `<span style="background:${pegColor}; color:${pegTextColor}; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:4px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
   let body = '';
   if (hasNews) {
     const leadSentiment = classifySentiment(lead.title);
@@ -2105,7 +2109,7 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-  let ribbonHtml = '';
+let ribbonHtml = '';
   const hasQuote = stock.quote && stock.quote.last_price != null;
   if (hasQuote) {
     const chg = stock.quote.change_pct;
@@ -2119,6 +2123,7 @@ function renderEntry(stock) {
       flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low">52WK LOW</span>`;
     }
 
+    // Displays the unified Fundamental Pills (which now include ROCE), removing the old ROCE button
     const fundHtml = cachedFund
       ? renderCompactFundamentalPills(cachedFund)
       : `<button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>`;
@@ -2127,7 +2132,7 @@ function renderEntry(stock) {
       ? renderCompactRocePills(cachedRoce)
       : `<button class="ribbon-roce-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📈 ROCE</button>`;
 
-    ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
+ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
         <span class="ribbon-name">${escapeHtml(stock.company)}</span>
         <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
@@ -2137,7 +2142,6 @@ function renderEntry(stock) {
         <span class="ribbon-change${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">  ${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
         ${fundHtml}
-        ${roceHtml}
       </div>
     </div>`;
   }
