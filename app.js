@@ -836,17 +836,30 @@ function renderFundamentalsPanel(f) {
 function renderCompactFundamentalPills(f) {
   const pills = [];
   const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
-  
-  if (f.trailing_pe != null) pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E">PE ${Number(f.trailing_pe).toFixed(1)}</span>`);
-  if (peg != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(peg).toFixed(1)}</span>`);
-  
-  // We now pull ROCE and Debt directly into this main pill, removing the need for a separate ROCE button
+
+  if (f.trailing_pe != null) {
+    const indText = f.industry_pe != null ? ` (Ind ${Number(f.industry_pe).toFixed(0)})` : '';
+    pills.push(`<span class="ribbon-fund-pill" title="Trailing P/E vs Industry P/E">PE ${Number(f.trailing_pe).toFixed(1)}${indText}</span>`);
+  }
+  if (peg != null) pills.push(`<span class="ribbon-fund-pill" title="PEG ratio">PEG ${Number(peg).toFixed(2)}</span>`);
+
   const roceMetric = f.roce != null ? f.roce : f.return_on_equity;
-  if (roceMetric != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE/ROE">ROCE ${(Number(roceMetric) * 100).toFixed(1)}%</span>`);
-  
+  if (roceMetric != null) pills.push(`<span class="ribbon-fund-pill" title="ROCE / ROE">ROCE ${(Number(roceMetric) * 100).toFixed(1)}%</span>`);
+
+  // Decimal Debt Ratio (e.g., 0.14 instead of 13.8%)
   const debtMetric = f.debt_ratio != null ? f.debt_ratio : (f.debt_to_equity != null ? (f.debt_to_equity / 100) : null);
-  if (debtMetric != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio">DR ${(Number(debtMetric) * 100).toFixed(1)}%</span>`);
-  
+  if (debtMetric != null) pills.push(`<span class="ribbon-fund-pill" title="Debt Ratio (Decimal)">DR ${Number(debtMetric).toFixed(2)}</span>`);
+
+  // Revenue & PAT Growth directly on the ribbon
+  if (f.revenue_growth != null) {
+    const sign = f.revenue_growth >= 0 ? '+' : '';
+    pills.push(`<span class="ribbon-fund-pill" title="Revenue Growth (YoY)">Rev ${sign}${(Number(f.revenue_growth) * 100).toFixed(1)}%</span>`);
+  }
+  if (f.earnings_growth != null) {
+    const sign = f.earnings_growth >= 0 ? '+' : '';
+    pills.push(`<span class="ribbon-fund-pill" title="PAT / Earnings Growth (YoY)">PAT ${sign}${(Number(f.earnings_growth) * 100).toFixed(1)}%</span>`);
+  }
+
   if (pills.length === 0) return `<span class="ribbon-fund-pill" style="opacity:0.75">No fundamentals data</span>`;
   return pills.join('');
 }
