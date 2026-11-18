@@ -1051,14 +1051,15 @@
   <button class="chip sent-chip sent-positive" data-sentiment="positive">✓ Positive</button>
 </div>
 
-<div class="toolbar sentiment-toolbar" id="sort-toolbar">
-  <button class="chip sort-chip active" data-sort="default">A–Z (default)</button>
-  <button class="chip sort-chip" data-sort="change-desc">↑ Gainers first</button>
-  <button class="chip sort-chip" data-sort="change-asc">↓ Losers first</button>
-  <button class="chip" data-sort="garp-desc">GARP Score (High-Low)</button>
-  <button class="chip" data-sort="garp-asc">GARP Score (Low-High)</button>
-  <button class="chip" data-sort="peg-asc">PEG Ratio (Low-High)</button>
-  <button class="chip" data-sort="peg-desc">PEG Ratio (High-Low)</button>
+<div class="filter-bar" style="margin-top:10px;">
+      <span class="status">Sort:</span>
+      <button class="chip active" data-sort="default">A-Z (Default)</button>
+      <button class="chip" data-sort="garp-desc">GARP ↓</button>
+      <button class="chip" data-sort="garp-asc">GARP ↑</button>
+      <button class="chip" data-sort="peg-asc">PEG ↑</button>
+      <button class="chip" data-sort="peg-desc">PEG ↓</button>
+      <button class="chip" data-sort="change-desc">% Chg ↓</button>
+      <button class="chip" data-sort="change-asc">% Chg ↑</button>
 </div>
 
 <div class="refresh-bar" style="padding-top:0">
