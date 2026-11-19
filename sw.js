@@ -1,6 +1,6 @@
 // Service worker for The Morning Ledger
 // Change this line in your sw.js file to a new version:
-const CACHE_NAME = 'morning-ledger-v15-garp';
+const CACHE_NAME = 'morning-ledger-v16-garp';
 const SHELL_FILES = [
   './index.html',
   './app.js',

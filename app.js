@@ -2255,16 +2255,19 @@ ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE
    ========================================================================== */
+/* ==========================================================================
+   BULK GARP AUTO-AUDIT ENGINE (WITH CIRCUIT BREAKER & CALIBRATED GATES)
+   ========================================================================== */
 async function runBulkGarpAudit() {
   const backendUrl = getBackendUrl();
   const btn = $('#bulk-garp-btn');
-  
+
   if (!backendUrl) {
     openSettings();
     showKiteStatus('Set Backend URL first in settings to run the Auto Audit.', 'error');
     return;
   }
-  
+
   if (btn) {
     btn.classList.add('spinning');
     btn.innerHTML = '<span>⏳ Starting Audit...</span>';
@@ -2272,120 +2275,138 @@ async function runBulkGarpAudit() {
 
   const stocks = Store.getStocks();
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
-  
-  let failedCount = 0; 
+
+  let failedCount = 0;
+  let consecutiveFails = 0;
+  let stoppedEarly = false;
 
   for (let i = 0; i < stocks.length; i++) {
     const [ticker] = stocks[i];
     const cleanT = getCleanTicker(ticker);
-    
+
     if (btn) btn.innerHTML = `<span>⏳ Auditing ${i + 1} of ${stocks.length}...</span>`;
-    
+
     let fundamentals = getCachedFundamentals(cleanT);
     if (!fundamentals) {
       try {
-        await new Promise(r => setTimeout(r, 1500)); 
+        await new Promise(r => setTimeout(r, 2500)); // 2.5s pacing to avoid Yahoo rate limits
         const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
         const data = await resp.json();
-        
-        if (data.status === 'success') {
+
+        if (resp.ok && data.status === 'success') {
           fundamentals = data.fundamentals;
           setCachedFundamentals(cleanT, fundamentals);
+          consecutiveFails = 0;
         } else {
           console.warn(`Yahoo blocked data for ${cleanT}: ${data.error}`);
           failedCount++;
+          consecutiveFails++;
+          if (consecutiveFails >= 3) {
+            stoppedEarly = true;
+            console.warn('Stopping bulk audit early due to Yahoo rate limit.');
+            break;
+          }
         }
-      } catch(e) { 
-        console.warn('Network error fetching fundamentals for', cleanT); 
+      } catch (e) {
+        console.warn('Network error fetching fundamentals for', cleanT);
         failedCount++;
+        consecutiveFails++;
+        if (consecutiveFails >= 3) {
+          stoppedEarly = true;
+          break;
+        }
       }
     }
-    
-    let score = 60; 
+
+    let score = 60; // 60 Base points
     let inputs = {
-      'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0", 
-      'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5" 
+      'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0",
+      'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5"
     };
 
     let isSub12 = false;
     let isSuper18 = false;
 
     if (fundamentals) {
-       // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
-       const cachedRoceObj = getCachedRoce(cleanT);
-       const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
-       const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
-       const returnPct = returnMetric * 100;
-       if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
-       else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
+      // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
+      const cachedRoceObj = getCachedRoce(cleanT);
+      const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
+      const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
+      const returnPct = returnMetric * 100;
+      if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
+      else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
 
-       // Gate 2: True Operating Margin (OPM) first; fallback to Net Profit Margin
-       const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
-       const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
-       if (opm != null) {
-         if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
-         else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
-       } else {
-         if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
-         else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
-       }
+      // Gate 2: True Operating Margin (OPM) first; fallback to Net Profit Margin
+      const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
+      const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
+      if (opm != null) {
+        if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
+        else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
+      } else {
+        if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
+        else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
+      }
 
-       // Gate 3: D/E Solvency (Yahoo reports Gross D/E as %, so 0.6x accounts for gross vs net)
-       const deRaw = fundamentals.debt_to_equity;
-       const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
-       if (de != null) {
-         if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
-         else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
-       }
+      // Gate 3: D/E Solvency (Yahoo reports Gross D/E as %, so 0.6x accounts for gross vs net)
+      const deRaw = fundamentals.debt_to_equity;
+      const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
+      if (de != null) {
+        if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
+        else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
+      }
 
-       // Gate 6: Valuation Bonus (P/E vs Industry P/E, or fallback to your <50 / 50-75 bands)
-       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
-       if (pe != null && pe > 0) {
-         if (fundamentals.industry_pe) {
-           if (pe <= fundamentals.industry_pe * 1.2) { score += 10; inputs['garp-g6'] = "45"; }
-           else if (pe <= fundamentals.industry_pe * 1.8) { score += 5; inputs['garp-g6'] = "40"; }
-         } else {
-           if (pe < 50) { score += 10; inputs['garp-g6'] = "45"; }
-           else if (pe <= 75) { score += 5; inputs['garp-g6'] = "40"; }
-         }
-       }
+      // Gate 6: Valuation Bonus (P/E vs Industry P/E, or fallback to <50 / 50-75 bands)
+      const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
+      if (pe != null && pe > 0) {
+        if (fundamentals.industry_pe) {
+          if (pe <= fundamentals.industry_pe * 1.2) { score += 10; inputs['garp-g6'] = "45"; }
+          else if (pe <= fundamentals.industry_pe * 1.8) { score += 5; inputs['garp-g6'] = "40"; }
+        } else {
+          if (pe < 50) { score += 10; inputs['garp-g6'] = "45"; }
+          else if (pe <= 75) { score += 5; inputs['garp-g6'] = "40"; }
+        }
+      }
 
-       // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
-       const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
-       const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
+      // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
+      const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
+      const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
 
-       let primaryGrowth = null;
-       if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
-       else if (revGrowth != null) primaryGrowth = revGrowth;
-       else if (earnGrowth != null) primaryGrowth = earnGrowth;
-       else primaryGrowth = returnMetric;
+      let primaryGrowth = null;
+      if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
+      else if (revGrowth != null) primaryGrowth = revGrowth;
+      else if (earnGrowth != null) primaryGrowth = earnGrowth;
+      else primaryGrowth = returnMetric;
 
-       isSub12 = (primaryGrowth < 0.12);
-       isSuper18 = (primaryGrowth >= 0.18);
+      isSub12 = (primaryGrowth < 0.12);
+      isSuper18 = (primaryGrowth >= 0.18);
     }
-	
+
     let status = 'PRUNE_GTT_EXIT';
     if (score >= 85) status = 'ACCUMULATE_CORE';
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
+    // Don't overwrite a previously good cached score with a 60 if Yahoo failed
     if (fundamentals || !savedScores[ticker]) {
       savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
     }
   }
-  
+
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
-  
+
   if (btn) {
     btn.classList.remove('spinning');
-    if (failedCount > 0) {
-      btn.innerHTML = `<span style="color:var(--clay);">⚠ Blocked by Yahoo (${failedCount}). Try again later.</span>`;
+    if (stoppedEarly) {
+      btn.innerHTML = `<span style="color:var(--clay);">⚠ Paused: Yahoo rate limit hit. Try again in 15 mins.</span>`;
+      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 6000);
+    } else if (failedCount > 0) {
+      btn.innerHTML = `<span style="color:var(--clay);">⚠ Done (${failedCount} skipped by Yahoo).</span>`;
       setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 5000);
     } else {
       btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
     }
   }
-  
+
   renderContent();
   renderPortfolioAnalytics();
 }
