@@ -74,15 +74,15 @@ const SECTOR_MAP = {
   "ACUTAAS": "Specialty & Green Chemistry", "AEQUS": "Aerospace & Defense", "AEROFLEX": "AI Cooling, Data Center & IT",
   "AETHER": "Specialty & Green Chemistry", "AFFLE": "AI Cooling, Data Center & IT", "APLAPOLLO": "Capital Goods & Power Grid",
   "APOLLO": "Aerospace & Defense", "ARROWGREEN": "Specialty & Green Chemistry", "ASTRAMICRO": "Aerospace & Defense",
-  "ATHERENERG": "Auto Ancillary & EV", "AVALON": "Commodity Converters & Distressed", "AXISCADES": "Aerospace & Defense",
+  "ATHERENERG": "Auto Ancillary & EV", "AVALON": "EMS", "AXISCADES": "Aerospace & Defense",
   "AZAD": "Aerospace & Defense", "BORORENEW": "Clean Energy & Renewables", "BSE": "Financial Tollbooths",
   "CAMS": "Financial Tollbooths", "CGPOWER": "Capital Goods & Power Grid", "CPPLUS": "AI Cooling, Data Center & IT",
   "CUPID": "Healthcare & Pharma", "CYIENTDLM": "Aerospace & Defense", "DATAPATTNS": "Aerospace & Defense",
   "DEEPINDS": "Capital Goods & Power Grid", "DHOOTTRANS": "Commodity Converters & Distressed", "E2E": "AI Cooling, Data Center & IT",
-  "ELGIEQUIP": "Capital Goods & Power Grid", "FCL": "Commodity Converters & Distressed", "GRAVITA": "Commodity Converters & Distressed",
+  "ELGIEQUIP": "Capital Goods & Power Grid", "FCL": "Commodity Converters & Distressed", "GRAVITA": "Commodity Recycle",
   "GRSE": "Aerospace & Defense", "HBLENGINE": "Capital Goods & Power Grid", "HFCL-BE": "AI Cooling, Data Center & IT",
   "IDEA": "Commodity Converters & Distressed", "IKS": "AI Cooling, Data Center & IT", "INDOMIM": "Aerospace & Defense",
-  "INOXINDIA": "Capital Goods & Power Grid", "KANOHAR": "Capital Goods & Power Grid", "KAYNES": "AI Cooling, Data Center & IT",
+  "INOXINDIA": "Capital Goods & Power Grid", "KANOHAR": "Capital Goods & Power Grid", "KAYNES": "EMS",
   "KRN": "AI Cooling, Data Center & IT", "KSHINTL": "Commodity Converters & Distressed", "KUSUMGAR": "Commodity Converters & Distressed",
   "LALPATHLAB": "Healthcare & Pharma", "LAURUSLABS": "Healthcare & Pharma", "LENSKART": "Healthcare & Pharma",
   "MACPOWER": "Commodity Converters & Distressed", "MANINDS": "Commodity Converters & Distressed", "MARINE": "Commodity Converters & Distressed",
@@ -2273,45 +2273,59 @@ async function runBulkGarpAudit() {
     let isSuper18 = false;
 
     if (fundamentals) {
-       const returnMetric = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
-       const rocePct = returnMetric * 100;
-       if (rocePct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
-       
-       const pm = fundamentals.profit_margin ? fundamentals.profit_margin * 100 : 0;
-       if (pm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
-       else if (pm >= 8) { score += 5; inputs['garp-g2'] = "5"; }
-       
-       const deRaw = fundamentals.debt_to_equity;
-       const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio || 1.0);
-       if (de <= 0.1) { score += 10; inputs['garp-g3'] = "10"; }
-       else if (de <= 0.5) { score += 5; inputs['garp-g3'] = "5"; }
-       
-       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
-       const industryPE = fundamentals.industry_pe || 40; // Fallback to 40 if backend lacks peer data
-       
-       if (pe != null && pe > 0) {
-           if (pe <= (industryPE * 1.2)) { 
-             score += 10; 
-             inputs['garp-g6'] = "45"; 
-           } else if (pe <= (industryPE * 1.8)) {
-             score += 5;
-             inputs['garp-g6'] = "40"; 
-           }
+       // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
+       const cachedRoceObj = getCachedRoce(cleanT);
+       const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
+       const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
+       const returnPct = returnMetric * 100;
+       if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
+       else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
+
+       // Gate 2: True Operating Margin (OPM) first; fallback to Net Profit Margin
+       const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
+       const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
+       if (opm != null) {
+         if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
+         else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
+       } else {
+         if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
+         else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
        }
 
+       // Gate 3: D/E Solvency (Yahoo reports Gross D/E as %, so 0.6x accounts for gross vs net)
+       const deRaw = fundamentals.debt_to_equity;
+       const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
+       if (de != null) {
+         if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
+         else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
+       }
+
+       // Gate 6: Valuation Bonus (P/E vs Industry P/E, or fallback to your <50 / 50-75 bands)
+       const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
+       if (pe != null && pe > 0) {
+         if (fundamentals.industry_pe) {
+           if (pe <= fundamentals.industry_pe * 1.2) { score += 10; inputs['garp-g6'] = "45"; }
+           else if (pe <= fundamentals.industry_pe * 1.8) { score += 5; inputs['garp-g6'] = "40"; }
+         } else {
+           if (pe < 50) { score += 10; inputs['garp-g6'] = "45"; }
+           else if (pe <= 75) { score += 5; inputs['garp-g6'] = "40"; }
+         }
+       }
+
+       // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
        const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
        const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
-       
+
        let primaryGrowth = null;
        if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
        else if (revGrowth != null) primaryGrowth = revGrowth;
        else if (earnGrowth != null) primaryGrowth = earnGrowth;
-       else primaryGrowth = fundamentals.roce != null ? fundamentals.roce : (fundamentals.return_on_equity || 0);
-       
+       else primaryGrowth = returnMetric;
+
        isSub12 = (primaryGrowth < 0.12);
        isSuper18 = (primaryGrowth >= 0.18);
     }
-    
+	
     let status = 'PRUNE_GTT_EXIT';
     if (score >= 85) status = 'ACCUMULATE_CORE';
     else if (score >= 70) status = 'HOLD_SATELLITE';
