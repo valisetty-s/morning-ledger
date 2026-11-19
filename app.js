@@ -1696,7 +1696,8 @@ function getCachedFundamentals(ticker) {
   if (!raw) return null;
   try {
     const cached = JSON.parse(raw);
-    if (cached.date !== new Date().toDateString()) return null;
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    if (!cached.ts || (Date.now() - cached.ts > SEVEN_DAYS)) return null;
     return cached.fundamentals;
   } catch (e) {
     return null;
@@ -1705,7 +1706,7 @@ function getCachedFundamentals(ticker) {
 
 function setCachedFundamentals(ticker, fundamentals) {
   localStorage.setItem(`ml_fund_${ticker}`, JSON.stringify({
-    date: new Date().toDateString(),
+    ts: Date.now(),
     fundamentals,
   }));
 }
