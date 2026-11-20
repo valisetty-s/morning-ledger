@@ -291,7 +291,9 @@ function init() {
     });
   });
 
-const TREND_HINTS = {
+  const TREND_HINTS = {
+    'actionable-buys': 'High-conviction GARP (≥ 75) & reasonable PEG (≤ 1.8) in a healthy pullback (< 50-DMA or near 200-DMA) without heavy institutional selling — Ready for Tranche 1 / Tranche 2 accumulation.',
+    'actionable-exits': 'Weak fundamentals (GARP < 65) combined with a broken long-term trend (Below 200-DMA) — Review thesis and consider trimming or exiting on relief rallies.',
     'uptrend': 'Price is above 20D, 50D, and 200D — Institutional momentum is intact. Hold your position and let winners compound; avoid chasing if PEG is stretched.',
     'dip-buy': 'Price is below 50D but above 200D — Long-term trend is still healthy, but the stock is pulling back. If GARP ≥ 75, this is your sweet spot to accumulate on dips.',
     'below-200': 'Price is below 200D — Structural downtrend or prolonged weakness. Do not blindly average down; wait for it to reclaim the 200D or review if the fundamental thesis broke.'
@@ -2102,6 +2104,56 @@ function classifyTrend(quote) {
   return 'neutral';
 }
 
+function getActionSignal(stock, savedScoresMap) {
+  const q = stock.quote;
+  if (!q || q.last_price == null) return null;
+
+  const scores = savedScoresMap || JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  const garp = scores[stock.ticker] ? scores[stock.ticker].score : null;
+  if (garp == null) return null;
+
+  const cleanTicker = getCleanTicker(stock.ticker);
+  const f = getCachedFundamentals(cleanTicker);
+  const rawPeg = f ? (f.pegRatio != null ? f.pegRatio : f.peg_ratio) : null;
+  const peg = rawPeg != null ? Number(rawPeg) : null;
+
+  const p = q.last_price;
+  const trend = classifyTrend(q);
+  const isHeavySelling = (q.change_pct != null && q.change_pct <= -1.0) &&
+                         (q.volume_vs_avg_pct != null && q.volume_vs_avg_pct >= 150);
+  const near200D = q.dma_200 != null && Math.abs(p - q.dma_200) / q.dma_200 <= 0.03;
+
+  // 1. High-Quality GARP Setups (Actionable Buys)
+  if (garp >= 75 && (peg == null || (peg > 0 && peg <= 1.8))) {
+    if (near200D && !isHeavySelling) {
+      return { type: 'buy', label: '💎 Tranche 2 (200D)', color: '#2E6F40', bg: '#E8F5E9' };
+    }
+    if (trend === 'dip-buy') {
+      if (isHeavySelling) {
+        return { type: 'wait', label: '⏳ Wait (High-Vol Drop)', color: '#B26A00', bg: '#FFF3E0' };
+      }
+      return { type: 'buy', label: '🎯 Tranche 1 (Pullback)', color: '#2E6F40', bg: '#E8F5E9' };
+    }
+  }
+
+  // 2. Momentum / Compounders
+  if (garp >= 70 && trend === 'uptrend') {
+    return { type: 'hold', label: '🚀 Hold / Ride', color: '#5B7553', bg: '#F1F6F0' };
+  }
+
+  // 3. Valuation Compression
+  if (garp >= 70 && peg != null && peg > 2.5 && trend === 'below-200') {
+    return { type: 'compression', label: '🧊 Compression (Pause)', color: '#6D4C41', bg: '#EFEBE9' };
+  }
+
+  // 4. Deteriorating / Broken Trend (Actionable Trim/Exits)
+  if (garp < 65 && trend === 'below-200') {
+    return { type: 'exit', label: '⚠️ Review / Trim', color: '#A4453A', bg: '#FDECEA' };
+  }
+
+  return null;
+}
+
 function renderContent() {
   renderMoversSummary();
   if (!newsData) {
@@ -2126,7 +2178,21 @@ function renderContent() {
   }
   
   if (currentTrend !== 'all') {
-    filtered = filtered.filter(s => classifyTrend(s.quote) === currentTrend);
+    if (currentTrend === 'actionable-buys') {
+      const savedScoresMap = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+      filtered = filtered.filter(s => {
+        const sig = getActionSignal(s, savedScoresMap);
+        return sig && sig.type === 'buy';
+      });
+    } else if (currentTrend === 'actionable-exits') {
+      const savedScoresMap = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+      filtered = filtered.filter(s => {
+        const sig = getActionSignal(s, savedScoresMap);
+        return sig && sig.type === 'exit';
+      });
+    } else {
+      filtered = filtered.filter(s => classifyTrend(s.quote) === currentTrend);
+    }
   }
 
   if (filtered.length === 0) {
@@ -2238,10 +2304,14 @@ let ribbonHtml = '';
       return `<span class="ribbon-fund-pill" style="border-color:${color}; color:${color};" title="${label}: ₹${val} (Price is ${isBelow ? 'below' : 'above'})">${label} ₹${Math.round(val)} ${arrow}</span>`;
     };
     const dmaHtml = [
-      makeDmaPill('20D', stock.quote.dma_20),
-      makeDmaPill('50D', stock.quote.dma_50),
-      makeDmaPill('200D', stock.quote.dma_200),
+      makeDmaPill('20-DMA', stock.quote.dma_20),
+      makeDmaPill('50-DMA', stock.quote.dma_50),
+      makeDmaPill('200-DMA', stock.quote.dma_200),
     ].join('');
+    const signal = getActionSignal(stock, savedScores);
+    const signalHtml = signal
+      ? `<span class="ribbon-fund-pill" style="border-color:${signal.color}; color:${signal.color}; background:${signal.bg}; font-weight:600;">${signal.label}</span>`
+      : '';
 	
 ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
@@ -2252,7 +2322,7 @@ ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
         <span class="ribbon-price${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">₹${stock.quote.last_price.toFixed(2)}</span>
         <span class="ribbon-change${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">  ${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
-		${dmaHtml}
+		${dmaHtml} ${signalHtml}
         ${fundHtml}
       </div>
     </div>`;

@@ -1024,7 +1024,7 @@
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open · NSE · BSE · <span style="opacity:0.6">build v46 · seggregated stats</span></div>
+  <div class="eyebrow">Issued before market open - <span style="opacity:0.6">build v47</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -1051,7 +1051,7 @@
   <button class="chip sent-chip sent-positive" data-sentiment="positive">✓ Positive</button>
 </div>
 
-<div class="filter-bar" style="margin-top:10px;">
+<div class="filter-bar" style="margin-top:15px;">
       <button class="chip active" data-sort="default">A-Z (Default)</button>
       <button class="chip" data-sort="garp-desc">GARP ↓</button>
       <button class="chip" data-sort="garp-asc">GARP ↑</button>
@@ -1063,10 +1063,14 @@
 <div class="filter-bar" style="margin-top:8px;">
       <span class="status">Trend:</span>
       <button class="chip active" data-trend="all">All</button>
-      <button class="chip" data-trend="uptrend">🚀 Uptrend</button>
-      <button class="chip" data-trend="dip-buy">🎯 Dip-Buy (&lt;50D &gt;200D)</button>
-      <button class="chip" data-trend="below-200">⚠️ Below 200D</button>
-</div>
+      <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Actionable Buys</button>
+      <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Actionable Trim/Exits</button>
+      <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend (Hold / Ride)</button>
+      <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy (Buy in Correction)</button>
+      <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ Below 200D (Wait / Review)</button>
+    </div>
+<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; margin:4px 0 6px 4px; line-height:1.4;"></div>
+
 <div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; margin:4px 0 6px 4px; line-height:1.4;"></div>
 <div class="refresh-bar" style="padding-top:0">
     <div style="display:flex; gap:8px;">
