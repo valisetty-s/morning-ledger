@@ -1060,7 +1060,14 @@
       <button class="chip" data-sort="change-desc">% Chg ↓</button>
       <button class="chip" data-sort="change-asc">% Chg ↑</button>
 </div>
-
+<div class="filter-bar" style="margin-top:8px;">
+      <span class="status">Trend:</span>
+      <button class="chip active" data-trend="all">All</button>
+      <button class="chip" data-trend="uptrend">🚀 Uptrend</button>
+      <button class="chip" data-trend="dip-buy">🎯 Dip-Buy (&lt;50D &gt;200D)</button>
+      <button class="chip" data-trend="below-200">⚠️ Below 200D</button>
+</div>
+<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; margin:4px 0 6px 4px; line-height:1.4;"></div>
 <div class="refresh-bar" style="padding-top:0">
     <div style="display:flex; gap:8px;">
       <button class="refresh-btn" id="global-cues-btn">

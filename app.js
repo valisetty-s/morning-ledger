@@ -176,6 +176,7 @@ const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'garp-desc'; 
+let currentTrend = 'all';
 let newsData = null;
 let currentAnalyticsMode = 'tier';
 let selectedSliceKey = null;
@@ -286,6 +287,33 @@ function init() {
       document.querySelectorAll('.chip[data-sort]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       currentSort = chip.dataset.sort;
+      renderContent();
+    });
+  });
+
+const TREND_HINTS = {
+    'uptrend': 'Price is above 20D, 50D, and 200D — Institutional momentum is intact. Hold your position and let winners compound; avoid chasing if PEG is stretched.',
+    'dip-buy': 'Price is below 50D but above 200D — Long-term trend is still healthy, but the stock is pulling back. If GARP ≥ 75, this is your sweet spot to accumulate on dips.',
+    'below-200': 'Price is below 200D — Structural downtrend or prolonged weakness. Do not blindly average down; wait for it to reclaim the 200D or review if the fundamental thesis broke.'
+  };
+
+  document.querySelectorAll('.chip[data-trend]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-trend]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentTrend = chip.dataset.trend;
+
+      const hintEl = document.getElementById('trendHint');
+      if (hintEl) {
+        if (TREND_HINTS[currentTrend]) {
+          hintEl.textContent = TREND_HINTS[currentTrend];
+          hintEl.style.display = 'block';
+        } else {
+          hintEl.textContent = '';
+          hintEl.style.display = 'none';
+        }
+      }
+
       renderContent();
     });
   });
@@ -2061,6 +2089,18 @@ function renderMoversSummary() {
     </div>
   </div>`;
 }
+function classifyTrend(quote) {
+  if (!quote || quote.last_price == null) return 'unknown';
+  const p = quote.last_price;
+  const { dma_20, dma_50, dma_200 } = quote;
+
+  if (dma_200 != null && p < dma_200) return 'below-200';
+  if (dma_50 != null && p < dma_50 && (dma_200 == null || p >= dma_200)) return 'dip-buy';
+  if (dma_20 != null && dma_50 != null && p >= dma_20 && p >= dma_50 && (dma_200 == null || p >= dma_200)) {
+    return 'uptrend';
+  }
+  return 'neutral';
+}
 
 function renderContent() {
   renderMoversSummary();
@@ -2083,6 +2123,10 @@ function renderContent() {
       const overall = classifyStockOverallSentiment(s.articles);
       return overall === currentSentiment;
     });
+  }
+  
+  if (currentTrend !== 'all') {
+    filtered = filtered.filter(s => classifyTrend(s.quote) === currentTrend);
   }
 
   if (filtered.length === 0) {
@@ -2184,6 +2228,21 @@ let ribbonHtml = '';
       ? renderCompactRocePills(cachedRoce)
       : `<button class="ribbon-roce-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📈 ROCE</button>`;
 
+    // Moving Average Pills (Green ▲ if Price >= DMA, Red ▼ if Price < DMA)
+    const ltp = stock.quote.last_price;
+    const makeDmaPill = (label, val) => {
+      if (val == null) return '';
+      const isBelow = ltp < val;
+      const color = isBelow ? '#A4453A' : '#5B7553';
+      const arrow = isBelow ? '▼' : '▲';
+      return `<span class="ribbon-fund-pill" style="border-color:${color}; color:${color};" title="${label}: ₹${val} (Price is ${isBelow ? 'below' : 'above'})">${label} ₹${Math.round(val)} ${arrow}</span>`;
+    };
+    const dmaHtml = [
+      makeDmaPill('20D', stock.quote.dma_20),
+      makeDmaPill('50D', stock.quote.dma_50),
+      makeDmaPill('200D', stock.quote.dma_200),
+    ].join('');
+	
 ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
       <div class="ribbon-name-row">
         <span class="ribbon-name">${escapeHtml(stock.company)}</span>
@@ -2193,6 +2252,7 @@ ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
         <span class="ribbon-price${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">₹${stock.quote.last_price.toFixed(2)}</span>
         <span class="ribbon-change${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">  ${chg != null ? `${chgSign}${chg}%` : '—'}</span>
         ${flagsHtml}
+		${dmaHtml}
         ${fundHtml}
       </div>
     </div>`;
