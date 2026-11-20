@@ -291,6 +291,33 @@ function init() {
     });
   });
 
+  const sortSelect = $('#sort-select');
+  if (sortSelect) {
+    sortSelect.value = currentSort;
+    sortSelect.addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderContent();
+    });
+  }
+
+  const filterSelect = $('#filter-select');
+  if (filterSelect) {
+    filterSelect.value = currentFilter;
+    filterSelect.addEventListener('change', (e) => {
+      currentFilter = e.target.value;
+      renderContent();
+    });
+  }
+
+  const sentimentSelect = $('#sentiment-select');
+  if (sentimentSelect) {
+    sentimentSelect.value = currentSentiment;
+    sentimentSelect.addEventListener('change', (e) => {
+      currentSentiment = e.target.value;
+      renderContent();
+    });
+  }
+
   const TREND_HINTS = {
     'actionable-buys': 'High-conviction GARP (≥ 75) & reasonable PEG (≤ 1.8) in a healthy pullback (< 50-DMA or near 200-DMA) without heavy institutional selling — Ready for Tranche 1 / Tranche 2 accumulation.',
     'actionable-exits': 'Weak fundamentals (GARP < 65) combined with a broken long-term trend (Below 200-DMA) — Review thesis and consider trimming or exiting on relief rallies.',
@@ -2217,51 +2244,43 @@ function renderEntry(stock) {
 
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
   const scoreData = savedScores[stock.ticker];
-  const scoreBadge = scoreData 
-    ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:8px; vertical-align: middle;">GARP: ${scoreData.score}</span>` 
+  const scoreBadge = scoreData
+    ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">GARP: ${scoreData.score}</span>`
     : '';
 
-  // Extract and format the PEG ratio dynamically, checking both API variations
   const cleanTickerForFund = getCleanTicker(stock.ticker);
   const cachedFund = getCachedFundamentals(cleanTickerForFund);
-  
+
   let rawPeg = null;
   if (cachedFund) {
-      rawPeg = cachedFund.pegRatio != null ? cachedFund.pegRatio : cachedFund.peg_ratio;
+    rawPeg = cachedFund.pegRatio != null ? cachedFund.pegRatio : cachedFund.peg_ratio;
   }
-  
   const pegRatio = rawPeg != null ? Number(rawPeg).toFixed(2) : null;
-  
-  let pegColor = '#E9ECEF'; // Neutral Gray fallback for N/A
+
+  let pegColor = '#E9ECEF';
   let pegTextColor = 'var(--ink-soft)';
   let pegText = 'N/A';
-  
   if (pegRatio) {
-      pegText = pegRatio;
-      pegTextColor = 'white';
-      if (rawPeg > 0 && rawPeg <= 1.5) pegColor = '#5B7553'; // Green for high-value PEG
-      else if (rawPeg > 1.5 && rawPeg <= 2.5) pegColor = '#B8923F'; // Amber for moderate
-      else if (rawPeg > 2.5 || rawPeg < 0) pegColor = '#A4453A'; // Red for expensive or negative growth
+    pegText = pegRatio;
+    pegTextColor = 'white';
+    if (rawPeg > 0 && rawPeg <= 1.5) pegColor = '#5B7553';
+    else if (rawPeg > 1.5 && rawPeg <= 2.5) pegColor = '#B8923F';
+    else if (rawPeg > 2.5 || rawPeg < 0) pegColor = '#A4453A';
   }
-  
-  const pegBadge = `<span style="background:${pegColor}; color:${pegTextColor}; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:4px; vertical-align: middle;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
-  let body = '';
-  if (hasNews) {
-    const leadSentiment = classifySentiment(lead.title);
-    body = `<div class="headline"><span class="sentiment-dot ${leadSentiment}"></span><a href="${escapeHtml(lead.url)}" target="_blank" rel="noopener">${escapeHtml(lead.title)}</a></div>
-      <div class="article-meta">${escapeHtml(lead.source)} · ${formatPublished(lead.published)}</div>`;
-    if (rest.length) {
-      body += rest.map(a => {
-        const s = classifySentiment(a.title);
-        return `<div class="more-articles">
-        <div class="sub-headline"><span class="sentiment-dot ${s}"></span><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid var(--rule-strong)">${escapeHtml(a.title)}</a></div>
-        <div class="article-meta">${escapeHtml(a.source)} · ${formatPublished(a.published)}</div>
-      </div>`;
-      }).join('');
-    }
-  } else {
-    body = `<div class="quiet">No recent news found</div>`;
-  }
+  const pegBadge = `<span style="background:${pegColor}; color:${pegTextColor}; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
+
+  const hasQuote = stock.quote && stock.quote.last_price != null;
+  const chg = hasQuote ? stock.quote.change_pct : null;
+  const cardBorderClass = !hasQuote || chg == null
+    ? 'ribbon-neu-card'
+    : (chg > 0 ? 'ribbon-pos-card' : (chg < 0 ? 'ribbon-neg-card' : 'ribbon-neu-card'));
+  const chgSign = chg != null && chg > 0 ? '+' : '';
+  const chgClass = chg != null && chg < 0 ? 'price-down' : (chg != null && chg > 0 ? 'price-up' : '');
+
+  const signal = hasQuote ? getActionSignal(stock, savedScores) : null;
+  const signalBadge = signal
+    ? `<span class="ribbon-fund-pill" style="border:1px solid ${signal.color}; color:${signal.color}; background:${signal.bg}; font-weight:600;">${signal.label}</span>`
+    : '';
 
   const badgeHtml = hasNews
     ? (overallSentiment === 'negative'
@@ -2271,115 +2290,137 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-let ribbonHtml = '';
-  const hasQuote = stock.quote && stock.quote.last_price != null;
-  if (hasQuote) {
-    const chg = stock.quote.change_pct;
-    const ribbonClass = chg == null ? 'ribbon-neu' : (chg > 0 ? 'ribbon-pos' : (chg < 0 ? 'ribbon-neg' : 'ribbon-neu'));
-    const chgSign = chg != null && chg > 0 ? '+' : '';
-
-    let flagsHtml = '';
-    if (stock.quote.near_52wk_flag === 'near-high') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week high">52WK HIGH</span>`;
-    } else if (stock.quote.near_52wk_flag === 'near-low') {
-      flagsHtml += `<span class="ribbon-flag" title="Within 2% of 52-week low">52WK LOW</span>`;
-    }
-
-    // Displays the unified Fundamental Pills (which now include ROCE), removing the old ROCE button
-    const fundHtml = cachedFund
-      ? renderCompactFundamentalPills(cachedFund)
-      : `<button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Fundamentals</button>`;
-    const cachedRoce = getCachedRoce(cleanTickerForFund);
-    const roceHtml = cachedRoce
-      ? renderCompactRocePills(cachedRoce)
-      : `<button class="ribbon-roce-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📈 ROCE</button>`;
-
-    // Moving Average Pills (Green ▲ if Price >= DMA, Red ▼ if Price < DMA)
-    const ltp = stock.quote.last_price;
-    const makeDmaPill = (label, val) => {
-      if (val == null) return '';
-      const isBelow = ltp < val;
-      const color = isBelow ? '#A4453A' : '#5B7553';
-      const arrow = isBelow ? '▼' : '▲';
-      return `<span class="ribbon-fund-pill" style="border-color:${color}; color:${color};" title="${label}: ₹${val} (Price is ${isBelow ? 'below' : 'above'})">${label} ₹${Math.round(val)} ${arrow}</span>`;
-    };
-    const dmaHtml = [
-      makeDmaPill('20-DMA', stock.quote.dma_20),
-      makeDmaPill('50-DMA', stock.quote.dma_50),
-      makeDmaPill('200-DMA', stock.quote.dma_200),
-    ].join('');
-    const signal = getActionSignal(stock, savedScores);
-    const signalHtml = signal
-      ? `<span class="ribbon-fund-pill" style="border-color:${signal.color}; color:${signal.color}; background:${signal.bg}; font-weight:600;">${signal.label}</span>`
-      : '';
-	
-ribbonHtml = `<div class="price-ribbon ${ribbonClass}">
-      <div class="ribbon-name-row">
-        <span class="ribbon-name">${escapeHtml(stock.company)}</span>
-        <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
-      </div>
-      <div class="ribbon-data-row" id="ribbon-data-${escapeHtml(stock.ticker)}">
-        <span class="ribbon-price${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">₹${stock.quote.last_price.toFixed(2)}</span>
-        <span class="ribbon-change${chg != null && chg < 0 ? ' price-down' : (chg != null && chg > 0 ? ' price-up' : '')}">  ${chg != null ? `${chgSign}${chg}%` : '—'}</span>
-        ${flagsHtml}
-		${dmaHtml} ${signalHtml}
-        ${fundHtml}
-      </div>
-    </div>`;
-  }
-
-  const garpAuditBtn = `<button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11px; padding:2px 8px; border:1px solid var(--rule-strong); background:transparent; border-radius:4px; cursor:pointer; margin-left:8px;">📋 GARP Audit</button>`;
-
-  const headHtml = hasQuote
-    ? `<div class="entry-head-badge-only" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-         <div style="display:flex; align-items:center;">${badgeHtml} ${scoreBadge} ${pegBadge}</div>
-         <div>${garpAuditBtn}</div>
-       </div>`
-    : `<div class="entry-head" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-        <div style="display:flex; align-items:center;">
-          <span class="entry-name">${escapeHtml(stock.company)}</span>
-          <span class="entry-ticker" style="margin-left:5px;">${escapeHtml(getCleanTicker(stock.ticker))}</span>
-          ${scoreBadge} ${pegBadge}
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          ${badgeHtml}
-          ${garpAuditBtn}
-        </div>
-      </div>`;
-
-  let holdingsHtml = '';
+  // Compact inline P&L for the always-visible meta row
+  let inlinePnlHtml = '';
+  let fullHoldingsHtml = '';
   if (stock.qty && stock.qty > 0) {
     const invested = stock.qty * (stock.avgPrice || 0);
-    let currValHtml = '';
-    
     if (hasQuote && stock.quote.last_price) {
       const currentVal = stock.qty * stock.quote.last_price;
       const pnl = currentVal - invested;
       const pnlSign = pnl >= 0 ? '+' : '';
       const pnlClass = pnl >= 0 ? 'price-up' : 'price-down';
-      currValHtml = ` &nbsp; Value: ₹${currentVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (<span class="${pnlClass}">${pnlSign}₹${pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>)`;
+      inlinePnlHtml = `<span class="card-pnl-inline">Qty ${stock.qty} · <span class="${pnlClass}">${pnlSign}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</span></span>`;
+      fullHoldingsHtml = `<div class="spec-line">💼 Qty: <strong>${stock.qty}</strong> <span class="spec-sep">·</span> Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} <span class="spec-sep">·</span> Inv: ₹${Math.round(invested).toLocaleString('en-IN')} <span class="spec-sep">·</span> Val: ₹${Math.round(currentVal).toLocaleString('en-IN')} (<span class="${pnlClass}">${pnlSign}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</span>)</div>`;
+    } else {
+      inlinePnlHtml = `<span class="card-pnl-inline">Qty ${stock.qty} · Inv ₹${Math.round(invested).toLocaleString('en-IN')}</span>`;
+      fullHoldingsHtml = `<div class="spec-line">💼 Qty: <strong>${stock.qty}</strong> <span class="spec-sep">·</span> Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} <span class="spec-sep">·</span> Inv: ₹${Math.round(invested).toLocaleString('en-IN')}</div>`;
     }
-    
-    holdingsHtml = `
-      <div style="background: #F8F9FA; border: 1px solid #E9ECEF; border-radius: 6px; padding: 6px 10px; margin-top: 6px; font-family: 'SF Mono', monospace; font-size: 11px; color: var(--ink-soft);">
-        💼 Qty: ${stock.qty} &nbsp; Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} &nbsp; Inv: ₹${invested.toLocaleString('en-IN', { maximumFractionDigits: 0 })}${currValHtml}
-      </div>
-    `;
   }
 
-  const aiBriefingHtml = `
-    <div>
-      <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI 1-Min Briefing</button>
-      <div id="ai-panel-entry-${escapeHtml(stock.ticker)}"></div>
-    </div>
-  `;
+  // Always-visible 1-line lead headline
+  let leadHeadlineHtml = '';
+  if (hasNews) {
+    const leadSentiment = classifySentiment(lead.title);
+    leadHeadlineHtml = `<div class="card-lead-headline" title="${escapeHtml(lead.title)}"><span class="sentiment-dot ${leadSentiment}"></span><a href="${escapeHtml(lead.url)}" target="_blank" rel="noopener">${escapeHtml(lead.title)}</a></div>`;
+  }
 
-  return `<div class="entry ${overallSentiment === 'negative' ? 'has-negative' : ''}">
-    ${headHtml}
-    ${ribbonHtml}
-    ${holdingsHtml}
-    ${body}
-    ${aiBriefingHtml}
+  // Inside collapsible drawer: DMAs (clean dot-separated specs)
+  let dmaLineHtml = '';
+  if (hasQuote) {
+    const ltp = stock.quote.last_price;
+    const fmtDma = (label, val) => {
+      if (val == null) return null;
+      const isBelow = ltp < val;
+      const color = isBelow ? '#A4453A' : '#5B7553';
+      const arrow = isBelow ? '▼' : '▲';
+      return `<span style="color:${color}; font-weight:700;" title="${label}: ₹${val} (Price is ${isBelow ? 'below' : 'above'})">${label} ₹${Math.round(val)} ${arrow}</span>`;
+    };
+    const dmaParts = [
+      fmtDma('20-DMA', stock.quote.dma_20),
+      fmtDma('50-DMA', stock.quote.dma_50),
+      fmtDma('200-DMA', stock.quote.dma_200),
+    ].filter(Boolean);
+
+    let flagPart = '';
+    if (stock.quote.near_52wk_flag === 'near-high') flagPart = `<span class="ribbon-flag">52WK HIGH</span>`;
+    else if (stock.quote.near_52wk_flag === 'near-low') flagPart = `<span class="ribbon-flag">52WK LOW</span>`;
+
+    if (dmaParts.length || flagPart) {
+      dmaLineHtml = `<div class="spec-line">${dmaParts.join(' <span class="spec-sep">·</span> ')}${flagPart ? ' ' + flagPart : ''}</div>`;
+    }
+  }
+
+  // Inside collapsible drawer: Fundamentals (without duplicate PEG)
+  let fundLineHtml = '';
+  if (cachedFund) {
+    const fParts = [];
+    if (cachedFund.trailing_pe != null) fParts.push(`PE <strong>${Number(cachedFund.trailing_pe).toFixed(1)}</strong>`);
+    const roceMetric = cachedFund.roce != null ? cachedFund.roce : cachedFund.return_on_equity;
+    if (roceMetric != null) fParts.push(`ROCE <strong>${(Number(roceMetric) * 100).toFixed(1)}%</strong>`);
+    const debtMetric = cachedFund.debt_ratio != null ? cachedFund.debt_ratio : (cachedFund.debt_to_equity != null ? cachedFund.debt_to_equity / 100 : null);
+    if (debtMetric != null) fParts.push(`DR <strong>${Number(debtMetric).toFixed(2)}</strong>`);
+    if (cachedFund.revenue_growth != null) {
+      const s = cachedFund.revenue_growth >= 0 ? '+' : '';
+      fParts.push(`Rev <strong>${s}${(Number(cachedFund.revenue_growth) * 100).toFixed(1)}%</strong>`);
+    }
+    if (cachedFund.earnings_growth != null) {
+      const s = cachedFund.earnings_growth >= 0 ? '+' : '';
+      fParts.push(`PAT <strong>${s}${(Number(cachedFund.earnings_growth) * 100).toFixed(1)}%</strong>`);
+    }
+    if (fParts.length) {
+      fundLineHtml = `<div class="spec-line" id="ribbon-data-${escapeHtml(stock.ticker)}">${fParts.join(' <span class="spec-sep">·</span> ')}</div>`;
+    }
+  } else {
+    fundLineHtml = `<div id="ribbon-data-${escapeHtml(stock.ticker)}"><button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Load Fundamentals</button></div>`;
+  }
+
+  // Inside collapsible drawer: Extra news articles
+  let moreNewsHtml = '';
+  if (hasNews) {
+    moreNewsHtml = `<div class="article-meta" style="margin-top:0;">${escapeHtml(lead.source)} · ${formatPublished(lead.published)}</div>`;
+    if (rest.length) {
+      moreNewsHtml += rest.map(a => {
+        const s = classifySentiment(a.title);
+        return `<div class="more-articles" style="margin-top:4px;">
+          <div class="sub-headline" style="margin-top:2px;"><span class="sentiment-dot ${s}"></span><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid var(--rule-strong)">${escapeHtml(a.title)}</a></div>
+          <div class="article-meta">${escapeHtml(a.source)} · ${formatPublished(a.published)}</div>
+        </div>`;
+      }).join('');
+    }
+  } else {
+    moreNewsHtml = `<div class="quiet" style="margin-top:0;">No recent news found</div>`;
+  }
+
+  const extraCountLabel = rest.length ? ` · +${rest.length} news` : '';
+
+  return `<div class="entry ${cardBorderClass} ${overallSentiment === 'negative' ? 'has-negative' : ''}">
+    <div class="card-top-row">
+      <div class="card-title-group">
+        <span class="entry-name">${escapeHtml(stock.company)}</span>
+        <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
+      </div>
+      ${hasQuote ? `
+      <div class="card-price-group">
+        <span class="card-ltp ${chgClass}">₹${stock.quote.last_price.toFixed(2)}</span>
+        <span class="card-chg ${chgClass}">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
+      </div>` : ''}
+    </div>
+
+    <div class="card-meta-row">
+      ${scoreBadge}
+      ${pegBadge}
+      ${signalBadge}
+      ${badgeHtml}
+      ${inlinePnlHtml}
+    </div>
+
+    ${leadHeadlineHtml}
+
+    <details class="card-details">
+      <summary><span>Metrics, DMAs &amp; Actions${extraCountLabel}</span></summary>
+      <div class="card-details-body">
+        ${dmaLineHtml}
+        ${fundLineHtml}
+        ${fullHoldingsHtml}
+        ${moreNewsHtml}
+        <div class="card-actions-row">
+          <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:5px 10px; border:1px solid var(--rule-strong); background:var(--paper); border-radius:6px; cursor:pointer; font-weight:600;">📋 GARP Audit</button>
+          <button class="ribbon-ai-btn" style="margin-top:0;" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI 1-Min Briefing</button>
+        </div>
+        <div id="ai-panel-entry-${escapeHtml(stock.ticker)}"></div>
+      </div>
+    </details>
   </div>`;
 }
 

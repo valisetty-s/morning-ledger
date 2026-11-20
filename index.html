@@ -1019,12 +1019,189 @@
 
   .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
   .price-down { color: #B03A2E !important; font-weight: 800 !important; }
+
+  /* ---------- CRISP UI (IDEAS 1 & 3) ---------- */
+  .compact-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    flex-wrap: wrap;
+  }
+  .ctrl-select {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--rule-strong);
+    background: var(--paper-dim);
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+  }
+  .ctrl-select:focus {
+    border-color: var(--ink);
+  }
+  .trend-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: var(--paper);
+  }
+  .trend-toolbar::-webkit-scrollbar { display: none; }
+  .trend-label {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  /* Crisp Stock Card (Progressive Disclosure) */
+  .entry {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(28, 27, 25, 0.03);
+  }
+  .entry.ribbon-pos-card { border-left: 4px solid var(--sage); }
+  .entry.ribbon-neg-card { border-left: 4px solid var(--clay); }
+  .entry.ribbon-neu-card { border-left: 4px solid var(--rule-strong); }
+
+  .card-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .card-title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-price-group {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .card-ltp {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .card-chg {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .card-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .card-pnl-inline {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-left: auto;
+  }
+
+  .card-lead-headline {
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--ink);
+    margin-top: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-lead-headline a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .card-lead-headline a:hover {
+    text-decoration: underline;
+  }
+
+  .card-details {
+    margin-top: 8px;
+    border-top: 1px dashed var(--rule);
+    padding-top: 6px;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .card-details summary {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    padding: 2px 0;
+  }
+  .card-details summary::-webkit-details-marker { display: none; }
+  .card-details summary::before {
+    content: '▸ ';
+    font-size: 11px;
+    margin-right: 4px;
+  }
+  .card-details[open] summary::before {
+    content: '▾ ';
+  }
+  .card-details-body {
+    padding-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .spec-line {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 11.5px;
+    color: var(--ink);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    background: var(--paper);
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--rule);
+  }
+  .spec-sep { color: var(--rule-strong); }
+  .card-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+
 </style>
 </head>
 <body>
 
 <div class="masthead">
-  <div class="eyebrow">Issued before market open - <span style="opacity:0.6">build v47</span></div>
+  <div class="eyebrow">Issued before market open - <span style="opacity:0.6">build v48 (Crisp)</span></div>
   <h1>The Morning Ledger</h1>
   <div class="dateline">
     <span id="dateline-date">—</span>
@@ -1036,58 +1213,52 @@
 <div id="global-cues-container" style="display: none;"></div>
 
 <!-- Interactive Portfolio Analytics & Pie Chart Container -->
-<div id="portfolio-analytics-container" style="display: block;"></div>
+<div id="portfolio-analytics-container" style="display: none;"></div>
 <div id="portfolio-drilldown-container" style="display: none; margin: 10px 20px 20px;"></div>
 
-<div class="toolbar" id="toolbar">
-  <button class="chip active" data-filter="all">All holdings</button>
-  <button class="chip" data-filter="fresh">Fresh news only</button>
-  <button class="chip" id="analytics-toggle-chip">📊 Portfolio Analytics</button>
+<div class="compact-controls">
+  <select id="sort-select" class="ctrl-select" aria-label="Sort stocks">
+    <option value="garp-desc" selected>Sort: GARP ↓</option>
+    <option value="garp-asc">Sort: GARP ↑</option>
+    <option value="peg-asc">Sort: PEG ↑</option>
+    <option value="peg-desc">Sort: PEG ↓</option>
+    <option value="change-desc">Sort: % Chg ↓</option>
+    <option value="change-asc">Sort: % Chg ↑</option>
+    <option value="default">Sort: A–Z</option>
+  </select>
+  <select id="filter-select" class="ctrl-select" aria-label="Filter news">
+    <option value="all" selected>All holdings</option>
+    <option value="fresh">Fresh news only</option>
+  </select>
+  <select id="sentiment-select" class="ctrl-select" aria-label="Filter sentiment">
+    <option value="all" selected>All tone</option>
+    <option value="negative">⚠ Negative</option>
+    <option value="positive">✓ Positive</option>
+  </select>
+  <button class="chip" id="analytics-toggle-chip" style="margin-left:auto;">📊 Analytics</button>
 </div>
 
-<div class="toolbar sentiment-toolbar" id="sentiment-toolbar">
-  <button class="chip sent-chip active" data-sentiment="all">All tone</button>
-  <button class="chip sent-chip sent-negative" data-sentiment="negative">⚠ Negative</button>
-  <button class="chip sent-chip sent-positive" data-sentiment="positive">✓ Positive</button>
+<div class="trend-toolbar">
+  <span class="trend-label">Trend:</span>
+  <button class="chip active" data-trend="all">All</button>
+  <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Buys</button>
+  <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Trim/Exits</button>
+  <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend</button>
+  <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy</button>
+  <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ &lt;200D</button>
 </div>
+<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; padding:2px 20px 8px; line-height:1.4; border-bottom:1px solid var(--rule);"></div>
 
-<div class="filter-bar" style="margin-top:15px;">
-      <button class="chip active" data-sort="default">A-Z (Default)</button>
-      <button class="chip" data-sort="garp-desc">GARP ↓</button>
-      <button class="chip" data-sort="garp-asc">GARP ↑</button>
-      <button class="chip" data-sort="peg-asc">PEG ↑</button>
-      <button class="chip" data-sort="peg-desc">PEG ↓</button>
-      <button class="chip" data-sort="change-desc">% Chg ↓</button>
-      <button class="chip" data-sort="change-asc">% Chg ↑</button>
-</div>
-<div class="filter-bar" style="margin-top:8px;">
-      <span class="status">Trend:</span>
-      <button class="chip active" data-trend="all">All</button>
-      <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Actionable Buys</button>
-      <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Actionable Trim/Exits</button>
-      <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend (Hold / Ride)</button>
-      <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy (Buy in Correction)</button>
-      <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ Below 200D (Wait / Review)</button>
-    </div>
-<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; margin:4px 0 6px 4px; line-height:1.4;"></div>
-
-<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; margin:4px 0 6px 4px; line-height:1.4;"></div>
-<div class="refresh-bar" style="padding-top:0">
-    <div style="display:flex; gap:8px;">
-      <button class="refresh-btn" id="global-cues-btn">
-        <span>🌐 Global Cues</span>
-      </button>
-	  <!-- NEW BULK AUDIT BUTTON -->
-      <button class="refresh-btn" id="bulk-garp-btn" style="border-color:var(--sage); color:var(--sage);">
-        <span>🤖 GARP Auto-Audit All</span>
-      </button>
-    </div>
+<div class="refresh-bar" style="padding-bottom:4px;">
+  <div style="display:flex; gap:12px; flex-wrap:wrap;">
+    <button class="refresh-btn" id="global-cues-btn">
+      <span>🌐 Global Cues</span>
+    </button>
+    <button class="refresh-btn" id="bulk-garp-btn" style="color:var(--sage);">
+      <span>🤖 GARP Auto-Audit All</span>
+    </button>
   </div>
-
-  <!-- Dynamic Containers matching your custom JS engine IDs -->
-  <div id="global-cues-container" style="display:none; padding:15px; border-bottom:1px solid var(--rule);"></div>
-  <div id="portfolio-analytics-container" style="display:none; padding:15px; border-bottom:1px solid var(--rule);"></div>
-  <div id="portfolio-drilldown-container" style="display:none; padding:15px;"></div>
+</div>
 
 <div class="refresh-bar">
   <span class="status" id="refresh-status">Not yet fetched today</span>
