@@ -915,17 +915,36 @@ function fmtPct(v) {
 
 function renderFundamentalsPanel(f) {
   const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
+  const debtMetric = f.debt_ratio != null ? f.debt_ratio : (f.debt_to_equity != null ? (f.debt_to_equity / 100) : null);
+
+  let cfoValHtml = '—';
+  if (f.cfo_to_ebitda != null) {
+    const pct = Math.round(Number(f.cfo_to_ebitda) * 100);
+    const cColor = pct >= 70 ? '#5B7553' : (pct >= 50 ? '#B8923F' : '#A4453A');
+    const warn = pct < 50 ? ' ⚠️' : '';
+    cfoValHtml = `<span style="color:${cColor}; font-weight:700;">${pct}%${warn}</span>`;
+  }
+
+  let capexValHtml = '—';
+  if (f.fixed_asset_ratio != null) {
+    const faPct = Math.round(Number(f.fixed_asset_ratio) * 100);
+    const cwipTxt = f.cwip_ratio != null ? ` · CWIP ${Math.round(Number(f.cwip_ratio) * 100)}%` : '';
+    const tag = f.is_capex_heavy ? ' 🏗️' : '';
+    capexValHtml = `FA ${faPct}%${cwipTxt}${tag}`;
+  }
+
   return `<div class="fundamentals-panel">
     <div class="fund-row"><span class="fund-label">P/E (trailing)</span><span class="fund-val">${fmtRatio(f.trailing_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">Industry P/E</span><span class="fund-val">${fmtRatio(f.industry_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">P/E (forward)</span><span class="fund-val">${fmtRatio(f.forward_pe)}</span></div>
-    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="Indicative">⚠</span></span><span class="fund-val">${fmtRatio(peg)}</span></div>
-    <div class="fund-row"><span class="fund-label">Revenue Growth</span><span class="fund-val">${fmtPct(f.revenue_growth)}</span></div>
-    <div class="fund-row"><span class="fund-label">PAT Growth</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">PEG <span class="fund-caveat" title="P/E ÷ 3Y Growth">calc</span></span><span class="fund-val">${fmtRatio(peg)}</span></div>
+    <div class="fund-row"><span class="fund-label">Price / Book</span><span class="fund-val">${fmtRatio(f.price_to_book)}</span></div>
+    <div class="fund-row"><span class="fund-label">ROCE</span><span class="fund-val">${fmtPct(f.roce)}</span></div>
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
-    <div class="fund-row"><span class="fund-label">ROCE <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.roce)}</span></div>
-    <div class="fund-row"><span class="fund-label">Debt Ratio <span class="fund-caveat" title="Calculated">calc</span></span><span class="fund-val">${fmtPct(f.debt_ratio)}</span></div>
-    <div class="fund-row"><span class="fund-label">Profit margin</span><span class="fund-val">${fmtPct(f.profit_margin)}</span></div>
+    <div class="fund-row"><span class="fund-label">OPM %</span><span class="fund-val">${fmtPct(f.operating_margin)}</span></div>
+    <div class="fund-row"><span class="fund-label">Debt / Equity</span><span class="fund-val">${fmtRatio(debtMetric, 'x')}</span></div>
+    <div class="fund-row"><span class="fund-label">Sales Growth (3Y)</span><span class="fund-val">${fmtPct(f.revenue_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">Profit Growth (3Y)</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">3-Yr CFO / EBITDA</span><span class="fund-val">${cfoValHtml}</span></div>
+    <div class="fund-row"><span class="fund-label">Capex Profile</span><span class="fund-val">${capexValHtml}</span></div>
   </div>`;
 }
 
@@ -1003,6 +1022,7 @@ function updatePriceStatus() {
   const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
   priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
 }
+
 function updateGarpAuditStatus() {
   const el = $('#garp-audit-status');
   if (!el) return;
@@ -1848,6 +1868,15 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
     } catch (e) {}
   }
 
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  const garpScore = savedScores[ticker] ? savedScores[ticker].score : null;
+  const cachedStock = newsData && newsData.results
+    ? newsData.results.find(r => r.ticker === ticker || getCleanTicker(r.ticker) === cleanTickerForFund)
+    : null;
+  const trend = cachedStock && cachedStock.quote ? classifyTrend(cachedStock.quote) : 'unknown';
+  const sigObj = cachedStock ? getActionSignal(cachedStock, savedScores) : null;
+  const actionSignal = sigObj ? sigObj.label : null;
+
   try {
     const resp = await fetch(`${backendUrl}/api/ai/briefing`, {
       method: 'POST',
@@ -1856,6 +1885,9 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
         symbol: ticker,
         company: company,
         tier: tier,
+        garp_score: garpScore,
+        trend: trend,
+        action_signal: actionSignal,
         fundamentals: fundamentals || {},
         news: articles
       })
@@ -1863,14 +1895,16 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
     const data = await resp.json();
     if (data.status === 'success') {
       const b = data.briefing;
-      const sentColor = b.sentiment === 'BULLISH' ? 'var(--sage)' : (b.sentiment === 'BEARISH' ? 'var(--clay)' : 'var(--ink)');
+      const isHigh = (b.news_materiality || '').toUpperCase() === 'HIGH';
+      const matBg = isHigh ? '#FDECEA' : 'var(--paper-dim)';
+      const matColor = isHigh ? '#A4453A' : 'var(--ink-soft)';
+      const matText = isHigh ? '🔴 HIGH (Thesis Impact)' : '⚪ LOW (Routine Chatter)';
       panel.innerHTML = `
         <div class="ai-briefing-card">
-          <div class="ai-b-row"><strong>Business:</strong> ${escapeHtml(b.business_summary)}</div>
-          <div class="ai-b-row"><strong>Financials:</strong> ${escapeHtml(b.financial_health)}</div>
-          <div class="ai-b-row"><strong>Sentiment:</strong> <span style="color:${sentColor};font-weight:700">${escapeHtml(b.sentiment)}</span></div>
-          <div class="ai-b-row"><strong>Catalyst:</strong> ${escapeHtml(b.key_catalyst)}</div>
-          <div class="ai-b-row"><strong>Risk:</strong> ${escapeHtml(b.key_risk)}</div>
+          <div class="ai-b-row"><strong>News Materiality:</strong> <span style="background:${matBg}; color:${matColor}; padding:2px 7px; border-radius:4px; font-weight:700; font-size:11px;">${matText}</span></div>
+          <div class="ai-b-row"><strong>What Changed:</strong> ${escapeHtml(b.what_changed || b.key_catalyst || '')}</div>
+          <div class="ai-b-row"><strong>Business:</strong> ${escapeHtml(b.business_summary || '')}</div>
+          <div class="ai-b-row"><strong>Key Watchpoint:</strong> ${escapeHtml(b.key_watchpoint || b.key_risk || '')}</div>
         </div>
       `;
       if (btn) btn.style.display = 'none';
@@ -1933,7 +1967,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
     ${renderEntry(stockObj)}
     ${aiBtnHtml}
     <div id="ai-briefing-panel"></div>
-    <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (PE, P/B, ROE...)</button>
+    <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (Screener: PE, ROCE, CFO...)</button>
     <div id="fundamentals-panel"></div>
     ${errorNote}
   </div>`;
@@ -2032,10 +2066,11 @@ async function fetchAndShowFundamentals(ticker) {
     return;
   }
 
-  const cached = getCachedFundamentals(ticker);
+  const cleanTicker = getCleanTicker(ticker);
+  const cached = getCachedFundamentals(cleanTicker);
   if (cached) {
     panel.innerHTML = renderFundamentalsPanel(cached) +
-      `<div class="fund-note">📦 Cached to avoid Yahoo rate limits.</div>`;
+      `<div class="fund-note">📦 Cached from Screener.in (7-day cache).</div>`;
     if (btn) btn.style.display = 'none';
     return;
   }
@@ -2046,22 +2081,22 @@ async function fetchAndShowFundamentals(ticker) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
-    const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(ticker)}`, { signal: controller.signal });
+    const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanTicker)}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await resp.json();
 
     if (!resp.ok || data.status !== 'success') {
       panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(data.error))}</div>`;
-      if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
+      if (btn) btn.textContent = '📊 Show fundamentals (Screener: PE, ROCE, CFO...)';
       return;
     }
 
-    setCachedFundamentals(ticker, data.fundamentals);
+    setCachedFundamentals(cleanTicker, data.fundamentals);
     panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
     if (btn) btn.style.display = 'none';
   } catch (e) {
     panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
-    if (btn) btn.textContent = '📊 Show fundamentals (PE, P/B, ROE...)';
+    if (btn) btn.textContent = '📊 Show fundamentals (Screener: PE, ROCE, CFO...)';
   }
 }
 
@@ -2252,33 +2287,6 @@ function renderContent() {
       });
     } else {
       filtered = filtered.filter(s => classifyTrend(s.quote) === currentTrend);
-    }
-  }
-
-const countBar = document.getElementById('filterCountBar');
-  if (countBar) {
-    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all';
-    if (isFiltered) {
-      const labels = {
-        'capex-heavy': '🏗️ Capex Heavy',
-        'weak-cash': '⚠️ Weak Cash (<50%)',
-        'fresh': 'Fresh News',
-        'actionable-buys': '💎 Actionable Buys',
-        'actionable-exits': '✂️ Actionable Trim/Exits',
-        'uptrend': '🚀 Uptrend',
-        'dip-buy': '🎯 Dip-Buy',
-        'below-200': '⚠️ Below 200D'
-      };
-      const activeTags = [
-        labels[currentFilter],
-        currentSentiment !== 'all' ? `Tone: ${currentSentiment}` : null,
-        labels[currentTrend]
-      ].filter(Boolean).join(' + ');
-
-      countBar.textContent = `Showing ${filtered.length} of ${newsData.results.length} stocks (${activeTags})`;
-      countBar.style.display = 'block';
-    } else {
-      countBar.style.display = 'none';
     }
   }
 
@@ -2651,6 +2659,7 @@ async function runBulkGarpAudit() {
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
   localStorage.setItem('ml_last_garp_audit', new Date().toISOString());
   updateGarpAuditStatus();
+
   if (btn) {
     btn.classList.remove('spinning');
     if (stoppedEarly) {
