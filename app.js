@@ -858,14 +858,14 @@ function renderDrilldownTable(slice) {
           <span style="font-family:'SF Mono',monospace; color:var(--ink);">${escapeHtml(item.ticker)}</span>
           <div style="font-size: 11px; font-weight: 400; color:var(--ink-soft); font-family: -apple-system, sans-serif;">${escapeHtml(item.company)}</div>
         </td>
-        <td style="padding: 8px 6px; color:var(--ink-soft); font-size: 11px;">${escapeHtml(item.sector)}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: center;">${item.qty}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;">₹${item.avgPrice ? item.avgPrice.toFixed(1) : '—'}</td>
-        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${item.ltp ? item.ltp.toFixed(1) : '—'}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${Math.round(item.currentVal || item.invested).toLocaleString('en-IN')}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;" class="${pnlClass}">
           ${pnlSign}₹${Math.abs(Math.round(item.pnl)).toLocaleString('en-IN')} (${pnlSign}${item.pnlPct.toFixed(1)}%)
         </td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${item.ltp ? item.ltp.toFixed(1) : '—'}</td>
+        <td style="padding: 8px 6px; color:var(--ink-soft); font-size: 11px;">${escapeHtml(item.sector)}</td>
       </tr>
     `;
   }).join('');
@@ -892,12 +892,12 @@ function renderDrilldownTable(slice) {
           <thead>
             <tr style="border-bottom: 2px solid var(--rule-strong); font-size: 10.5px; text-transform: uppercase; color: var(--ink-soft); letter-spacing: 0.5px;">
               <th style="padding: 6px;">Stock</th>
-              <th style="padding: 6px;">Sector Niche</th>
               <th style="padding: 6px; text-align: center;">Qty</th>
               <th style="padding: 6px; text-align: right;">Avg Buy</th>
-              <th style="padding: 6px; text-align: right;">LTP</th>
               <th style="padding: 6px; text-align: right;">Current Value</th>
               <th style="padding: 6px; text-align: right;">P&amp;L</th>
+              <th style="padding: 6px; text-align: right;">LTP</th>
+              <th style="padding: 6px;">Sector Niche</th>
             </tr>
           </thead>
           <tbody>
@@ -959,8 +959,8 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">ROE</span><span class="fund-val">${fmtPct(f.return_on_equity)}</span></div>
     <div class="fund-row"><span class="fund-label">OPM %</span><span class="fund-val">${fmtPct(f.operating_margin)}</span></div>
     <div class="fund-row"><span class="fund-label">Debt / Equity</span><span class="fund-val">${fmtRatio(debtMetric, 'x')}</span></div>
-    <div class="fund-row"><span class="fund-label">Sales Growth (3Y)</span><span class="fund-val">${fmtPct(f.revenue_growth)}</span></div>
-    <div class="fund-row"><span class="fund-label">Profit Growth (3Y)</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">Sales Growth (2Q YoY)</span><span class="fund-val">${fmtPct(f.revenue_growth)}</span></div>
+    <div class="fund-row"><span class="fund-label">Profit Growth (2Q YoY)</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
     <div class="fund-row"><span class="fund-label">3-Yr CFO / EBITDA</span><span class="fund-val">${cfoValHtml}</span></div>
     <div class="fund-row"><span class="fund-label">Capex Profile</span><span class="fund-val">${capexValHtml}</span></div>
   </div>`;
@@ -1837,6 +1837,8 @@ function renderGlobalCues(cues, container) {
   </div>`;
 }
 
+const FUND_CACHE_VERSION = 2; // Bump to auto-invalidate old caches across desktop & mobile
+
 function getCachedFundamentals(ticker) {
   const raw = localStorage.getItem(`ml_fund_${ticker}`);
   if (!raw) return null;
@@ -1844,6 +1846,7 @@ function getCachedFundamentals(ticker) {
     const cached = JSON.parse(raw);
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     if (!cached.ts || (Date.now() - cached.ts > SEVEN_DAYS)) return null;
+    if (cached.v !== FUND_CACHE_VERSION) return null;
     return cached.fundamentals;
   } catch (e) {
     return null;
@@ -1852,6 +1855,7 @@ function getCachedFundamentals(ticker) {
 
 function setCachedFundamentals(ticker, fundamentals) {
   localStorage.setItem(`ml_fund_${ticker}`, JSON.stringify({
+    v: FUND_CACHE_VERSION,
     ts: Date.now(),
     fundamentals,
   }));
@@ -2511,13 +2515,19 @@ function renderEntry(stock) {
     if (roceMetric != null) fParts.push(`ROCE <strong>${(Number(roceMetric) * 100).toFixed(1)}%</strong>`);
     const debtMetric = cachedFund.debt_ratio != null ? cachedFund.debt_ratio : (cachedFund.debt_to_equity != null ? cachedFund.debt_to_equity / 100 : null);
     if (debtMetric != null) fParts.push(`DR <strong>${Number(debtMetric).toFixed(2)}</strong>`);
+    const fmtGrowth = (v) => {
+      const pct = Number(v) * 100;
+      if (pct > 999) return '>+999%';
+      if (pct < -999) return '<-999%';
+      return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    };
     if (cachedFund.revenue_growth != null) {
-      const s = cachedFund.revenue_growth >= 0 ? '+' : '';
-      fParts.push(`Rev <strong>${s}${(Number(cachedFund.revenue_growth) * 100).toFixed(1)}%</strong>`);
+      const exact = `${(Number(cachedFund.revenue_growth) * 100).toFixed(1)}%`;
+      fParts.push(`<span title="Last 2Q YoY Sales Growth: ${exact}">Rev(2Q) <strong>${fmtGrowth(cachedFund.revenue_growth)}</strong></span>`);
     }
     if (cachedFund.earnings_growth != null) {
-      const s = cachedFund.earnings_growth >= 0 ? '+' : '';
-      fParts.push(`PAT <strong>${s}${(Number(cachedFund.earnings_growth) * 100).toFixed(1)}%</strong>`);
+      const exact = `${(Number(cachedFund.earnings_growth) * 100).toFixed(1)}%`;
+      fParts.push(`<span title="Last 2Q YoY PAT Growth: ${exact}">PAT(2Q) <strong>${fmtGrowth(cachedFund.earnings_growth)}</strong></span>`);
     }
     if (cachedFund.cfo_to_ebitda != null) {
       const pct = Math.round(Number(cachedFund.cfo_to_ebitda) * 100);
