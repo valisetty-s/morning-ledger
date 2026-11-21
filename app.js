@@ -2286,7 +2286,16 @@ function getActionSignal(stock, savedScoresMap) {
     return { type: 'exit', label: '⚠️ Review / Trim', color: '#A4453A', bg: '#FDECEA' };
   }
 
-  return null;
+  // 5. Fallback Status Badges (so no audited stock with a price is left blank)
+  if (garp >= 75 && (trend === 'dip-buy' || near200D) && peg != null && peg > 1.8) {
+    return { type: 'hold-expensive', label: '⏸️ Hold (Expensive Dip)', color: '#9C6500', bg: '#FFF8E1' };
+  }
+
+  if (trend === 'below-200') {
+    return { type: 'watch', label: '👀 Watch (<200D)', color: '#7A5C9B', bg: '#F4EFF8' };
+  }
+
+  return { type: 'hold-neutral', label: '🟢 Hold', color: '#5C5852', bg: '#F3ECDD' };
 }
 
 function renderContent() {
