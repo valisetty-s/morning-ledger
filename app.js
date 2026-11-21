@@ -2195,6 +2195,16 @@ function renderContent() {
   let filtered = newsData.results;
   if (currentFilter === 'fresh') {
     filtered = filtered.filter(s => s.articles && s.articles.length > 0);
+  } else if (currentFilter === 'capex-heavy') {
+    filtered = filtered.filter(s => {
+      const f = getCachedFundamentals(getCleanTicker(s.ticker));
+      return f && f.is_capex_heavy === true;
+    });
+  } else if (currentFilter === 'weak-cash') {
+    filtered = filtered.filter(s => {
+      const f = getCachedFundamentals(getCleanTicker(s.ticker));
+      return f && f.cfo_to_ebitda != null && f.cfo_to_ebitda < 0.50;
+    });
   }
 
   if (currentSentiment !== 'all') {
@@ -2282,6 +2292,14 @@ function renderEntry(stock) {
     ? `<span class="ribbon-fund-pill" style="border:1px solid ${signal.color}; color:${signal.color}; background:${signal.bg}; font-weight:600;">${signal.label}</span>`
     : '';
 
+  const weakCashBadge = (cachedFund && cachedFund.cfo_to_ebitda != null && cachedFund.cfo_to_ebitda < 0.50)
+    ? `<span class="ribbon-fund-pill" style="border:1px solid #A4453A; color:#A4453A; background:#FDECEA; font-weight:600;" title="3-Yr Cumulative CFO/EBITDA is ${Math.round(cachedFund.cfo_to_ebitda * 100)}% (< 50%)">⚠️ Weak Cash</span>`
+    : '';
+
+  const capexBadge = (cachedFund && cachedFund.is_capex_heavy)
+    ? `<span class="ribbon-fund-pill" style="border:1px solid #8E735B; color:#5C5852; background:var(--paper-dim); font-weight:600;" title="Capex-Heavy: Fixed Assets+CWIP ${cachedFund.fixed_asset_ratio != null ? Math.round(cachedFund.fixed_asset_ratio * 100) + '%' : '—'} of Assets, CWIP ${cachedFund.cwip_ratio != null ? Math.round(cachedFund.cwip_ratio * 100) + '%' : '0%'} of FA">🏗️ Capex</span>`
+    : '';
+
   const badgeHtml = hasNews
     ? (overallSentiment === 'negative'
         ? '<span class="entry-badge sent-badge-negative">⚠ Watch</span>'
@@ -2358,6 +2376,16 @@ function renderEntry(stock) {
       const s = cachedFund.earnings_growth >= 0 ? '+' : '';
       fParts.push(`PAT <strong>${s}${(Number(cachedFund.earnings_growth) * 100).toFixed(1)}%</strong>`);
     }
+    if (cachedFund.cfo_to_ebitda != null) {
+      const pct = Math.round(Number(cachedFund.cfo_to_ebitda) * 100);
+      const cColor = pct >= 70 ? '#5B7553' : (pct >= 50 ? '#B8923F' : '#A4453A');
+      fParts.push(`<span style="color:${cColor}; font-weight:700;" title="3-Yr Cumulative Operating Cash Flow / Operating Profit">CFO/EBITDA ${pct}%</span>`);
+    }
+    if (cachedFund.fixed_asset_ratio != null) {
+      const faPct = Math.round(Number(cachedFund.fixed_asset_ratio) * 100);
+      const cwipTxt = cachedFund.cwip_ratio != null ? ` · CWIP ${Math.round(Number(cachedFund.cwip_ratio) * 100)}%` : '';
+      fParts.push(`<span title="Fixed Assets + CWIP as % of Total Assets">FA ${faPct}%${cwipTxt}</span>`);
+    }
     if (fParts.length) {
       fundLineHtml = `<div class="spec-line" id="ribbon-data-${escapeHtml(stock.ticker)}">${fParts.join(' <span class="spec-sep">·</span> ')}</div>`;
     }
@@ -2401,6 +2429,8 @@ function renderEntry(stock) {
       ${scoreBadge}
       ${pegBadge}
       ${signalBadge}
+      ${weakCashBadge}
+      ${capexBadge}
       ${badgeHtml}
       ${inlinePnlHtml}
     </div>
