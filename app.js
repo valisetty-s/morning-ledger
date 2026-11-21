@@ -2036,7 +2036,7 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
 
   const cached = getCachedFundamentals(ticker);
   if (cached) {
-    btn.outerHTML = renderCompactFundamentalPills(cached);
+    renderContent();
     return;
   }
 
@@ -2057,7 +2057,7 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
     }
 
     setCachedFundamentals(ticker, data.fundamentals);
-    btn.outerHTML = renderCompactFundamentalPills(data.fundamentals);
+    renderContent();
   } catch (e) {
     btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(formatFundamentalsError(e.message || String(e)))}">⚠ error</span>`;
   }
