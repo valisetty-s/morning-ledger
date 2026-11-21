@@ -213,6 +213,7 @@ function timeLabel(isoString) {
 
 function init() {
   datelineDate.textContent = todayLabel();
+  updateGarpAuditStatus();
   renderPortfolioAnalytics();
 
   const cached = Store.getCache();
@@ -1001,6 +1002,25 @@ function updatePriceStatus() {
   if (!priceStatusEl) return;
   const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
   priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
+}
+function updateGarpAuditStatus() {
+  const el = $('#garp-audit-status');
+  if (!el) return;
+  const iso = localStorage.getItem('ml_last_garp_audit');
+  if (!iso) {
+    el.textContent = 'Last audit: never';
+    return;
+  }
+  const d = new Date(iso);
+  if (isNaN(d)) {
+    el.textContent = 'Last audit: never';
+    return;
+  }
+  const datePart = isToday(iso)
+    ? 'Today'
+    : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const timePart = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  el.textContent = `Last audit: ${datePart}, ${timePart}`;
 }
 
 function openSettings() {
@@ -2235,6 +2255,33 @@ function renderContent() {
     }
   }
 
+const countBar = document.getElementById('filterCountBar');
+  if (countBar) {
+    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all';
+    if (isFiltered) {
+      const labels = {
+        'capex-heavy': '🏗️ Capex Heavy',
+        'weak-cash': '⚠️ Weak Cash (<50%)',
+        'fresh': 'Fresh News',
+        'actionable-buys': '💎 Actionable Buys',
+        'actionable-exits': '✂️ Actionable Trim/Exits',
+        'uptrend': '🚀 Uptrend',
+        'dip-buy': '🎯 Dip-Buy',
+        'below-200': '⚠️ Below 200D'
+      };
+      const activeTags = [
+        labels[currentFilter],
+        currentSentiment !== 'all' ? `Tone: ${currentSentiment}` : null,
+        labels[currentTrend]
+      ].filter(Boolean).join(' + ');
+
+      countBar.textContent = `Showing ${filtered.length} of ${newsData.results.length} stocks (${activeTags})`;
+      countBar.style.display = 'block';
+    } else {
+      countBar.style.display = 'none';
+    }
+  }
+
   if (filtered.length === 0) {
     const sentimentNote = currentSentiment !== 'all' ? ` with ${currentSentiment} news` : '';
     contentEl.innerHTML = `<div class="empty-state">
@@ -2602,7 +2649,8 @@ async function runBulkGarpAudit() {
   }
 
   localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
-
+  localStorage.setItem('ml_last_garp_audit', new Date().toISOString());
+  updateGarpAuditStatus();
   if (btn) {
     btn.classList.remove('spinning');
     if (stoppedEarly) {
