@@ -65,7 +65,7 @@ const DEFAULT_STOCKS = [
   ["ROSSTECH","Rossell Techsys","Top31-50",0,0],["RPEL","Raghav Productivity Enhancers","Top51-75",0,0],
   ["SAILIFE","Sai Life Sciences","Top31-50",0,0],["SANSERA","Sansera Engineering","Top31-50",0,0],
   ["SBCL","Shivalik Bimetal Controls","Top31-50",0,0],["SEDEMAC","SEDEMAC Mechatronics","Top31-50",0,0],
-  ["SETL","Standard Engineering Technology","Top31-50",0,0],["SJS","SJS Enterprises","Top31-50",0,0],
+  ["SETL","Standard Engineering Technology","Top31-50",0,0],["SETL","Standard Glass Lining Tech","Top31-50",0,0],
   ["SKYGOLD","Sky Gold Ltd","Top51-75",0,0],["STEELCAS","Steelcast Ltd","Top51-75",0,0],
   ["SUDEEPPHRM","Sudeep Pharma","Top31-50",0,0],["SUPRIYA","Supriya Lifescience","Top31-50",0,0],
   ["TANFACIND","Tanfac Industries","Top51-75",0,0],["TDPOWERSYS","TD Power Systems","Top31-50",0,0],
