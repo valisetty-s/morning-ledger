@@ -1204,6 +1204,9 @@ async function fetchLatestPrices() {
     const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
     priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
     renderPortfolioAnalytics();
+
+    // Auto-trigger GARP Audit immediately after prices finish loading
+    runBulkGarpAudit();
   } catch (e) {
     if (priceBtn) priceBtn.classList.remove('spinning');
     priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
@@ -2460,7 +2463,10 @@ function renderEntry(stock) {
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE (WITH CIRCUIT BREAKER & CALIBRATED GATES)
    ========================================================================== */
+let isBulkGarpRunning = false;
+
 async function runBulkGarpAudit() {
+  if (isBulkGarpRunning) return;
   const backendUrl = getBackendUrl();
   const btn = $('#bulk-garp-btn');
 
@@ -2470,6 +2476,7 @@ async function runBulkGarpAudit() {
     return;
   }
 
+  isBulkGarpRunning = true;
   if (btn) {
     btn.classList.add('spinning');
     btn.innerHTML = '<span>⏳ Starting Audit...</span>';
@@ -2609,6 +2616,7 @@ async function runBulkGarpAudit() {
     }
   }
 
+  isBulkGarpRunning = false;
   renderContent();
   renderPortfolioAnalytics();
 }
