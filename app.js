@@ -301,11 +301,29 @@ function init() {
     });
   }
 
+  const FILTER_HINTS = {
+    'strong-cash': '3-Yr Cumulative CFO / EBITDA ≥ 70% — High-quality earnings: most of the reported operating profit is converting into real cash in the bank.',
+    'weak-cash': '3-Yr Cumulative CFO / EBITDA < 50% — Caution: profits may be stuck in unpaid receivables or inventory. Check if the company is also flagged 🏗️ Capex (temporary expansion) before judging.',
+    'capex-heavy': 'Fixed Assets + CWIP ≥ 40% of Total Assets OR CWIP ≥ 15% of Fixed Assets — Capital-intensive or actively expanding plants. Trailing ROCE/cash may look temporarily depressed until new capacity ramps up.',
+    'active-cwip': 'Capital Work in Progress (CWIP) ≥ 15% of Fixed Assets — New factories or lines are actively under construction right now. High future revenue trigger once commissioned, but watch debt and execution timelines.',
+    'fresh': 'Showing only stocks with recent news headlines fetched from Google News.'
+  };
+
   const filterSelect = $('#filter-select');
   if (filterSelect) {
     filterSelect.value = currentFilter;
     filterSelect.addEventListener('change', (e) => {
       currentFilter = e.target.value;
+      const fHintEl = document.getElementById('filterHint');
+      if (fHintEl) {
+        if (FILTER_HINTS[currentFilter]) {
+          fHintEl.textContent = FILTER_HINTS[currentFilter];
+          fHintEl.style.display = 'block';
+        } else {
+          fHintEl.textContent = '';
+          fHintEl.style.display = 'none';
+        }
+      }
       renderContent();
     });
   }
@@ -1507,6 +1525,18 @@ function applySorting(stocks, sortType) {
     } catch { return null; }
   };
 
+  // Helper to extract cached PAT / Earnings Growth (3Y)
+  const getPat = (t) => {
+    const clean = getCleanTicker(t);
+    const raw = localStorage.getItem(`ml_fund_${clean}`);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw).fundamentals;
+      const pat = parsed.earnings_growth != null ? parsed.earnings_growth : parsed.earningsGrowth;
+      return pat != null ? Number(pat) : null;
+    } catch { return null; }
+  };
+
   switch (sortType) {
     case 'garp-desc':
       sorted.sort((a, b) => {
@@ -1537,6 +1567,22 @@ function applySorting(stocks, sortType) {
         const valA = getPeg(a.ticker) != null ? getPeg(a.ticker) : -9999;
         const valB = getPeg(b.ticker) != null ? getPeg(b.ticker) : -9999;
         if (valA !== valB) return valB - valA;
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
+    case 'pat-desc':
+      sorted.sort((a, b) => {
+        const valA = getPat(a.ticker) != null ? getPat(a.ticker) : -9999;
+        const valB = getPat(b.ticker) != null ? getPat(b.ticker) : -9999;
+        if (valA !== valB) return valB - valA;
+        return (a.company || '').localeCompare(b.company || '');
+      });
+      break;
+    case 'pat-asc':
+      sorted.sort((a, b) => {
+        const valA = getPat(a.ticker) != null ? getPat(a.ticker) : 9999;
+        const valB = getPat(b.ticker) != null ? getPat(b.ticker) : 9999;
+        if (valA !== valB) return valA - valB;
         return (a.company || '').localeCompare(b.company || '');
       });
       break;
@@ -2253,15 +2299,25 @@ function renderContent() {
   let filtered = newsData.results;
   if (currentFilter === 'fresh') {
     filtered = filtered.filter(s => s.articles && s.articles.length > 0);
-  } else if (currentFilter === 'capex-heavy') {
+  } else if (currentFilter === 'strong-cash') {
     filtered = filtered.filter(s => {
       const f = getCachedFundamentals(getCleanTicker(s.ticker));
-      return f && f.is_capex_heavy === true;
+      return f && f.cfo_to_ebitda != null && f.cfo_to_ebitda >= 0.70;
     });
   } else if (currentFilter === 'weak-cash') {
     filtered = filtered.filter(s => {
       const f = getCachedFundamentals(getCleanTicker(s.ticker));
       return f && f.cfo_to_ebitda != null && f.cfo_to_ebitda < 0.50;
+    });
+  } else if (currentFilter === 'capex-heavy') {
+    filtered = filtered.filter(s => {
+      const f = getCachedFundamentals(getCleanTicker(s.ticker));
+      return f && f.is_capex_heavy === true;
+    });
+  } else if (currentFilter === 'active-cwip') {
+    filtered = filtered.filter(s => {
+      const f = getCachedFundamentals(getCleanTicker(s.ticker));
+      return f && f.cwip_ratio != null && f.cwip_ratio >= 0.15;
     });
   }
 
@@ -2287,6 +2343,35 @@ function renderContent() {
       });
     } else {
       filtered = filtered.filter(s => classifyTrend(s.quote) === currentTrend);
+    }
+  }
+
+  const countBar = document.getElementById('filterCountBar');
+  if (countBar) {
+    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all';
+    if (isFiltered) {
+      const labels = {
+        'strong-cash': '💰 Strong Cash (≥70%)',
+        'weak-cash': '⚠️ Weak Cash (<50%)',
+        'capex-heavy': '🏗️ Capex Heavy',
+        'active-cwip': '🏭 Active Expansion (CWIP ≥15%)',
+        'fresh': 'Fresh News',
+        'actionable-buys': '💎 Buys',
+        'actionable-exits': '✂️ Trim/Exits',
+        'uptrend': '🚀 Uptrend',
+        'dip-buy': '🎯 Dip-Buy',
+        'below-200': '⚠️ <200D'
+      };
+      const activeTags = [
+        labels[currentFilter],
+        currentSentiment !== 'all' ? `Tone: ${currentSentiment}` : null,
+        labels[currentTrend]
+      ].filter(Boolean).join(' + ');
+
+      countBar.textContent = `Showing ${filtered.length} of ${newsData.results.length} stocks (${activeTags})`;
+      countBar.style.display = 'block';
+    } else {
+      countBar.style.display = 'none';
     }
   }
 
