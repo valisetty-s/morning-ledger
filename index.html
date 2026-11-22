@@ -422,6 +422,12 @@
     transition: all 0.15s ease;
   }
   .refresh-btn:hover { border-color: var(--teal); background: var(--teal-soft); }
+  .refresh-btn.active {
+    background: var(--teal-soft);
+    border-color: var(--teal);
+    color: var(--teal);
+    box-shadow: 0 0 0 1px var(--teal);
+  }
   .refresh-btn svg { width: 13px; height: 13px; }
   .status { font-size: 11.5px; color: var(--ink-soft); }
 
@@ -1579,7 +1585,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v55 · Dark Bento</span>
+            <span class="build-tag">v56 · Dark Bento</span>
           </div>
         </div>
       </div>
@@ -1623,6 +1629,12 @@
           <span id="price-refresh-label">Fetch latest prices</span>
         </button>
         <span class="status" id="price-status">Prices: tap to fetch</span>
+      </div>
+      <div class="sync-item">
+        <button class="refresh-btn active" id="analytics-toggle-chip" title="Toggle Portfolio Overview & Pie Chart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+          <span id="analytics-toggle-label">📊 Overview</span>
+        </button>
       </div>
     </div>
     <span class="status" id="garp-audit-status">Last audit: never</span>
@@ -1673,7 +1685,6 @@
         <option value="negative">⚠ Negative</option>
         <option value="positive">✓ Positive</option>
       </select>
-      <button class="chip active" id="analytics-toggle-chip" style="margin-left:auto;">📊 Overview</button>
     </div>
 
     <div class="trend-toolbar">
