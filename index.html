@@ -3,204 +3,571 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#FBF6EE">
+<meta name="theme-color" content="#F4F7F6">
 <title>The Morning Ledger</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
 <style>
-  @font-face {
-    font-family: 'Newsreader';
-    src: local('Newsreader');
-  }
-
   :root {
-    --paper: #FBF6EE;
-    --paper-dim: #F3ECDD;
-    --ink: #1C1B19;
-    --ink-soft: #5C5852;
-    --rule: #E2D8C3;
-    --rule-strong: #C9BCA0;
-    --sunrise: #C45A3E;
-    --sunrise-dim: #F1DFD6;
-    --sage: #5B7553;
-    --sage-dim: #E3E9DE;
-    --clay: #A4453A;
-    --clay-dim: #F0DEDB;
-    --gold: #B8923F;
-    --gold-dim: #FDF3DB;
+    --bg: #F4F7F6;
+    --surface: #FFFFFF;
+    --surface-soft: #F8FAF9;
+    --ink: #0F2420;
+    --ink-soft: #546A65;
+    --ink-muted: #7C908B;
+    --border: #E2EBE7;
+    --border-strong: #C9D8D2;
+
+    --teal: #0F766E;
+    --teal-dark: #0B5550;
+    --teal-soft: #E6F4F1;
+
+    --emerald: #059669;
+    --emerald-bg: #ECFDF5;
+    --emerald-border: #A7F3D0;
+
+    --indigo: #4F46E5;
+    --indigo-bg: #EEF2FF;
+    --indigo-border: #C7D2FE;
+
+    --amber: #D97706;
+    --amber-bg: #FFFBEB;
+    --amber-border: #FDE68A;
+
+    --rose: #E11D48;
+    --rose-bg: #FFF1F2;
+    --rose-border: #FECDD3;
+
+    --violet: #7C3AED;
+    --violet-bg: #F5F3FF;
+    --violet-border: #DDD6FE;
+
+    /* Legacy token aliases for inline compatibility */
+    --paper: var(--surface);
+    --paper-dim: var(--surface-soft);
+    --rule: var(--border);
+    --rule-strong: var(--border-strong);
+    --sage: var(--emerald);
+    --sage-dim: var(--emerald-bg);
+    --clay: var(--rose);
+    --clay-dim: var(--rose-bg);
+    --gold: var(--amber);
+    --gold-dim: var(--amber-bg);
+    --sunrise: var(--teal);
+    --sunrise-dim: var(--teal-soft);
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+    --shadow-sm: 0 1px 3px rgba(15, 36, 32, 0.04), 0 1px 2px rgba(15, 36, 32, 0.03);
+    --shadow-md: 0 4px 16px rgba(15, 36, 32, 0.06), 0 1px 3px rgba(15, 36, 32, 0.04);
+    --shadow-hover: 0 8px 24px rgba(15, 36, 32, 0.09);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   html, body {
-    background: var(--paper);
+    background: var(--bg);
     color: var(--ink);
-    font-family: 'Georgia', 'Newsreader', serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: contain;
   }
 
   body {
-    padding-bottom: 90px;
+    padding-bottom: 96px;
     min-height: 100vh;
   }
 
-  /* ---------- MASTHEAD ---------- */
-  .masthead {
-    padding: 28px 20px 16px;
-    text-align: center;
-    border-bottom: 3px double var(--ink);
+  .app-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+  @media (min-width: 768px) {
+    .app-shell { padding: 0 24px; }
+  }
+
+  /* ---------- STICKY TOP HEADER ---------- */
+  .top-header {
     position: sticky;
     top: 0;
-    background: var(--paper);
-    z-index: 20;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(15, 36, 32, 0.03);
   }
-  .masthead .eyebrow {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 10px;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    margin-bottom: 6px;
+  .header-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
   }
-  .masthead h1 {
-    font-size: 32px;
-    font-weight: 600;
-    letter-spacing: -0.3px;
-    line-height: 1.1;
+  @media (min-width: 768px) {
+    .header-inner { padding: 12px 24px; flex-wrap: nowrap; }
   }
-  .masthead .dateline {
-    font-family: -apple-system, system-ui, sans-serif;
+
+  .brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--teal) 0%, #10B981 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(15, 118, 110, 0.25);
+    flex-shrink: 0;
+  }
+  .brand-text h1 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    color: var(--ink);
+    line-height: 1.15;
+  }
+  .brand-sub {
     font-size: 11px;
     color: var(--ink-soft);
-    margin-top: 8px;
     display: flex;
-    justify-content: center;
-    gap: 14px;
     align-items: center;
+    gap: 6px;
+    margin-top: 1px;
   }
-  .dateline .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--rule-strong); }
-  .dateline .fresh { color: var(--sunrise); font-weight: 600; }
-
-  /* ---------- AI GLOBAL CUES CARD ---------- */
-  #global-cues-container {
-    padding: 14px 20px 0;
-  }
-  .global-cues-card {
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 12px;
-    padding: 14px 16px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 13px;
-    color: var(--ink);
-  }
-  .gc-header {
+  .brand-sub .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
+  .brand-sub .fresh { color: var(--emerald); font-weight: 700; }
+  .build-tag {
+    font-size: 9.5px;
     font-weight: 700;
-    font-size: 11.5px;
-    letter-spacing: 0.5px;
-    margin-bottom: 12px;
-    color: var(--ink);
-  }
-  .gc-section { margin-bottom: 10px; }
-  .gc-bullet { margin-bottom: 4px; line-height: 1.4; }
-  .gc-label { font-weight: 600; }
-  .gc-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 12px;
-    border-top: 1px solid var(--rule);
-    padding-top: 12px;
-    font-size: 12px;
-    line-height: 1.4;
-  }
-  @media (max-width: 480px) {
-    .gc-grid { grid-template-columns: 1fr; }
+    padding: 1px 6px;
+    border-radius: 100px;
+    background: var(--teal-soft);
+    color: var(--teal);
+    letter-spacing: 0.3px;
   }
 
-  /* ---------- PORTFOLIO PIE CHART & ANALYTICS ---------- */
-  #portfolio-analytics-container {
-    margin: 14px 20px 0;
-    display: block;
+  /* Integrated Search Bar in Header */
+  .lookup-bar {
+    flex: 1;
+    min-width: 220px;
+    position: relative;
   }
-  .analytics-card {
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 14px;
-    padding: 18px 16px;
-    font-family: -apple-system, system-ui, sans-serif;
+  .lookup-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 14px;
+    background: var(--surface-soft);
+    transition: all 0.15s ease;
   }
-  .analytics-head {
+  .lookup-input-wrap:focus-within {
+    background: #FFFFFF;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  }
+  .lookup-icon { width: 15px; height: 15px; color: var(--ink-muted); flex-shrink: 0; }
+  .lookup-input {
+    border: none;
+    background: none;
+    outline: none;
+    width: 100%;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .lookup-input::placeholder { color: var(--ink-muted); }
+
+  .lookup-suggestions {
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(100% + 6px);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-hover);
+    z-index: 40;
+    overflow: hidden;
+    display: none;
+  }
+  .lookup-suggestions.open { display: block; }
+  .suggestion-item {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--rule);
-    padding-bottom: 10px;
+    cursor: pointer;
   }
-  .analytics-title {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .analytics-toggle-group {
-    display: flex;
-    gap: 6px;
-  }
-  .chart-toggle-btn {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 5px 11px;
+  .suggestion-item:hover { background: var(--surface-soft); }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-name { color: var(--ink); font-weight: 600; }
+  .suggestion-ticker {
+    color: var(--teal);
+    background: var(--teal-soft);
+    padding: 2px 7px;
     border-radius: 6px;
-    border: 1px solid var(--rule-strong);
-    background: var(--paper);
+    font-family: 'SF Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .suggestion-empty { padding: 14px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .pill-btn {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .pill-btn:hover { background: var(--surface-soft); transform: translateY(-1px); }
+  .pill-btn.pill-cues {
+    background: var(--indigo-bg);
+    border-color: var(--indigo-border);
+    color: var(--indigo);
+  }
+  .pill-btn.pill-garp {
+    background: linear-gradient(135deg, var(--teal) 0%, #10B981 100%);
+    border-color: transparent;
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.22);
+  }
+  .pill-btn.pill-garp:hover { filter: brightness(1.05); }
+  .pill-btn.spinning svg, .refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- SYNC & PROGRESS STRIP ---------- */
+  .sync-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 18px;
+    flex-wrap: wrap;
+    padding: 10px 0 6px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .sync-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .sync-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .refresh-btn {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .refresh-btn:hover { border-color: var(--teal); background: var(--teal-soft); }
+  .refresh-btn svg { width: 13px; height: 13px; }
+  .status { font-size: 11.5px; color: var(--ink-soft); }
+
+  /* Animated GARP Audit Progress Bar */
+  .garp-progress-wrap {
+    display: none;
+    margin: 6px 0 10px;
+    background: var(--surface);
+    border: 1px solid var(--emerald-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .garp-progress-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--teal-dark);
+    margin-bottom: 6px;
+  }
+  .garp-progress-track {
+    width: 100%;
+    height: 7px;
+    background: var(--bg);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .garp-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--teal), #10B981, #34D399);
+    border-radius: 100px;
+    transition: width 0.3s ease;
+  }
+
+  /* ---------- AI GLOBAL CUES CARD ---------- */
+  #global-cues-container { margin: 10px 0; }
+  .global-cues-card {
+    background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FF 100%);
+    border: 1px solid var(--indigo-border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    font-size: 13px;
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .gc-header {
+    font-weight: 800;
+    font-size: 11.5px;
+    letter-spacing: 0.7px;
+    margin-bottom: 10px;
+    color: var(--indigo);
+  }
+  .gc-section { margin-bottom: 8px; }
+  .gc-bullet { margin-bottom: 4px; line-height: 1.45; }
+  .gc-label { font-weight: 700; }
+  .gc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--indigo-border);
+    padding-top: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  @media (max-width: 560px) { .gc-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- DESIGN 2: ASYMMETRIC BENTO HERO + ACTION RADAR ---------- */
+  #portfolio-analytics-container {
+    margin: 10px 0 14px;
+  }
+  .bento-top-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  @media (min-width: 900px) {
+    .bento-top-grid {
+      grid-template-columns: 1.85fr 1fr;
+      align-items: stretch;
+    }
+  }
+
+  .bento-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .bento-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .bento-eyebrow {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .chart-style-switch {
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .style-switch-btn {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
     color: var(--ink-soft);
     cursor: pointer;
     transition: all 0.15s ease;
   }
+  .style-switch-btn.active {
+    background: var(--surface);
+    color: var(--teal);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .analytics-toggle-group {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .chart-toggle-btn {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .chart-toggle-btn:hover { border-color: var(--teal); color: var(--teal); }
   .chart-toggle-btn.active {
     background: var(--ink);
-    color: var(--paper);
+    color: #FFFFFF;
     border-color: var(--ink);
   }
 
-  .portfolio-stats-summary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+  /* Hero KPI Strip */
+  .hero-kpi-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px 24px;
     margin-bottom: 16px;
   }
-  @media (max-width: 480px) {
-    .portfolio-stats-summary { grid-template-columns: 1fr; }
+  .hero-val-lbl {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 2px;
   }
-  .p-stat-box {
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    padding: 10px 12px;
+  .hero-val-main {
+    font-family: 'SF Mono', 'Segoe UI', monospace;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    color: var(--ink);
+    line-height: 1.1;
   }
-  .p-stat-lbl { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-  .p-stat-val { font-family: 'SF Mono', 'Courier New', monospace; font-size: 16px; font-weight: 700; color: var(--ink); }
-  .p-stat-val.pos { color: var(--sage); }
-  .p-stat-val.neg { color: var(--clay); }
+  .hero-sub-metrics {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .hero-sub-val {
+    font-family: 'SF Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .pnl-hero-pill {
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 100px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pnl-hero-pill.pos { background: var(--emerald-bg); color: var(--emerald); border: 1px solid var(--emerald-border); }
+  .pnl-hero-pill.neg { background: var(--rose-bg); color: var(--rose); border: 1px solid var(--rose-border); }
 
+  /* Horizontal Stacked Bar (Default Mode) */
+  .stacked-bar-track {
+    width: 100%;
+    height: 16px;
+    border-radius: 100px;
+    overflow: hidden;
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    margin-bottom: 12px;
+  }
+  .stacked-seg {
+    height: 100%;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .stacked-seg:hover { opacity: 0.85; }
+  .stacked-seg:first-child { border-radius: 100px 0 0 100px; }
+  .stacked-seg:last-child { border-radius: 0 100px 100px 0; }
+  .stacked-seg:only-child { border-radius: 100px; }
+
+  .bar-legend-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .bar-legend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .bar-legend-pill:hover {
+    background: #FFFFFF;
+    border-color: var(--teal);
+    box-shadow: var(--shadow-sm);
+  }
+  .legend-swatch { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Pie Chart Mode (Toggleable) */
   .chart-flex-wrap {
     display: flex;
     align-items: center;
     justify-content: space-around;
     gap: 20px;
     flex-wrap: wrap;
-    margin-top: 10px;
+    margin-top: 6px;
   }
   .pie-svg-container {
     position: relative;
-    width: 190px;
-    height: 190px;
+    width: 176px;
+    height: 176px;
     flex-shrink: 0;
   }
   .pie-svg-container svg {
@@ -213,8 +580,8 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 96px; height: 96px;
-    background: var(--paper-dim);
+    width: 92px; height: 92px;
+    background: var(--surface);
     border-radius: 50%;
     display: flex;
     flex-direction: column;
@@ -222,177 +589,459 @@
     justify-content: center;
     text-align: center;
     pointer-events: none;
-    box-shadow: inset 0 0 4px rgba(0,0,0,0.06);
+    box-shadow: inset 0 0 6px rgba(15, 36, 32, 0.06);
   }
-  .pie-center-lbl { font-size: 9px; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; letter-spacing: 0.5px; }
-  .pie-center-val { font-family: 'SF Mono', monospace; font-size: 13px; font-weight: 800; color: var(--ink); margin-top: 2px; }
+  .pie-center-lbl { font-size: 9.5px; text-transform: uppercase; color: var(--ink-muted); font-weight: 700; letter-spacing: 0.6px; }
+  .pie-center-val { font-family: 'SF Mono', monospace; font-size: 16px; font-weight: 800; color: var(--ink); margin-top: 1px; }
 
   .chart-legend {
     flex: 1;
-    min-width: 240px;
+    min-width: 220px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
+    max-height: 210px;
+    overflow-y: auto;
   }
   .legend-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 6px 10px;
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    border-radius: 6px;
-    font-size: 12px;
-    transition: background 0.15s ease;
-  }
-  .legend-row:hover { background: #FFFFFF; }
-  .legend-left { display: flex; align-items: center; gap: 8px; }
-  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-  .legend-name { font-weight: 600; color: var(--ink); }
-  .legend-count { font-size: 10px; color: var(--ink-soft); }
-  .legend-right { font-family: 'SF Mono', monospace; font-weight: 700; color: var(--ink); display: flex; gap: 8px; }
-  .legend-amt { color: var(--ink-soft); font-weight: 500; font-size: 11px; }
-
-  /* Segregated P&L Stats Grid */
-  .pnl-stats-panel {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid var(--rule);
-  }
-  .pnl-stats-header {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--ink-soft);
-    margin-bottom: 10px;
-  }
-  .pnl-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 10px;
-  }
-  .pnl-stat-card {
-    background: var(--paper);
-    border: 1px solid var(--rule);
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 10px 12px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .pnl-stat-card:hover {
-    border-color: var(--rule-strong);
-    background: #FFFFFF;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  .legend-row:hover { background: #FFFFFF; border-color: var(--teal); }
+  .legend-left { display: flex; align-items: center; gap: 8px; }
+  .legend-name { font-weight: 700; color: var(--ink); }
+  .legend-count { font-size: 10.5px; color: var(--ink-muted); }
+  .legend-right { font-family: 'SF Mono', monospace; font-weight: 700; color: var(--ink); display: flex; gap: 8px; }
+  .legend-amt { color: var(--ink-soft); font-weight: 500; font-size: 11px; }
+
+  /* Segregated P&L Details inside Hero */
+  .pnl-breakdown-details {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
   }
-  .pnl-card-title {
+  .pnl-breakdown-details summary {
     font-size: 11.5px;
     font-weight: 700;
-    color: var(--ink);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-  .pnl-card-metrics {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-  .pnl-card-val {
-    font-family: 'SF Mono', monospace;
-    font-size: 14px;
-    font-weight: 800;
-  }
-  .pnl-card-sub {
-    font-size: 10.5px;
-    font-family: 'SF Mono', monospace;
-    color: var(--ink-soft);
-  }
-
-  /* ---------- AI BRIEFINGS ---------- */
-  .ai-briefing-btn {
-    display: block;
-    width: 100%;
-    margin-top: 12px;
-    padding: 10px 12px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    color: #FFFFFF;
-    background: linear-gradient(135deg, #7A5C9B 0%, #4D3962 100%);
-    border: none;
-    border-radius: 8px;
+    color: var(--teal);
     cursor: pointer;
+    list-style: none;
+    user-select: none;
   }
-  .ai-briefing-btn:disabled { opacity: 0.7; cursor: wait; }
-
-  .ribbon-ai-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-    padding: 6px 12px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: #4D3962;
-    background: #F4EFF8;
-    border: 1px solid #D8CBE4;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .ribbon-ai-btn:active { background: #E7DEEE; }
-  .ribbon-ai-btn:disabled { opacity: 0.6; cursor: wait; }
-
-  .ai-briefing-card {
-    margin-top: 10px;
-    padding: 14px;
-    background: #F4EFF8;
-    border: 1px solid #D8CBE4;
-    border-radius: 9px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12.5px;
-    line-height: 1.5;
-  }
-  .ai-b-row { margin-bottom: 7px; }
-  .ai-b-row:last-child { margin-bottom: 0; }
-
-  /* ---------- TOOLBAR ---------- */
-  .toolbar {
-    display: flex;
+  .pnl-breakdown-details summary::-webkit-details-marker { display: none; }
+  .pnl-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
     gap: 8px;
-    padding: 14px 20px;
+    margin-top: 10px;
+  }
+  .pnl-stat-card {
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .pnl-stat-card:hover { border-color: var(--teal); background: #FFFFFF; box-shadow: var(--shadow-sm); }
+  .pnl-card-title { font-size: 11.5px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .pnl-card-metrics { display: flex; justify-content: space-between; align-items: baseline; }
+  .pnl-card-val { font-family: 'SF Mono', monospace; font-size: 13.5px; font-weight: 800; }
+  .pnl-card-sub { font-size: 10.5px; font-family: 'SF Mono', monospace; font-weight: 700; }
+
+  /* Action Radar 2x2 Pastel Grid */
+  .radar-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    height: calc(100% - 30px);
+  }
+  .radar-tile {
+    border-radius: 14px;
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.16s ease;
+    user-select: none;
+  }
+  .radar-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .radar-tile.active { box-shadow: 0 0 0 2.5px var(--ink); }
+  .radar-num {
+    font-family: 'SF Mono', monospace;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+  .radar-lbl {
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .radar-mint { background: var(--emerald-bg); border-color: var(--emerald-border); color: #047857; }
+  .radar-rose { background: var(--rose-bg); border-color: var(--rose-border); color: #BE123C; }
+  .radar-amber { background: var(--amber-bg); border-color: var(--amber-border); color: #B45309; }
+  .radar-violet { background: var(--violet-bg); border-color: var(--violet-border); color: #6D28D9; }
+
+  /* ---------- FILTER & SORT RAIL ---------- */
+  .controls-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .compact-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctrl-select {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-soft);
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+  }
+  .ctrl-select:focus { border-color: var(--teal); background: #FFFFFF; }
+
+  .trend-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-top: 10px;
     overflow-x: auto;
-    border-bottom: 1px solid var(--rule);
-    background: var(--paper);
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
-  .toolbar::-webkit-scrollbar { display: none; }
+  .trend-toolbar::-webkit-scrollbar { display: none; }
+
   .chip {
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: inherit;
     font-size: 12px;
+    font-weight: 600;
     white-space: nowrap;
-    padding: 6px 14px;
+    padding: 6px 13px;
     border-radius: 100px;
-    border: 1px solid var(--rule-strong);
-    background: transparent;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
     color: var(--ink-soft);
     flex-shrink: 0;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
+  .chip:hover { border-color: var(--teal); color: var(--teal); }
   .chip.active {
     background: var(--ink);
-    color: var(--paper);
+    color: #FFFFFF;
     border-color: var(--ink);
   }
 
-  .sentiment-toolbar {
-    border-bottom: 1px solid var(--rule);
+  .hint-banner {
+    display: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--teal-dark);
+    background: var(--teal-soft);
+    border: 1px solid #BEE3DB;
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
+    line-height: 1.45;
   }
-  .sent-chip.sent-negative.active { background: var(--clay); border-color: var(--clay); color: var(--paper); }
-  .sent-chip.sent-positive.active { background: var(--sage); border-color: var(--sage); color: var(--paper); }
+  .count-banner {
+    display: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    padding: 4px 4px 10px;
+  }
+
+  /* ---------- MOVERS SUMMARY STRIP ---------- */
+  .movers-summary {
+    margin: 0 0 14px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    box-shadow: var(--shadow-sm);
+    font-size: 12.5px;
+  }
+  .movers-counts { display: flex; gap: 14px; align-items: center; }
+  .movers-counts .count-up { color: var(--emerald); font-weight: 800; }
+  .movers-counts .count-down { color: var(--rose); font-weight: 800; }
+  .movers-counts .count-flat { color: var(--ink-muted); font-weight: 700; }
+  .movers-best-worst { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-soft); }
+  .movers-best-worst span.name { color: var(--ink); font-weight: 700; }
+  .movers-best-worst .mover-up span.pct { color: var(--emerald); font-weight: 800; }
+  .movers-best-worst .mover-down span.pct { color: var(--rose); font-weight: 800; }
+
+  /* ---------- DESIGN 2: 2-COLUMN BENTO STOCK CARDS GRID ---------- */
+  .section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 2px 0 24px;
+  }
+  @media (min-width: 820px) {
+    .section {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+  }
+  .entry:hover {
+    box-shadow: var(--shadow-hover);
+    border-color: var(--border-strong);
+  }
+  .entry.ribbon-pos-card { border-top: 3px solid var(--emerald); }
+  .entry.ribbon-neg-card { border-top: 3px solid var(--rose); }
+  .entry.ribbon-neu-card { border-top: 3px solid var(--border-strong); }
+  .entry.has-negative {
+    background: linear-gradient(180deg, #FFF7F8 0%, #FFFFFF 38%);
+  }
+
+  /* Card Header: Title + Ticker on Left, GARP Speedometer Arc on Right */
+  .bento-stock-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .stock-id-col {
+    min-width: 0;
+    flex: 1;
+  }
+  .stock-name-line {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .entry-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+    line-height: 1.25;
+  }
+  .ribbon-code {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #FFFFFF;
+    background: #334E58;
+    padding: 2px 7px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+  }
+
+  /* Price + Signal Row */
+  .stock-price-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .card-ltp {
+    font-family: 'SF Mono', monospace;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.4px;
+  }
+  .chg-pill {
+    font-family: 'SF Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 100px;
+  }
+  .chg-pill.pos { background: var(--emerald-bg); color: var(--emerald); }
+  .chg-pill.neg { background: var(--rose-bg); color: var(--rose); }
+  .chg-pill.neu { background: var(--bg); color: var(--ink-soft); }
+
+  .signal-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  /* Semi-Circular GARP Speedometer Arc */
+  .garp-gauge-wrap {
+    flex-shrink: 0;
+    width: 72px;
+    text-align: center;
+    position: relative;
+    cursor: pointer;
+  }
+  .garp-gauge-wrap svg { display: block; width: 72px; height: 44px; overflow: visible; }
+  .garp-gauge-val {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 2px;
+    font-family: 'SF Mono', monospace;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .garp-gauge-lbl {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* 3 Compact Pastel Mini-Metric Tiles */
+  .mini-tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mini-tile {
+    border-radius: 10px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .mini-tile.tile-good { background: var(--emerald-bg); border-color: var(--emerald-border); }
+  .mini-tile.tile-warn { background: var(--amber-bg); border-color: var(--amber-border); }
+  .mini-tile.tile-bad  { background: var(--rose-bg); border-color: var(--rose-border); }
+  .mini-tile.tile-info { background: var(--indigo-bg); border-color: var(--indigo-border); }
+
+  .mini-tile-lbl {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--ink-soft);
+  }
+  .mini-tile-val {
+    font-family: 'SF Mono', monospace;
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--ink);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cfo-bar-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(15, 36, 32, 0.1);
+    border-radius: 100px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+  .cfo-bar-fill {
+    height: 100%;
+    border-radius: 100px;
+  }
+
+  /* 3-Pill DMA Trend Ladder */
+  .dma-ladder-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .dma-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .dma-lbl {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--ink-muted);
+    letter-spacing: 0.5px;
+  }
+  .dma-pill {
+    font-family: 'SF Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 100px;
+    cursor: help;
+  }
+  .dma-pill.above { background: var(--emerald-bg); color: #047857; border: 1px solid var(--emerald-border); }
+  .dma-pill.below { background: var(--rose-bg); color: #BE123C; border: 1px solid var(--rose-border); }
+  .dma-pill.flag  { background: var(--indigo-bg); color: var(--indigo); border: 1px solid var(--indigo-border); font-family: inherit; }
+
+  .card-flags-inline {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .card-pnl-inline {
+    font-family: 'SF Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .entry-badge {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .entry-badge.fresh { background: var(--teal-soft); color: var(--teal); }
+  .entry-badge.sent-badge-negative { background: var(--rose-bg); color: var(--rose); }
+  .entry-badge.sent-badge-positive { background: var(--emerald-bg); color: var(--emerald); }
 
   .sentiment-dot {
     display: inline-block;
@@ -403,441 +1052,225 @@
     position: relative;
     top: -1px;
   }
-  .sentiment-dot.negative { background: var(--clay); }
-  .sentiment-dot.neutral { background: var(--rule-strong); }
-  .sentiment-dot.positive { background: var(--sage); }
+  .sentiment-dot.negative { background: var(--rose); }
+  .sentiment-dot.neutral { background: var(--border-strong); }
+  .sentiment-dot.positive { background: var(--emerald); }
 
-  .entry.has-negative {
-    background: rgba(176, 58, 46, 0.07) !important;
-    border-left: 3px solid var(--clay);
-    border-radius: 6px;
-    padding-left: 10px;
-    margin-left: -2px;
-  }
-  .entry.has-negative .entry-name,
-  .entry.has-negative .ribbon-name { color: var(--clay); }
-
-  /* ---------- REFRESH BAR ---------- */
-  .refresh-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    font-family: -apple-system, system-ui, sans-serif;
-  }
-  .refresh-bar .status {
-    font-size: 11px;
+  .card-lead-headline {
+    font-size: 12.5px;
+    line-height: 1.4;
     color: var(--ink-soft);
-  }
-  .refresh-btn {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--sunrise);
-    background: none;
-    border: none;
-    padding: 6px 4px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-  }
-  .refresh-btn svg { width: 13px; height: 13px; }
-  .refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ---------- SECTIONS ---------- */
-  .section {
-    padding: 6px 20px 22px;
-  }
-  .section-head {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin: 18px 0 10px;
-  }
-  .section-head .rule {
-    flex: 1;
-    height: 1px;
-    background: var(--rule-strong);
-  }
-  .section-label {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: var(--ink);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 2px;
   }
-  .section-label.tier-top30 { color: var(--sage); }
-  .section-label.tier-top31-50 { color: var(--gold); }
-  .section-label.tier-top51-75 { color: var(--sunrise); }
-  .section-label.tier-watch { color: var(--clay); }
+  .card-lead-headline a { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .card-lead-headline a:hover { color: var(--teal); text-decoration: underline; }
 
-  /* ---------- ENTRY ---------- */
-  .entry {
-    padding: 14px 0;
-    border-bottom: 1px solid var(--rule);
-    background: #FFFFFF;
+  /* Collapsible Drawer inside Bento Card */
+  .card-details {
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+    margin-top: auto;
   }
-  .entry:last-child { border-bottom: none; }
-  .entry-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 2px;
-  }
-  .entry-head-badge-only {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 2px;
-    min-height: 1px;
-  }
-  .entry-name {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.3;
-  }
-  .entry-ticker {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 10px;
+  .card-details summary {
+    font-size: 11.5px;
+    font-weight: 700;
     color: var(--ink-soft);
-    letter-spacing: 0.3px;
-    margin-left: 6px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
   }
-
-  .price-ribbon {
+  .card-details summary:hover { color: var(--teal); }
+  .card-details summary::-webkit-details-marker { display: none; }
+  .card-details summary::before { content: '▸ '; font-size: 11px; margin-right: 4px; }
+  .card-details[open] summary::before { content: '▾ '; }
+  .card-details-body {
+    padding-top: 10px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 8px;
-    padding: 10px 14px;
-    border-radius: 9px;
+  }
+  .spec-line {
+    font-family: 'SF Mono', monospace;
+    font-size: 11.5px;
     color: var(--ink);
-  }
-  .price-ribbon.ribbon-pos { background: #FFFFFF; border-left: 4px solid var(--sage); }
-  .price-ribbon.ribbon-neg { background: #FFFFFF; border-left: 4px solid var(--clay); }
-  .price-ribbon.ribbon-neu { background: #FFFFFF; border-left: 4px solid var(--rule-strong); }
-  .ribbon-name-row {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .ribbon-name {
-    font-family: 'Georgia', serif;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ink);
-    line-height: 1.25;
-  }
-  .ribbon-data-row {
-    display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 6px 8px;
+    align-items: center;
+    background: var(--surface-soft);
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
   }
-  .ribbon-price {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-  }
-  .ribbon-change {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 16px;
-    font-weight: 700;
-    opacity: 0.95;
-  }
-  .ribbon-code {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    background: var(--paper-dim);
-    padding: 3px 8px;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-  .ribbon-flag {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 100px;
-    background: var(--paper-dim);
-    white-space: nowrap;
-  }
-  .ribbon-fund-btn, .ribbon-roce-btn {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 100px;
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    color: var(--ink);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .ribbon-fund-btn:disabled, .ribbon-roce-btn:disabled { opacity: 0.6; }
-  .ribbon-fund-pill {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 5px;
-    background: var(--paper-dim);
-    color: var(--ink);
-    white-space: nowrap;
-    cursor: help;
-  }
-  .ribbon-fund-pill.ribbon-fund-error {
-    font-family: -apple-system, system-ui, sans-serif;
-    background: var(--rule);
-  }
-  .entry-badge {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    padding: 3px 7px;
-    border-radius: 4px;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .entry-badge.fresh { background: var(--sunrise-dim); color: var(--sunrise); }
-  .entry-badge.sent-badge-negative { background: var(--clay-dim); color: var(--clay); }
-  .entry-badge.sent-badge-positive { background: var(--sage-dim); color: var(--sage); }
-
-  .headline {
-    font-size: 14.5px;
-    line-height: 1.5;
-    color: var(--ink);
-    margin-top: 6px;
-  }
-  .headline a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
-
-  .article-meta {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 10.5px;
-    color: var(--ink-soft);
-    margin-top: 4px;
-  }
-
-  .more-articles {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
-    color: var(--ink-soft);
-    margin-top: 8px;
-  }
-  .more-articles .sub-headline {
-    font-family: 'Georgia', serif;
-    font-size: 13px;
-    color: var(--ink);
-    margin-top: 6px;
-    line-height: 1.4;
-  }
-
-  .quiet {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12.5px;
-    color: var(--ink-soft);
-    font-style: italic;
-    margin-top: 6px;
-  }
-
-  /* ---------- EMPTY / LOADING ---------- */
-  .empty-state {
-    text-align: center;
-    padding: 70px 30px;
-    color: var(--ink-soft);
-  }
-  .empty-state .glyph { font-size: 32px; margin-bottom: 14px; opacity: 0.5; }
-  .empty-state h3 { font-family: -apple-system, system-ui, sans-serif; font-size: 15px; color: var(--ink); margin-bottom: 6px; font-weight: 600; }
-  .empty-state p { font-family: -apple-system, system-ui, sans-serif; font-size: 12.5px; line-height: 1.6; max-width: 280px; margin: 0 auto; }
-
-  .skeleton-entry {
-    padding: 14px 0;
-    border-bottom: 1px solid var(--rule);
-  }
-  .skel-line {
-    height: 12px;
-    background: linear-gradient(90deg, var(--rule) 0%, var(--paper-dim) 50%, var(--rule) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-    border-radius: 3px;
-    margin-bottom: 8px;
-  }
-  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-  /* ---------- SINGLE-STOCK LOOKUP ---------- */
-  .lookup-bar {
-    padding: 4px 20px 14px;
-    position: relative;
-  }
-  .lookup-input-wrap {
+  .spec-sep { color: var(--border-strong); }
+  .card-actions-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    border: 1px solid var(--rule-strong);
-    border-radius: 10px;
-    padding: 10px 14px;
-    background: var(--paper-dim);
+    flex-wrap: wrap;
+    margin-top: 2px;
   }
-  .lookup-icon { width: 16px; height: 16px; color: var(--ink-soft); flex-shrink: 0; }
-  .lookup-input {
-    border: none;
-    background: none;
-    outline: none;
+
+  .ribbon-fund-btn, .ribbon-roce-btn {
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--teal-soft);
+    border: 1px solid #BEE3DB;
+    color: var(--teal-dark);
+    cursor: pointer;
     width: 100%;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 14px;
+  }
+  .ribbon-fund-btn:disabled { opacity: 0.6; }
+  .ribbon-fund-pill {
+    font-family: 'SF Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--surface-soft);
     color: var(--ink);
+    white-space: nowrap;
   }
-  .lookup-input::placeholder { color: var(--ink-soft); }
+  .ribbon-fund-pill.ribbon-fund-error { background: var(--rose-bg); color: var(--rose); font-family: inherit; }
 
-  .lookup-suggestions {
-    position: absolute;
-    left: 20px; right: 20px;
-    top: 100%;
-    background: var(--paper);
-    border: 1px solid var(--rule-strong);
-    border-radius: 10px;
-    margin-top: 4px;
-    box-shadow: 0 6px 18px rgba(28,27,25,0.12);
-    z-index: 25;
-    overflow: hidden;
-    display: none;
-  }
-  .lookup-suggestions.open { display: block; }
-  .suggestion-item {
-    padding: 11px 14px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 13.5px;
-    border-bottom: 1px solid var(--rule);
-    display: flex;
-    justify-content: space-between;
+  .ribbon-ai-btn {
+    display: inline-flex;
     align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--violet);
+    background: var(--violet-bg);
+    border: 1px solid var(--violet-border);
+    border-radius: 8px;
+    cursor: pointer;
   }
-  .suggestion-item:last-child { border-bottom: none; }
-  .suggestion-item:active { background: var(--paper-dim); }
-  .suggestion-name { color: var(--ink); }
-  .suggestion-ticker { color: var(--ink-soft); font-family: 'SF Mono', monospace; font-size: 11px; }
-  .suggestion-empty { padding: 14px; font-family: -apple-system, system-ui, sans-serif; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+  .ribbon-ai-btn:disabled { opacity: 0.6; cursor: wait; }
 
-  .movers-summary {
-    margin: 0 20px 14px;
-    padding: 12px 16px;
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 12px;
-    font-family: -apple-system, system-ui, sans-serif;
+  .ai-briefing-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #FFFFFF;
+    background: linear-gradient(135deg, var(--violet) 0%, #4F46E5 100%);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
   }
-  .movers-counts {
-    display: flex;
-    gap: 16px;
+  .ai-briefing-card {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: var(--violet-bg);
+    border: 1px solid var(--violet-border);
+    border-radius: 10px;
     font-size: 12.5px;
-    margin-bottom: 8px;
+    line-height: 1.5;
   }
-  .movers-counts .count-up { color: var(--sage); font-weight: 700; }
-  .movers-counts .count-down { color: var(--clay); font-weight: 700; }
-  .movers-counts .count-flat { color: var(--ink-soft); font-weight: 700; }
-  .movers-best-worst {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--ink-soft);
+  .ai-b-row { margin-bottom: 6px; }
+  .ai-b-row:last-child { margin-bottom: 0; }
+
+  .article-meta { font-size: 10.5px; color: var(--ink-muted); margin-top: 2px; }
+  .more-articles .sub-headline { font-size: 12.5px; color: var(--ink); margin-top: 4px; line-height: 1.4; }
+  .quiet { font-size: 12px; color: var(--ink-muted); font-style: italic; }
+
+  /* ---------- SINGLE-STOCK LOOKUP CARD ---------- */
+  .lookup-result-card {
+    margin: 0 0 16px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1.5px solid var(--teal);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
   }
-  .movers-best-worst span.name { color: var(--ink); font-weight: 600; }
-  .movers-best-worst .mover-up span.pct { color: var(--sage); font-weight: 700; }
-  .movers-best-worst .mover-down span.pct { color: var(--clay); font-weight: 700; }
+  .lookup-result-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .lookup-result-title { font-size: 16px; font-weight: 800; }
+  .lookup-close { font-size: 12px; font-weight: 700; color: var(--ink-soft); background: var(--bg); border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .lookup-loading { font-size: 13px; color: var(--ink-soft); padding: 8px 0; }
 
   .fundamentals-toggle-btn {
     display: block;
     width: 100%;
-    margin-top: 12px;
+    margin-top: 10px;
     padding: 9px 12px;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: inherit;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--ink);
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 8px;
+    font-weight: 700;
+    color: var(--teal-dark);
+    background: var(--teal-soft);
+    border: 1px solid #BEE3DB;
+    border-radius: 10px;
     cursor: pointer;
   }
   .fundamentals-panel {
     margin-top: 10px;
     padding: 12px 14px;
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 9px;
-    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
   }
   .fund-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 6px 0;
-    border-bottom: 1px solid var(--rule);
-    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
   }
   .fund-row:last-of-type { border-bottom: none; }
-  .fund-label { color: var(--ink-soft); }
-  .fund-val { font-family: 'SF Mono', 'Courier New', monospace; font-weight: 600; color: var(--ink); }
-  .fund-caveat {
-    font-size: 11px;
-    cursor: help;
-    color: var(--gold);
-    margin-left: 3px;
-  }
-  .fund-note {
-    margin-top: 8px;
-    font-size: 10.5px;
-    color: var(--ink-soft);
-    font-style: italic;
-    line-height: 1.4;
-  }
+  .fund-label { color: var(--ink-soft); font-weight: 500; }
+  .fund-val { font-family: 'SF Mono', monospace; font-weight: 700; color: var(--ink); }
+  .fund-caveat { font-size: 10px; color: var(--amber); margin-left: 3px; }
+  .fund-note { margin-top: 8px; font-size: 11px; color: var(--ink-muted); font-style: italic; }
 
-  .lookup-result-card {
-    margin: 0 20px 18px;
-    padding: 16px 18px;
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 12px;
-  }
-  .lookup-result-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 4px;
-  }
-  .lookup-result-title { font-size: 16px; font-weight: 600; }
-  .lookup-close {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
+  /* ---------- EMPTY / LOADING ---------- */
+  .empty-state {
+    text-align: center;
+    padding: 64px 24px;
     color: var(--ink-soft);
-    background: none;
-    border: none;
-    padding: 4px 8px;
-    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
   }
-  .lookup-loading {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12.5px;
-    color: var(--ink-soft);
-    padding: 10px 0 2px;
-  }
+  .empty-state .glyph { font-size: 32px; margin-bottom: 12px; opacity: 0.6; }
+  .empty-state h3 { font-size: 16px; color: var(--ink); margin-bottom: 6px; font-weight: 700; }
+  .empty-state p { font-size: 13px; line-height: 1.55; max-width: 320px; margin: 0 auto; }
 
-  /* ---------- SETTINGS PANEL ---------- */
+  .skeleton-entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+  .skel-line {
+    height: 12px;
+    background: linear-gradient(90deg, var(--border) 0%, var(--surface-soft) 50%, var(--border) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ---------- SETTINGS PANEL & MODALS ---------- */
   .settings-overlay {
     position: fixed; inset: 0;
-    background: rgba(28,27,25,0.4);
+    background: rgba(15, 36, 32, 0.45);
+    backdrop-filter: blur(4px);
     z-index: 50;
     display: none;
   }
@@ -845,31 +1278,23 @@
   .settings-panel {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: var(--paper);
-    border-radius: 18px 18px 0 0;
-    padding: 20px 22px 36px;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    padding: 22px 24px 36px;
     z-index: 51;
-    font-family: -apple-system, system-ui, sans-serif;
-    max-height: 80vh;
+    max-height: 82vh;
     overflow-y: auto;
     transform: translateY(100%);
     transition: transform 0.25s ease;
+    max-width: 680px;
+    margin: 0 auto;
   }
   .settings-overlay.open .settings-panel { transform: translateY(0); }
-  .settings-panel h2 {
-    font-family: 'Georgia', serif;
-    font-size: 19px;
-    margin-bottom: 4px;
-  }
-  .settings-panel .hint {
-    font-size: 12px;
-    color: var(--ink-soft);
-    margin-bottom: 18px;
-    line-height: 1.5;
-  }
+  .settings-panel h2 { font-size: 19px; font-weight: 800; margin-bottom: 4px; }
+  .settings-panel .hint { font-size: 12px; color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
   .field-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--ink-soft);
@@ -879,87 +1304,73 @@
   }
   .field-input, .field-textarea {
     width: 100%;
-    border: 1px solid var(--rule-strong);
-    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
     padding: 10px 12px;
-    font-size: 14px;
+    font-size: 13.5px;
     font-family: inherit;
-    background: var(--paper-dim);
+    background: var(--surface-soft);
     color: var(--ink);
   }
   .field-textarea { min-height: 90px; resize: vertical; }
-  .field-input:focus, .field-textarea:focus { outline: 2px solid var(--sunrise); outline-offset: 1px; }
+  .field-input:focus, .field-textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; background: #fff; }
 
   .btn-row { display: flex; gap: 10px; margin-top: 22px; }
   .btn {
     flex: 1;
     padding: 12px;
-    border-radius: 9px;
+    border-radius: 10px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     border: none;
     font-family: inherit;
     cursor: pointer;
   }
-  .btn-primary { background: var(--ink); color: var(--paper); }
-  .btn-secondary { background: var(--paper-dim); color: var(--ink); border: 1px solid var(--rule-strong); }
+  .btn-primary { background: var(--teal); color: #FFFFFF; }
+  .btn-secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--border-strong); }
 
   .close-x {
     position: absolute;
     top: 16px; right: 18px;
-    font-size: 22px;
+    font-size: 20px;
     color: var(--ink-soft);
-    line-height: 1;
-    background: none;
+    background: var(--bg);
+    width: 32px; height: 32px;
+    border-radius: 50%;
     border: none;
     cursor: pointer;
   }
 
-  .csv-upload-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
+  .csv-upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .btn-upload {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 7px;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: inherit;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--ink);
-    background: var(--paper-dim);
-    border: 1px solid var(--rule-strong);
-    border-radius: 8px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
     padding: 9px 14px;
     cursor: pointer;
   }
   .btn-upload svg { width: 15px; height: 15px; }
-  .csv-filename {
-    font-size: 11.5px;
-    color: var(--sage);
-    font-weight: 600;
-  }
-  .csv-hint {
-    font-size: 11px;
-    color: var(--ink-soft);
-    margin-top: 8px;
-    line-height: 1.5;
-  }
+  .csv-filename { font-size: 12px; color: var(--emerald); font-weight: 700; }
+  .csv-hint { font-size: 11px; color: var(--ink-muted); margin-top: 6px; }
 
-  /* ---------- BOTTOM NAV / FAB ---------- */
   .fab {
     position: fixed;
     bottom: 22px; right: 20px;
     width: 52px; height: 52px;
     border-radius: 50%;
     background: var(--ink);
-    color: var(--paper);
+    color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 14px rgba(28,27,25,0.25);
+    box-shadow: 0 6px 18px rgba(15, 36, 32, 0.28);
     border: none;
     z-index: 30;
     cursor: pointer;
@@ -970,10 +1381,9 @@
     position: fixed;
     bottom: 0; left: 0; right: 0;
     background: var(--ink);
-    color: var(--paper);
+    color: #FFFFFF;
     padding: 14px 20px;
     padding-bottom: max(14px, env(safe-area-inset-bottom));
-    font-family: -apple-system, system-ui, sans-serif;
     font-size: 12.5px;
     display: none;
     align-items: center;
@@ -983,327 +1393,164 @@
   }
   .install-banner.show { display: flex; }
   .install-banner button {
-    background: var(--sunrise);
-    color: var(--paper);
+    background: var(--teal);
+    color: #FFFFFF;
     border: none;
     padding: 8px 14px;
-    border-radius: 7px;
+    border-radius: 8px;
     font-size: 12px;
-    font-weight: 600;
-    font-family: inherit;
-    white-space: nowrap;
+    font-weight: 700;
     cursor: pointer;
   }
-  .install-banner .dismiss {
-    background: none;
-    color: var(--paper);
-    opacity: 0.6;
-    padding: 8px;
-    font-size: 16px;
-    cursor: pointer;
-  }
+  .install-banner .dismiss { background: none; color: #FFFFFF; opacity: 0.7; padding: 8px; font-size: 16px; }
 
   .kite-status {
     margin-top: 10px;
     padding: 10px 12px;
-    border-radius: 8px;
-    font-family: -apple-system, system-ui, sans-serif;
+    border-radius: 10px;
     font-size: 12px;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
   }
-  .kite-status-info { background: var(--paper-dim); color: var(--ink-soft); border: 1px solid var(--rule); }
-  .kite-status-error { background: var(--clay-dim); color: var(--clay); border: 1px solid var(--clay); }
-  .kite-status-success { background: var(--sage-dim); color: var(--sage); border: 1px solid var(--sage); }
+  .kite-status-info { background: var(--surface-soft); color: var(--ink-soft); border: 1px solid var(--border); }
+  .kite-status-error { background: var(--rose-bg); color: var(--rose); border: 1px solid var(--rose-border); }
+  .kite-status-success { background: var(--emerald-bg); color: var(--emerald); border: 1px solid var(--emerald-border); }
 
-  .price-up   { color: #1A7A3C !important; font-weight: 800 !important; }
-  .price-down { color: #B03A2E !important; font-weight: 800 !important; }
-
-  /* ---------- CRISP UI (IDEAS 1 & 3) ---------- */
-  .compact-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--rule);
-    background: var(--paper);
-    flex-wrap: wrap;
-  }
-  .ctrl-select {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--rule-strong);
-    background: var(--paper-dim);
-    color: var(--ink);
-    cursor: pointer;
-    outline: none;
-  }
-  .ctrl-select:focus {
-    border-color: var(--ink);
-  }
-  .trend-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 10px 20px 6px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    background: var(--paper);
-  }
-  .trend-toolbar::-webkit-scrollbar { display: none; }
-  .trend-label {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--ink-soft);
-    flex-shrink: 0;
-  }
-
-  /* Crisp Stock Card (Progressive Disclosure) */
-  .entry {
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    border: 1px solid var(--rule);
-    border-radius: 10px;
-    background: #FFFFFF;
-    box-shadow: 0 1px 3px rgba(28, 27, 25, 0.03);
-  }
-  .entry.ribbon-pos-card { border-left: 4px solid var(--sage); }
-  .entry.ribbon-neg-card { border-left: 4px solid var(--clay); }
-  .entry.ribbon-neu-card { border-left: 4px solid var(--rule-strong); }
-
-  .card-top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .card-title-group {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-  }
-  .card-price-group {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-  .card-ltp {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--ink);
-  }
-  .card-chg {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .card-meta-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-  }
-  .card-pnl-inline {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 11px;
-    color: var(--ink-soft);
-    margin-left: auto;
-  }
-
-  .card-lead-headline {
-    font-size: 13.5px;
-    line-height: 1.4;
-    color: var(--ink);
-    margin-top: 8px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .card-lead-headline a {
-    color: var(--ink);
-    text-decoration: none;
-  }
-  .card-lead-headline a:hover {
-    text-decoration: underline;
-  }
-
-  .card-details {
-    margin-top: 8px;
-    border-top: 1px dashed var(--rule);
-    padding-top: 6px;
-    font-family: -apple-system, system-ui, sans-serif;
-  }
-  .card-details summary {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--ink-soft);
-    cursor: pointer;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    user-select: none;
-    padding: 2px 0;
-  }
-  .card-details summary::-webkit-details-marker { display: none; }
-  .card-details summary::before {
-    content: '▸ ';
-    font-size: 11px;
-    margin-right: 4px;
-  }
-  .card-details[open] summary::before {
-    content: '▾ ';
-  }
-  .card-details-body {
-    padding-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .spec-line {
-    font-family: 'SF Mono', 'Courier New', monospace;
-    font-size: 11.5px;
-    color: var(--ink);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    align-items: center;
-    background: var(--paper);
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--rule);
-  }
-  .spec-sep { color: var(--rule-strong); }
-  .card-actions-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 2px;
-  }
-
+  .price-up   { color: var(--emerald) !important; font-weight: 800 !important; }
+  .price-down { color: var(--rose) !important; font-weight: 800 !important; }
 </style>
 </head>
 <body>
 
-<div class="masthead">
-  <div class="eyebrow">Issued before market open - <span style="opacity:0.6">build v51 (PAT & Cash Filters)</span></div>
-  <h1>The Morning Ledger</h1>
-  <div class="dateline">
-    <span id="dateline-date">—</span>
-    <span class="dot"></span>
-    <span id="dateline-status">Tap refresh to fetch today's news</span>
+<header class="top-header">
+  <div class="header-inner">
+    <div class="brand-wrap">
+      <div class="brand-logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>The Morning Ledger</h1>
+        <div class="brand-sub">
+          <span id="dateline-date">—</span>
+          <span class="dot"></span>
+          <span id="dateline-status">Tap refresh to fetch news</span>
+          <span class="build-tag">v52 · Bento</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lookup-bar">
+      <div class="lookup-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="lookup-input" class="lookup-input" placeholder="Search stock — e.g. AARTIIND, CAMS, STLTECH..." autocomplete="off">
+      </div>
+      <div id="lookup-suggestions" class="lookup-suggestions"></div>
+    </div>
+
+    <div class="header-actions">
+      <button class="pill-btn pill-cues" id="global-cues-btn"><span>🌐 Global Cues</span></button>
+      <button class="pill-btn pill-garp" id="bulk-garp-btn"><span>🤖 GARP Auto-Audit</span></button>
+    </div>
   </div>
-</div>
+</header>
 
-<div id="global-cues-container" style="display: none;"></div>
+<main class="app-shell">
 
-<!-- Interactive Portfolio Analytics & Pie Chart Container -->
-<div id="portfolio-analytics-container" style="display: none;"></div>
-<div id="portfolio-drilldown-container" style="display: none; margin: 10px 20px 20px;"></div>
-
-<div class="compact-controls">
-  <select id="sort-select" class="ctrl-select" aria-label="Sort stocks">
-    <option value="garp-desc" selected>Sort: GARP ↓</option>
-    <option value="garp-asc">Sort: GARP ↑</option>
-    <option value="peg-asc">Sort: PEG ↑</option>
-    <option value="peg-desc">Sort: PEG ↓</option>
-    <option value="pat-desc">Sort: PAT ↓</option>
-    <option value="pat-asc">Sort: PAT ↑</option>
-    <option value="change-desc">Sort: % Chg ↓</option>
-    <option value="change-asc">Sort: % Chg ↑</option>
-    <option value="default">Sort: A–Z</option>
-  </select>
-  <select id="filter-select" class="ctrl-select" aria-label="Filter holdings">
-    <option value="all" selected>All holdings</option>
-    <option value="fresh">Fresh news only</option>
-    <option value="strong-cash">💰 Strong Cash (≥70%)</option>
-    <option value="weak-cash">⚠️ Weak Cash (&lt;50%)</option>
-    <option value="capex-heavy">🏗️ Capex Heavy</option>
-    <option value="active-cwip">🏭 Active Expansion (CWIP ≥15%)</option>
-  </select>
-  <select id="sentiment-select" class="ctrl-select" aria-label="Filter sentiment">
-    <option value="all" selected>All tone</option>
-    <option value="negative">⚠ Negative</option>
-    <option value="positive">✓ Positive</option>
-  </select>
-  <button class="chip" id="analytics-toggle-chip" style="margin-left:auto;">📊 Analytics</button>
-</div>
-
-<div id="filterHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; padding:6px 20px; line-height:1.4; background:var(--paper-dim); border-bottom:1px solid var(--rule);"></div>
-
-<div class="trend-toolbar">
-  <button class="chip active" data-trend="all">All</button>
-  <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Buys</button>
-  <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Trim/Exits</button>
-  <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend</button>
-  <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy</button>
-  <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ &lt;200D</button>
-</div>
-<div id="trendHint" style="display:none; color:#5B7553; font-size:12px; font-style:italic; padding:2px 20px 8px; line-height:1.4; border-bottom:1px solid var(--rule);"></div>
-<div id="filterCountBar" style="display:none; font-family:-apple-system,system-ui,sans-serif; font-size:11.5px; font-weight:600; color:var(--ink-soft); padding:6px 20px; background:var(--paper-dim); border-bottom:1px solid var(--rule);"></div>
-
-<div class="refresh-bar" style="padding-bottom:4px; flex-wrap:wrap; gap:6px;">
-  <div style="display:flex; gap:12px; flex-wrap:wrap;">
-    <button class="refresh-btn" id="global-cues-btn">
-      <span>🌐 Global Cues</span>
-    </button>
-    <button class="refresh-btn" id="bulk-garp-btn" style="color:var(--sage);">
-      <span>🤖 GARP Auto-Audit All</span>
-    </button>
+  <!-- Slim Sync & Status Strip -->
+  <div class="sync-strip">
+    <div class="sync-group">
+      <div class="sync-item">
+        <button class="refresh-btn" id="refresh-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+          <span id="refresh-label">Fetch today's news</span>
+        </button>
+        <span class="status" id="refresh-status">Not yet fetched today</span>
+      </div>
+      <div class="sync-item">
+        <button class="refresh-btn" id="price-refresh-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span id="price-refresh-label">Fetch latest prices</span>
+        </button>
+        <span class="status" id="price-status">Prices: tap to fetch</span>
+      </div>
+    </div>
+    <span class="status" id="garp-audit-status">Last audit: never</span>
   </div>
-  <span class="status" id="garp-audit-status">Last audit: never</span>
-</div>
 
-<div class="refresh-bar" style="justify-content:flex-start; gap:12px; flex-wrap:wrap; padding-bottom:4px;">
-  <button class="refresh-btn" id="refresh-btn">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
-    <span id="refresh-label">Fetch today's news</span>
-  </button>
-  <span class="status" id="refresh-status">Not yet fetched today</span>
-</div>
-
-<div class="refresh-bar" style="justify-content:flex-start; gap:12px; flex-wrap:wrap; padding-top:0;">
-  <button class="refresh-btn" id="price-refresh-btn">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-    <span id="price-refresh-label">Fetch latest prices</span>
-  </button>
-  <span class="status" id="price-status">Prices: tap to fetch (via Yahoo Finance, no login needed)</span>
-</div>
-
-<div class="lookup-bar">
-  <div class="lookup-input-wrap">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-    <input type="text" id="lookup-input" class="lookup-input" placeholder="Look up one stock — e.g. AARTIIND or Aarti Industries" autocomplete="off">
+  <!-- Live Animated GARP Audit Progress Bar -->
+  <div id="garp-progress-wrap" class="garp-progress-wrap">
+    <div class="garp-progress-head">
+      <span id="garp-progress-text">Auditing portfolio fundamentals…</span>
+      <span id="garp-progress-pct">0%</span>
+    </div>
+    <div class="garp-progress-track">
+      <div id="garp-progress-fill" class="garp-progress-fill"></div>
+    </div>
   </div>
-  <div id="lookup-suggestions" class="lookup-suggestions"></div>
-</div>
 
-<div id="lookup-result"></div>
+  <div id="global-cues-container" style="display: none;"></div>
+  <div id="lookup-result"></div>
 
-<div id="movers-summary"></div>
+  <!-- Design 2: Asymmetric Bento Portfolio Overview + Action Radar -->
+  <div id="portfolio-analytics-container" style="display: block;"></div>
+  <div id="portfolio-drilldown-container" style="display: none; margin: 0 0 16px;"></div>
 
-<div id="content">
-  <div class="empty-state">
-    <div class="glyph">☀︎</div>
-    <h3>Good morning.</h3>
-    <p>Tap "Fetch today's news" above to pull the latest headlines for every stock in your portfolio before the market opens.</p>
+  <!-- Compact Filter & Sort Rail -->
+  <div class="controls-card">
+    <div class="compact-controls">
+      <select id="sort-select" class="ctrl-select" aria-label="Sort stocks">
+        <option value="garp-desc" selected>Sort: GARP ↓</option>
+        <option value="garp-asc">Sort: GARP ↑</option>
+        <option value="peg-asc">Sort: PEG ↑</option>
+        <option value="peg-desc">Sort: PEG ↓</option>
+        <option value="pat-desc">Sort: PAT ↓</option>
+        <option value="pat-asc">Sort: PAT ↑</option>
+        <option value="change-desc">Sort: % Chg ↓</option>
+        <option value="change-asc">Sort: % Chg ↑</option>
+        <option value="default">Sort: A–Z</option>
+      </select>
+      <select id="filter-select" class="ctrl-select" aria-label="Filter holdings">
+        <option value="all" selected>All holdings</option>
+        <option value="fresh">Fresh news only</option>
+        <option value="strong-cash">💰 Strong Cash (≥70%)</option>
+        <option value="weak-cash">⚠️ Weak Cash (&lt;50%)</option>
+        <option value="capex-heavy">🏗️ Capex Heavy</option>
+        <option value="active-cwip">🏭 Active Expansion (CWIP ≥15%)</option>
+      </select>
+      <select id="sentiment-select" class="ctrl-select" aria-label="Filter sentiment">
+        <option value="all" selected>All tone</option>
+        <option value="negative">⚠ Negative</option>
+        <option value="positive">✓ Positive</option>
+      </select>
+      <button class="chip active" id="analytics-toggle-chip" style="margin-left:auto;">📊 Overview</button>
+    </div>
+
+    <div class="trend-toolbar">
+      <button class="chip active" data-trend="all">All</button>
+      <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Buys</button>
+      <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Trim/Exits</button>
+      <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend</button>
+      <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy</button>
+      <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ &lt;200D</button>
+    </div>
   </div>
-</div>
+
+  <div id="filterHint" class="hint-banner"></div>
+  <div id="trendHint" class="hint-banner"></div>
+  <div id="filterCountBar" class="count-banner"></div>
+
+  <div id="movers-summary"></div>
+
+  <div id="content">
+    <div class="empty-state">
+      <div class="glyph">☀︎</div>
+      <h3>Good morning.</h3>
+      <p>Tap "Fetch today's news" above to pull the latest headlines and prices for every stock in your portfolio before the market opens.</p>
+    </div>
+  </div>
+
+</main>
 
 <button class="fab" id="settings-fab" aria-label="Settings">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1337,22 +1584,22 @@
 SHRIRAMFIN,Shriram Finance,Top30
 AARTIIND,Aarti Industries,Top31-50"></textarea>
 
-    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--rule)">
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border)">
       <div class="field-label" style="margin-top:0">Your backend (required for news + Kite login)</div>
       <div class="hint" style="margin-bottom:12px">
        See <code>kite_backend/README.md</code> for setup
       </div>
-      <label class="field-label">Your backend URL</label>https://kite-portfolio.onrender.com
+      <label class="field-label">Your backend URL</label>
       <input type="text" id="kite-backend-url-input" class="field-input" default="https://kite-portfolio.onrender.com" placeholder="e.g. https://your-app.onrender.com" autocomplete="on" style="margin-bottom:10px">
     </div>
 
-      <label class="field-label">Kite Connect API Key </label>av7jcofmfblpij52
-      <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="on" style="margin-bottom:10px" default="av7jcofmfblpij52">
-      <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-        Log in to Kite &amp; import holdings
-      </button>
-      <div id="kite-status" class="kite-status" style="display:none"></div>
+    <label class="field-label">Kite Connect API Key</label>
+    <input type="text" id="kite-api-key-input" class="field-input" placeholder="e.g. abcdefghijklmnop" autocomplete="on" style="margin-bottom:10px" default="av7jcofmfblpij52">
+    <button class="btn-upload" id="kite-import-btn" style="width:100%;justify-content:center;gap:8px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Log in to Kite &amp; import holdings
+    </button>
+    <div id="kite-status" class="kite-status" style="display:none"></div>
     <div class="btn-row">
       <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
       <button class="btn btn-primary" id="settings-save">Save</button>
@@ -1361,53 +1608,45 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
 </div>
 
 <!-- GARP Engine Modal Overlay -->
-<div id="garp-overlay" class="overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
-  <div class="modal" style="background:var(--paper); padding:20px; border-radius:12px; width:90%; max-width:500px; max-height:85vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    <h2 id="garp-modal-title" style="margin-top:0;">GARP Audit Engine</h2>
+<div id="garp-overlay" class="overlay" style="display:none; position:fixed; inset:0; background:rgba(15,36,32,0.55); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center;">
+  <div class="modal" style="background:var(--surface); padding:22px; border-radius:18px; width:92%; max-width:500px; max-height:85vh; overflow-y:auto; box-shadow:0 16px 40px rgba(0,0,0,0.25);">
+    <h2 id="garp-modal-title" style="margin-top:0; font-size:18px; font-weight:800;">GARP Audit Engine</h2>
     <div class="quiet" style="margin-bottom:15px;">Evaluate fundamental gates to calculate Health Score</div>
     
-    <div id="garp-checklist" style="display:flex; flex-direction:column; gap:10px; padding-right: 5px;">
-      <!-- Gate 1 -->
+    <div id="garp-checklist" style="display:flex; flex-direction:column; gap:10px; padding-right: 5px; font-size:13px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>1. RoCE (≥ 18%)</label>
-        <select id="garp-g1" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">Pass (10 pts)</option><option value="0">Fail (0 pts)</option></select>
+        <select id="garp-g1" class="garp-input ctrl-select"><option value="10">Pass (10 pts)</option><option value="0">Fail (0 pts)</option></select>
       </div>
-      <!-- Gate 2 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>2. OPM Floor</label>
-        <select id="garp-g2" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">> 18% (10 pts)</option><option value="5">12-18% (5 pts)</option><option value="0">< 12% (0 pts)</option></select>
+        <select id="garp-g2" class="garp-input ctrl-select"><option value="10">&gt; 18% (10 pts)</option><option value="5">12-18% (5 pts)</option><option value="0">&lt; 12% (0 pts)</option></select>
       </div>
-      <!-- Gate 3 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>3. D/E Solvency</label>
-        <select id="garp-g3" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">Debt Free (10 pts)</option><option value="5">< 0.5x (5 pts)</option><option value="0">Breach (0 pts)</option></select>
+        <select id="garp-g3" class="garp-input ctrl-select"><option value="10">Debt Free (10 pts)</option><option value="5">&lt; 0.5x (5 pts)</option><option value="0">Breach (0 pts)</option></select>
       </div>
-      <!-- Gate 4 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>4. Order Book QoQ</label>
-        <select id="garp-g4" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">Expanding (10 pts)</option><option value="5">Stagnant (5 pts)</option><option value="0">Depleting (0 pts)</option></select>
+        <select id="garp-g4" class="garp-input ctrl-select"><option value="10">Expanding (10 pts)</option><option value="5">Stagnant (5 pts)</option><option value="0">Depleting (0 pts)</option></select>
       </div>
-      <!-- Gate 5 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>5. Book-to-Bill</label>
-        <select id="garp-g5" class="garp-input" style="padding:4px; border-radius:4px;"><option value="10">Strong ≥2x (10 pts)</option><option value="5">Mod 1.2-2x (5 pts)</option><option value="0">Low <1.2x (0 pts)</option></select>
+        <select id="garp-g5" class="garp-input ctrl-select"><option value="10">Strong ≥2x (10 pts)</option><option value="5">Mod 1.2-2x (5 pts)</option><option value="0">Low &lt;1.2x (0 pts)</option></select>
       </div>
-<!-- Gate 6-10 -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>6-10. Core Gates (Aggregated)</label>
-        <select id="garp-g6" class="garp-input" style="padding:4px; border-radius:4px;">
-            <option value="45">All Pass & P/E < 50 (45 pts)</option>
-            <option value="40">All Pass & P/E 50-75 (40 pts)</option>
-            <option value="35">Core Pass & P/E > 75 (35 pts)</option>
-            <option value="25">Mixed (25 pts)</option>
-            <option value="0">Fail (0 pts)</option>
+        <label>6-10. Core Gates</label>
+        <select id="garp-g6" class="garp-input ctrl-select">
+          <option value="45">All Pass &amp; P/E &lt; 50 (45 pts)</option>
+          <option value="40">All Pass &amp; P/E 50-75 (40 pts)</option>
+          <option value="35">Core Pass &amp; P/E &gt; 75 (35 pts)</option>
+          <option value="25">Mixed (25 pts)</option>
+          <option value="0">Fail (0 pts)</option>
         </select>
       </div>
-
-      <!-- FII/DII Flow -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <label>11. FII / DII Flow</label>
-        <select id="garp-g7" class="garp-input" style="padding:4px; border-radius:4px;">
+        <select id="garp-g7" class="garp-input ctrl-select">
           <option value="5">Accumulating (5 pts)</option>
           <option value="3">Domestic Absorbed (3 pts)</option>
           <option value="0">Dumping (0 pts)</option>
@@ -1415,18 +1654,19 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
       </div>
     </div>
 
-    <div style="margin-top:20px; padding:10px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; text-align:center;">
-      <div style="font-size:12px; color:var(--ink-soft); font-weight:600;">LIVE SCORE</div>
-      <div id="garp-live-score" style="font-size:26px; font-weight:bold; color:#5B7553;">100 / 100</div>
-      <div id="garp-status-label" style="font-size:14px; font-weight:bold; margin-top:5px; color:#5B7553;">ACCUMULATE_CORE</div>
+    <div style="margin-top:18px; padding:12px; background:var(--surface-soft); border:1px solid var(--border); border-radius:12px; text-align:center;">
+      <div style="font-size:11px; color:var(--ink-soft); font-weight:700; letter-spacing:0.6px;">LIVE SCORE</div>
+      <div id="garp-live-score" style="font-size:28px; font-weight:800; color:var(--emerald); font-family:'SF Mono',monospace;">100 / 100</div>
+      <div id="garp-status-label" style="font-size:13px; font-weight:800; margin-top:4px; color:var(--emerald);">ACCUMULATE_CORE</div>
     </div>
 
-    <div style="margin-top:20px; display:flex; gap:10px;">
-      <button id="garp-save-btn" style="flex:1; padding:10px; background:var(--sage); color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Save Score</button>
-      <button id="garp-close-btn" style="flex:1; padding:10px; background:#e9ecef; color:var(--ink); border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+    <div style="margin-top:18px; display:flex; gap:10px;">
+      <button id="garp-save-btn" class="btn btn-primary">Save Score</button>
+      <button id="garp-close-btn" class="btn btn-secondary">Cancel</button>
     </div>
   </div>
 </div>
+
 <script src="app.js"></script>
 </body>
 </html>

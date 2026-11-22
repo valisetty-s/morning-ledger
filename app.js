@@ -65,7 +65,7 @@ const DEFAULT_STOCKS = [
   ["ROSSTECH","Rossell Techsys","Top31-50",0,0],["RPEL","Raghav Productivity Enhancers","Top51-75",0,0],
   ["SAILIFE","Sai Life Sciences","Top31-50",0,0],["SANSERA","Sansera Engineering","Top31-50",0,0],
   ["SBCL","Shivalik Bimetal Controls","Top31-50",0,0],["SEDEMAC","SEDEMAC Mechatronics","Top31-50",0,0],
-  ["SETL","Standard Engineering Technology","Top31-50",0,0],["SETL","Standard Glass Lining Tech","Top31-50",0,0],
+  ["SETL","Standard Glass Lining Technology","Top31-50",0,0],["SJS","SJS Enterprises","Top31-50",0,0],
   ["SKYGOLD","Sky Gold Ltd","Top51-75",0,0],["STEELCAS","Steelcast Ltd","Top51-75",0,0],
   ["SUDEEPPHRM","Sudeep Pharma","Top31-50",0,0],["SUPRIYA","Supriya Lifescience","Top31-50",0,0],
   ["TANFACIND","Tanfac Industries","Top51-75",0,0],["TDPOWERSYS","TD Power Systems","Top31-50",0,0],
@@ -74,10 +74,10 @@ const DEFAULT_STOCKS = [
   ["VIKRAMTH","Vikram Thermo (India)","Top51-75",0,0],["WELCORP","Welspun Corp","Top51-75",0,0]
 ];
 const TIER_COLORS = {
-  "Top30":    "#5B7553",
-  "Top31-50": "#B8923F",
-  "Top51-75": "#C45A3E",
-  "Watch":    "#A4453A",
+  "Top30":    "#059669",
+  "Top31-50": "#4F46E5",
+  "Top51-75": "#D97706",
+  "Watch":    "#E11D48",
 };
 
 const SECTOR_COLORS = {
@@ -179,6 +179,7 @@ let currentSort = 'garp-desc';
 let currentTrend = 'all';
 let newsData = null;
 let currentAnalyticsMode = 'tier';
+let currentChartStyle = localStorage.getItem('ml_chart_style') || 'bar';
 let selectedSliceKey = null;
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
 let activeGarpTicker = null; 
@@ -230,7 +231,8 @@ function init() {
   const analyticsChip = $('#analytics-toggle-chip');
   if (analyticsChip) {
     analyticsChip.addEventListener('click', () => {
-      if (analyticsContainer.style.display === 'block') {
+      const isHidden = analyticsContainer.style.display === 'none';
+      if (!isHidden) {
         analyticsContainer.style.display = 'none';
         if (drilldownContainer) drilldownContainer.style.display = 'none';
         analyticsChip.classList.remove('active');
@@ -445,7 +447,7 @@ function renderPortfolioAnalytics() {
 
   const stocks = Store.getStocks();
   if (!stocks || stocks.length === 0) {
-    container.innerHTML = `<div class="analytics-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
+    container.innerHTML = `<div class="bento-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
     return;
   }
 
@@ -474,12 +476,31 @@ function renderPortfolioAnalytics() {
     let ltp = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote.last_price : avg;
     const currentVal = q > 0 ? (q * ltp) : 0;
     if (q > 0) totalCurrentVal += currentVal;
-    
+
     const sector = SECTOR_MAP[cleanT] || SECTOR_MAP[ticker] || "Other";
     const pnl = currentVal - invested;
     const pnlPct = invested > 0 ? ((pnl / invested) * 100) : 0;
 
     return { ticker, company, tier, qty: q, avgPrice: avg, invested, currentVal, ltp, sector, pnl, pnlPct };
+  });
+
+  // Compute live Action Radar counts
+  const radarSource = (newsData && newsData.results && newsData.results.length)
+    ? newsData.results
+    : stocks.map(([ticker, company, tier]) => ({ ticker, company, tier, quote: null }));
+
+  let buysCount = 0;
+  let exitsCount = 0;
+  let weakCashCount = 0;
+  let activeCwipCount = 0;
+
+  radarSource.forEach(s => {
+    const sig = getActionSignal(s, savedScores);
+    if (sig && sig.type === 'buy') buysCount++;
+    if (sig && sig.type === 'exit') exitsCount++;
+    const f = getCachedFundamentals(getCleanTicker(s.ticker));
+    if (f && f.cfo_to_ebitda != null && f.cfo_to_ebitda < 0.50) weakCashCount++;
+    if (f && f.cwip_ratio != null && f.cwip_ratio >= 0.15) activeCwipCount++;
   });
 
   const totalPnL = totalCurrentVal - totalInvested;
@@ -492,10 +513,10 @@ function renderPortfolioAnalytics() {
 
   if (currentAnalyticsMode === 'tier') {
     const tierMap = {
-      "Top30": { name: "✅ Accumulate", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
-      "Top31-50": { name: "🔵 Hold", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
-      "Top51-75": { name: "🟡 Trim", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
-      "Watch": { name: "🔴 Exit", val: 0, inv: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
+      "Top30": { name: "Accumulate", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
+      "Top31-50": { name: "Hold", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
+      "Top51-75": { name: "Trim", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
+      "Watch": { name: "Exit", val: 0, inv: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
     };
 
     enriched.forEach(item => {
@@ -523,7 +544,7 @@ function renderPortfolioAnalytics() {
     enriched.forEach(item => {
       const s = item.sector;
       if (!secMap[s]) {
-        secMap[s] = { name: s, val: 0, inv: 0, count: 0, color: SECTOR_COLORS[s] || "#8E735B", items: [] };
+        secMap[s] = { name: s, val: 0, inv: 0, count: 0, color: SECTOR_COLORS[s] || "#64748B", items: [] };
       }
       const weightVal = totalCurrentVal > 0 ? (item.currentVal || item.invested) : item.invested;
       secMap[s].val += weightVal;
@@ -562,12 +583,12 @@ function renderPortfolioAnalytics() {
       {
         key: "Top50", name: "Top 50 Holdings", val: top50Val, inv: top50Inv,
         pnl: top50Pnl, pnlPct: top50PnlPct, pnlContribution: totalPnL !== 0 ? (top50Pnl / totalPnL) * 100 : 0,
-        count: top50.length, pct: (top50Val / denominator) * 100, color: "#2E4057", items: top50
+        count: top50.length, pct: (top50Val / denominator) * 100, color: "#0F766E", items: top50
       },
       {
         key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
         pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#CBD5E1", items: rest
       }
     ];
 
@@ -590,12 +611,12 @@ function renderPortfolioAnalytics() {
       {
         key: "Top20Gainers", name: "Top 20 Gainers", val: topVal, inv: topInv,
         pnl: topPnl, pnlPct: topPnlPct, pnlContribution: totalPnL !== 0 ? (topPnl / totalPnL) * 100 : 0,
-        count: top20.length, pct: (topVal / denominator) * 100, color: "#5B7553", items: top20
+        count: top20.length, pct: (topVal / denominator) * 100, color: "#059669", items: top20
       },
       {
         key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
         pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#CBD5E1", items: rest
       }
     ];
 
@@ -618,12 +639,12 @@ function renderPortfolioAnalytics() {
       {
         key: "Top20Losers", name: "Top 20 Losers", val: botVal, inv: botInv,
         pnl: botPnl, pnlPct: botPnlPct, pnlContribution: totalPnL !== 0 ? (botPnl / totalPnL) * 100 : 0,
-        count: bot20.length, pct: (botVal / denominator) * 100, color: "#A4453A", items: bot20
+        count: bot20.length, pct: (botVal / denominator) * 100, color: "#E11D48", items: bot20
       },
       {
         key: "Rest", name: `Remaining (${rest.length})`, val: restVal, inv: restInv,
         pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#CBD5E1", items: rest
       }
     ];
 
@@ -643,14 +664,14 @@ function renderPortfolioAnalytics() {
 
     slices = [
       {
-        key: "Sub12", name: "⚠️ Sub-12% Growth Laggards", val: subVal, inv: subInv,
+        key: "Sub12", name: "Sub-12% Laggards", val: subVal, inv: subInv,
         pnl: subPnl, pnlPct: subPnlPct, pnlContribution: totalPnL !== 0 ? (subPnl / totalPnL) * 100 : 0,
-        count: sub12.length, pct: (subVal / denominator) * 100, color: "#A4453A", items: sub12
+        count: sub12.length, pct: (subVal / denominator) * 100, color: "#E11D48", items: sub12
       },
       {
         key: "Above12", name: "Normal/High Growth", val: aboveVal, inv: aboveInv,
         pnl: abovePnl, pnlPct: abovePnlPct, pnlContribution: totalPnL !== 0 ? (abovePnl / totalPnL) * 100 : 0,
-        count: above12.length, pct: (aboveVal / denominator) * 100, color: "#8E735B", items: above12
+        count: above12.length, pct: (aboveVal / denominator) * 100, color: "#0F766E", items: above12
       }
     ];
 
@@ -670,54 +691,90 @@ function renderPortfolioAnalytics() {
 
     slices = [
       {
-        key: "Super18", name: "🚀 Super Growth (>18%)", val: supVal, inv: supInv,
+        key: "Super18", name: "Super Growth (>18%)", val: supVal, inv: supInv,
         pnl: supPnl, pnlPct: supPnlPct, pnlContribution: totalPnL !== 0 ? (supPnl / totalPnL) * 100 : 0,
-        count: super18.length, pct: (supVal / denominator) * 100, color: "#048A81", items: super18
+        count: super18.length, pct: (supVal / denominator) * 100, color: "#059669", items: super18
       },
       {
         key: "Rest", name: `Other Holdings (${rest.length})`, val: restVal, inv: restInv,
         pnl: restPnl, pnlPct: restPnlPct, pnlContribution: totalPnL !== 0 ? (restPnl / totalPnL) * 100 : 0,
-        count: rest.length, pct: (restVal / denominator) * 100, color: "#C9BCA0", items: rest
+        count: rest.length, pct: (restVal / denominator) * 100, color: "#CBD5E1", items: rest
       }
     ];
   }
 
-  const svgSize = 190;
-  const strokeWidth = 32;
-  const radius = (svgSize - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  let accumulatedOffset = 0;
+  // Build either Horizontal Stacked Bar OR Interactive SVG Donut Chart
+  let allocationVisualHtml = '';
+  if (currentChartStyle === 'bar') {
+    const segsHtml = slices
+      .filter(s => s.pct > 0)
+      .map(s => `<div class="stacked-seg" data-slice-key="${escapeHtml(s.key)}" style="width:${Math.max(s.pct, 1.5).toFixed(2)}%; background:${s.color};" title="${escapeHtml(s.name)}: ₹${Math.round(s.val).toLocaleString('en-IN')} (${s.pct.toFixed(1)}%) — Tap to drill down"></div>`)
+      .join('');
 
-  const circlesHtml = slices.map((slice) => {
-    const strokeDash = (slice.pct / 100) * circumference;
-    const strokeOffset = -accumulatedOffset;
-    accumulatedOffset += strokeDash;
+    const pillsHtml = slices.map(s => `
+      <div class="bar-legend-pill" data-slice-key="${escapeHtml(s.key)}">
+        <span class="legend-swatch" style="background:${s.color}"></span>
+        <strong style="color:var(--ink);">${escapeHtml(s.name)}</strong>
+        <span style="font-family:'SF Mono',monospace; font-weight:700; color:var(--teal);">${s.pct.toFixed(1)}%</span>
+        <span style="color:var(--ink-muted); font-size:10.5px;">(${s.count})</span>
+      </div>
+    `).join('');
 
-    return `<circle cx="95" cy="95" r="${radius}" fill="transparent"
-      stroke="${slice.color}" stroke-width="${strokeWidth}"
-      stroke-dasharray="${strokeDash} ${circumference}"
-      stroke-dashoffset="${strokeOffset}"
-      data-slice-key="${escapeHtml(slice.key)}"
-      style="transition: stroke-dasharray 0.5s ease; cursor: pointer;">
-      <title>${slice.name}: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%) — Tap to reveal stocks</title>
-    </circle>`;
-  }).join('');
+    allocationVisualHtml = `
+      <div class="stacked-bar-track">${segsHtml}</div>
+      <div class="bar-legend-pills">${pillsHtml}</div>
+    `;
+  } else {
+    const svgSize = 176;
+    const strokeWidth = 28;
+    const radius = (svgSize - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    let accumulatedOffset = 0;
 
-  const legendHtml = slices.map(slice => `
-    <div class="legend-row" data-slice-key="${escapeHtml(slice.key)}" style="cursor: pointer;">
-      <div class="legend-left">
-        <span class="legend-swatch" style="background: ${slice.color}"></span>
-        <div>
-          <span class="legend-name">${escapeHtml(slice.name)}</span>
-          <span class="legend-count">${slice.count ? ` · ${slice.count} stocks (tap)` : ''}</span>
+    const circlesHtml = slices.map((slice) => {
+      const strokeDash = (slice.pct / 100) * circumference;
+      const strokeOffset = -accumulatedOffset;
+      accumulatedOffset += strokeDash;
+
+      return `<circle cx="88" cy="88" r="${radius}" fill="transparent"
+        stroke="${slice.color}" stroke-width="${strokeWidth}"
+        stroke-dasharray="${strokeDash} ${circumference}"
+        stroke-dashoffset="${strokeOffset}"
+        data-slice-key="${escapeHtml(slice.key)}"
+        style="transition: stroke-dasharray 0.45s ease; cursor: pointer;">
+        <title>${escapeHtml(slice.name)}: ₹${Math.round(slice.val).toLocaleString('en-IN')} (${slice.pct.toFixed(1)}%) — Tap to reveal stocks</title>
+      </circle>`;
+    }).join('');
+
+    const legendHtml = slices.map(slice => `
+      <div class="legend-row" data-slice-key="${escapeHtml(slice.key)}">
+        <div class="legend-left">
+          <span class="legend-swatch" style="background: ${slice.color}"></span>
+          <div>
+            <span class="legend-name">${escapeHtml(slice.name)}</span>
+            <span class="legend-count">${slice.count ? ` · ${slice.count}` : ''}</span>
+          </div>
+        </div>
+        <div class="legend-right">
+          <span class="legend-amt">₹${Math.round(slice.val).toLocaleString('en-IN')}</span>
+          <span>${slice.pct.toFixed(1)}%</span>
         </div>
       </div>
-      <div class="legend-right">
-        <span class="legend-amt">₹${Math.round(slice.val).toLocaleString('en-IN')}</span>
-        <span>${slice.pct.toFixed(1)}%</span>
+    `).join('');
+
+    allocationVisualHtml = `
+      <div class="chart-flex-wrap">
+        <div class="pie-svg-container">
+          <svg viewBox="0 0 176 176">${circlesHtml}</svg>
+          <div class="pie-center-hole">
+            <span class="pie-center-lbl">Stocks</span>
+            <span class="pie-center-val">${stocks.length}</span>
+          </div>
+        </div>
+        <div class="chart-legend">${legendHtml}</div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }
 
   const pnlCardsHtml = slices.map(slice => {
     const isPos = slice.pnl >= 0;
@@ -735,71 +792,107 @@ function renderPortfolioAnalytics() {
             ${sign}₹${Math.abs(Math.round(slice.pnl)).toLocaleString('en-IN')}
           </div>
           <div class="pnl-card-sub ${colorClass}">
-            ${sign}${slice.pnlPct.toFixed(1)}% ROI
+            ${sign}${slice.pnlPct.toFixed(1)}%
           </div>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-soft); margin-top: 5px; border-top: 1px dotted var(--rule); padding-top: 4px;">
-          <span>P&amp;L Share: <strong>${slice.pnlContribution ? slice.pnlContribution.toFixed(1) : '0.0'}%</strong></span>
-          <span>Val: <strong>${slice.pct.toFixed(1)}%</strong></span>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--ink-muted); margin-top:4px; border-top:1px dotted var(--border); padding-top:4px;">
+          <span>P&amp;L: <strong>${slice.pnlContribution ? slice.pnlContribution.toFixed(1) : '0.0'}%</strong></span>
+          <span>Wt: <strong>${slice.pct.toFixed(1)}%</strong></span>
         </div>
       </div>
     `;
   }).join('');
 
   container.innerHTML = `
-    <div class="analytics-card">
-      <div class="analytics-head" style="flex-wrap: wrap; gap: 8px;">
-        <span class="analytics-title">Portfolio Allocation &amp; P&amp;L Stats</span>
-        <div class="analytics-toggle-group" style="flex-wrap: wrap; gap: 4px;">
+    <div class="bento-top-grid">
+      <!-- Left Hero Portfolio Card -->
+      <div class="bento-card">
+        <div class="bento-card-head">
+          <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
+          <div class="chart-style-switch" role="group" aria-label="Chart display style">
+            <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
+            <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
+          </div>
+        </div>
+
+        <div class="hero-kpi-row">
+          <div>
+            <div class="hero-val-lbl">Portfolio Value</div>
+            <div class="hero-val-main">₹${Math.round(totalCurrentVal).toLocaleString('en-IN')}</div>
+          </div>
+          <div class="hero-sub-metrics">
+            <div>
+              <div class="hero-val-lbl">Total Invested</div>
+              <div class="hero-sub-val">₹${Math.round(totalInvested).toLocaleString('en-IN')}</div>
+            </div>
+            <div>
+              <div class="hero-val-lbl">Overall P&amp;L</div>
+              <div class="pnl-hero-pill ${pnlClass}">${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-toggle-group">
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'top50' ? 'active' : ''}" id="btn-chart-top50">Top 50</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20gainers' ? 'active' : ''}" id="btn-chart-top20gainers">Top 20 Gainers</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20losers' ? 'active' : ''}" id="btn-chart-top20losers">Top 20 Losers</button>
           <button class="chart-toggle-btn ${currentAnalyticsMode === 'sub12' ? 'active' : ''}" id="btn-chart-sub12">Sub-12% Growth</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'super18' ? 'active' : ''}" id="btn-chart-super18">Super Growth >18%</button>
+          <button class="chart-toggle-btn ${currentAnalyticsMode === 'super18' ? 'active' : ''}" id="btn-chart-super18">Super &gt;18%</button>
         </div>
+
+        ${allocationVisualHtml}
+
+        <details class="pnl-breakdown-details">
+          <summary>📊 Segregated P&amp;L Contribution (tap any slice to inspect stocks)</summary>
+          <div class="pnl-stats-grid">${pnlCardsHtml}</div>
+        </details>
       </div>
 
-      <div class="portfolio-stats-summary">
-        <div class="p-stat-box">
-          <div class="p-stat-lbl">Portfolio Value</div>
-          <div class="p-stat-val">₹${Math.round(totalCurrentVal).toLocaleString('en-IN')}</div>
+      <!-- Right Action Radar Card -->
+      <div class="bento-card">
+        <div class="bento-card-head" style="margin-bottom:10px;">
+          <span class="bento-eyebrow">Action Radar</span>
+          <span style="font-size:11px; color:var(--ink-muted); font-weight:600;">Tap to filter</span>
         </div>
-        <div class="p-stat-box">
-          <div class="p-stat-lbl">Total Invested</div>
-          <div class="p-stat-val">₹${Math.round(totalInvested).toLocaleString('en-IN')}</div>
-        </div>
-        <div class="p-stat-box">
-          <div class="p-stat-lbl">Overall P&amp;L</div>
-          <div class="p-stat-val ${pnlClass}">${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)</div>
-        </div>
-      </div>
-
-      <div class="chart-flex-wrap">
-        <div class="pie-svg-container">
-          <svg viewBox="0 0 190 190">
-            ${circlesHtml}
-          </svg>
-          <div class="pie-center-hole">
-            <span class="pie-center-lbl">Total</span>
-            <span class="pie-center-val">${stocks.length}</span>
+        <div class="radar-grid">
+          <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
+            <div class="radar-num">${buysCount}</div>
+            <div class="radar-lbl">💎 Buys</div>
           </div>
-        </div>
-        <div class="chart-legend">
-          ${legendHtml}
-        </div>
-      </div>
-
-      <div class="pnl-stats-panel">
-        <div class="pnl-stats-header">📊 Segregated P&amp;L Contribution by Active Filter</div>
-        <div class="pnl-stats-grid">
-          ${pnlCardsHtml}
+          <div class="radar-tile radar-rose ${currentTrend === 'actionable-exits' ? 'active' : ''}" id="radar-exits" title="GARP < 65 and trading below 200-DMA">
+            <div class="radar-num">${exitsCount}</div>
+            <div class="radar-lbl">✂️ Trim/Exits</div>
+          </div>
+          <div class="radar-tile radar-amber ${currentFilter === 'weak-cash' ? 'active' : ''}" id="radar-weak-cash" title="3-Yr Cumulative CFO / EBITDA < 50%">
+            <div class="radar-num">${weakCashCount}</div>
+            <div class="radar-lbl">⚠️ Weak Cash</div>
+          </div>
+          <div class="radar-tile radar-violet ${currentFilter === 'active-cwip' ? 'active' : ''}" id="radar-cwip" title="Capital Work in Progress (CWIP) ≥ 15% of Fixed Assets">
+            <div class="radar-num">${activeCwipCount}</div>
+            <div class="radar-lbl">🏭 Active CWIP</div>
+          </div>
         </div>
       </div>
     </div>
   `;
 
+  // Chart Style Switcher (Bar vs Pie)
+  const btnBar = document.getElementById('btn-style-bar');
+  const btnPie = document.getElementById('btn-style-pie');
+  if (btnBar) btnBar.addEventListener('click', () => {
+    currentChartStyle = 'bar';
+    localStorage.setItem('ml_chart_style', 'bar');
+    renderPortfolioAnalytics();
+  });
+  if (btnPie) btnPie.addEventListener('click', () => {
+    currentChartStyle = 'pie';
+    localStorage.setItem('ml_chart_style', 'pie');
+    renderPortfolioAnalytics();
+  });
+
+  // Analytics Mode Buttons
   const bindMode = (id, mode) => {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', () => {
@@ -809,7 +902,6 @@ function renderPortfolioAnalytics() {
       if (drilldownContainer) drilldownContainer.style.display = 'none';
     });
   };
-
   bindMode('btn-chart-tier', 'tier');
   bindMode('btn-chart-sector', 'sector');
   bindMode('btn-chart-top50', 'top50');
@@ -818,22 +910,40 @@ function renderPortfolioAnalytics() {
   bindMode('btn-chart-sub12', 'sub12');
   bindMode('btn-chart-super18', 'super18');
 
+  // Action Radar Quick-Filter Triggers
+  const triggerTrend = (trendKey) => {
+    const next = currentTrend === trendKey ? 'all' : trendKey;
+    const chip = document.querySelector(`.chip[data-trend="${next}"]`);
+    if (chip) chip.click();
+    renderPortfolioAnalytics();
+  };
+  const triggerHoldingFilter = (filterKey) => {
+    const next = currentFilter === filterKey ? 'all' : filterKey;
+    const sel = document.getElementById('filter-select');
+    if (sel) {
+      sel.value = next;
+      sel.dispatchEvent(new Event('change'));
+    }
+    renderPortfolioAnalytics();
+  };
+
+  const rBuys = document.getElementById('radar-buys');
+  if (rBuys) rBuys.addEventListener('click', () => triggerTrend('actionable-buys'));
+  const rExits = document.getElementById('radar-exits');
+  if (rExits) rExits.addEventListener('click', () => triggerTrend('actionable-exits'));
+  const rWeak = document.getElementById('radar-weak-cash');
+  if (rWeak) rWeak.addEventListener('click', () => triggerHoldingFilter('weak-cash'));
+  const rCwip = document.getElementById('radar-cwip');
+  if (rCwip) rCwip.addEventListener('click', () => triggerHoldingFilter('active-cwip'));
+
+  // Drilldown triggers on Bar segments, Bar pills, Pie circles, Pie legend rows, and P&L cards
   const handleSliceClick = (key) => {
     const foundSlice = slices.find(s => s.key === key);
     if (!foundSlice) return;
     renderDrilldownTable(foundSlice);
   };
-
-  container.querySelectorAll('circle[data-slice-key]').forEach(c => {
-    c.addEventListener('click', () => handleSliceClick(c.dataset.sliceKey));
-  });
-
-  container.querySelectorAll('.legend-row[data-slice-key]').forEach(r => {
-    r.addEventListener('click', () => handleSliceClick(r.dataset.sliceKey));
-  });
-
-  container.querySelectorAll('.pnl-stat-card[data-slice-key]').forEach(card => {
-    card.addEventListener('click', () => handleSliceClick(card.dataset.sliceKey));
+  container.querySelectorAll('[data-slice-key]').forEach(el => {
+    el.addEventListener('click', () => handleSliceClick(el.dataset.sliceKey));
   });
 
   if (selectedSliceKey) {
@@ -841,7 +951,6 @@ function renderPortfolioAnalytics() {
     if (currentSlice) renderDrilldownTable(currentSlice);
   }
 }
-
 function renderDrilldownTable(slice) {
   selectedSliceKey = slice.key;
   if (!drilldownContainer) return;
@@ -2400,6 +2509,41 @@ function renderContent() {
 
   const sortedFiltered = applySorting(filtered, currentSort);
   contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
+  if (analyticsContainer && analyticsContainer.style.display !== 'none') {
+    const rBuys = document.getElementById('radar-buys');
+    const rExits = document.getElementById('radar-exits');
+    const rWeak = document.getElementById('radar-weak-cash');
+    const rCwip = document.getElementById('radar-cwip');
+    if (rBuys) rBuys.classList.toggle('active', currentTrend === 'actionable-buys');
+    if (rExits) rExits.classList.toggle('active', currentTrend === 'actionable-exits');
+    if (rWeak) rWeak.classList.toggle('active', currentFilter === 'weak-cash');
+    if (rCwip) rCwip.classList.toggle('active', currentFilter === 'active-cwip');
+  }
+}
+
+function renderGarpArcSvg(score, ticker) {
+  const hasScore = score != null && !isNaN(score);
+  const clamped = hasScore ? Math.max(0, Math.min(100, Number(score))) : 0;
+  // Semi-circle path length for r=28: pi * 28 ≈ 87.96
+  const arcLen = 87.96;
+  const fillLen = (clamped / 100) * arcLen;
+  let strokeColor = '#CBD5E1';
+  if (hasScore) {
+    if (clamped >= 80) strokeColor = '#059669';
+    else if (clamped >= 68) strokeColor = '#D97706';
+    else strokeColor = '#E11D48';
+  }
+  return `
+    <div class="garp-gauge-wrap garp-trigger-btn" data-ticker="${escapeHtml(ticker)}" title="GARP Score: ${hasScore ? clamped + '/100' : 'Not audited'} — Tap to audit">
+      <svg viewBox="0 0 72 44">
+        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="#E2EBE7" stroke-width="6.5" stroke-linecap="round"/>
+        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="${strokeColor}" stroke-width="6.5" stroke-linecap="round"
+          stroke-dasharray="${fillLen.toFixed(1)} ${arcLen.toFixed(1)}"/>
+      </svg>
+      <div class="garp-gauge-val" style="color:${hasScore ? strokeColor : 'var(--ink-muted)'};">${hasScore ? clamped : '—'}</div>
+      <div class="garp-gauge-lbl">GARP</div>
+    </div>
+  `;
 }
 
 function renderEntry(stock) {
@@ -2410,30 +2554,10 @@ function renderEntry(stock) {
 
   const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
   const scoreData = savedScores[stock.ticker];
-  const scoreBadge = scoreData
-    ? `<span style="background:var(--sage); color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">GARP: ${scoreData.score}</span>`
-    : '';
+  const garpScore = scoreData ? scoreData.score : null;
 
   const cleanTickerForFund = getCleanTicker(stock.ticker);
   const cachedFund = getCachedFundamentals(cleanTickerForFund);
-
-  let rawPeg = null;
-  if (cachedFund) {
-    rawPeg = cachedFund.pegRatio != null ? cachedFund.pegRatio : cachedFund.peg_ratio;
-  }
-  const pegRatio = rawPeg != null ? Number(rawPeg).toFixed(2) : null;
-
-  let pegColor = '#E9ECEF';
-  let pegTextColor = 'var(--ink-soft)';
-  let pegText = 'N/A';
-  if (pegRatio) {
-    pegText = pegRatio;
-    pegTextColor = 'white';
-    if (rawPeg > 0 && rawPeg <= 1.5) pegColor = '#5B7553';
-    else if (rawPeg > 1.5 && rawPeg <= 2.5) pegColor = '#B8923F';
-    else if (rawPeg > 2.5 || rawPeg < 0) pegColor = '#A4453A';
-  }
-  const pegBadge = `<span style="background:${pegColor}; color:${pegTextColor}; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;" title="Price/Earnings-to-Growth">PEG: ${pegText}</span>`;
 
   const hasQuote = stock.quote && stock.quote.last_price != null;
   const chg = hasQuote ? stock.quote.change_pct : null;
@@ -2441,19 +2565,19 @@ function renderEntry(stock) {
     ? 'ribbon-neu-card'
     : (chg > 0 ? 'ribbon-pos-card' : (chg < 0 ? 'ribbon-neg-card' : 'ribbon-neu-card'));
   const chgSign = chg != null && chg > 0 ? '+' : '';
-  const chgClass = chg != null && chg < 0 ? 'price-down' : (chg != null && chg > 0 ? 'price-up' : '');
+  const chgPillClass = chg != null && chg > 0 ? 'pos' : (chg != null && chg < 0 ? 'neg' : 'neu');
 
   const signal = hasQuote ? getActionSignal(stock, savedScores) : null;
   const signalBadge = signal
-    ? `<span class="ribbon-fund-pill" style="border:1px solid ${signal.color}; color:${signal.color}; background:${signal.bg}; font-weight:600;">${signal.label}</span>`
+    ? `<span class="signal-pill" style="border:1px solid ${signal.color}33; color:${signal.color}; background:${signal.bg};">${signal.label}</span>`
     : '';
 
   const weakCashBadge = (cachedFund && cachedFund.cfo_to_ebitda != null && cachedFund.cfo_to_ebitda < 0.50)
-    ? `<span class="ribbon-fund-pill" style="border:1px solid #A4453A; color:#A4453A; background:#FDECEA; font-weight:600;" title="3-Yr Cumulative CFO/EBITDA is ${Math.round(cachedFund.cfo_to_ebitda * 100)}% (< 50%)">⚠️ Weak Cash</span>`
+    ? `<span class="ribbon-fund-pill" style="border:1px solid var(--rose-border); color:var(--rose); background:var(--rose-bg);" title="3-Yr Cumulative CFO/EBITDA is ${Math.round(cachedFund.cfo_to_ebitda * 100)}% (< 50%)">⚠️ Weak Cash</span>`
     : '';
 
   const capexBadge = (cachedFund && cachedFund.is_capex_heavy)
-    ? `<span class="ribbon-fund-pill" style="border:1px solid #8E735B; color:#5C5852; background:var(--paper-dim); font-weight:600;" title="Capex-Heavy: Fixed Assets+CWIP ${cachedFund.fixed_asset_ratio != null ? Math.round(cachedFund.fixed_asset_ratio * 100) + '%' : '—'} of Assets, CWIP ${cachedFund.cwip_ratio != null ? Math.round(cachedFund.cwip_ratio * 100) + '%' : '0%'} of FA">🏗️ Capex</span>`
+    ? `<span class="ribbon-fund-pill" style="border:1px solid var(--violet-border); color:var(--violet); background:var(--violet-bg);" title="Capex-Heavy: FA ${cachedFund.fixed_asset_ratio != null ? Math.round(cachedFund.fixed_asset_ratio * 100) + '%' : '—'}, CWIP ${cachedFund.cwip_ratio != null ? Math.round(cachedFund.cwip_ratio * 100) + '%' : '0%'}">🏗️ Capex</span>`
     : '';
 
   const badgeHtml = hasNews
@@ -2464,7 +2588,7 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-  // Compact inline P&L for the always-visible meta row
+  // Compact inline P&L + full holdings row for drawer
   let inlinePnlHtml = '';
   let fullHoldingsHtml = '';
   if (stock.qty && stock.qty > 0) {
@@ -2482,40 +2606,117 @@ function renderEntry(stock) {
     }
   }
 
-  // Always-visible 1-line lead headline
-  let leadHeadlineHtml = '';
-  if (hasNews) {
-    const leadSentiment = classifySentiment(lead.title);
-    leadHeadlineHtml = `<div class="card-lead-headline" title="${escapeHtml(lead.title)}"><span class="sentiment-dot ${leadSentiment}"></span><a href="${escapeHtml(lead.url)}" target="_blank" rel="noopener">${escapeHtml(lead.title)}</a></div>`;
+  // 3 Mini-Metric Tiles (PEG, PAT(2Q), CFO/EBITDA with Progress Bar)
+  const fmtGrowth = (v) => {
+    const pct = Number(v) * 100;
+    if (pct > 999) return '>+999%';
+    if (pct < -999) return '<-999%';
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  };
+
+  let miniTilesHtml = '';
+  if (cachedFund) {
+    // Tile 1: PEG
+    const rawPeg = cachedFund.pegRatio != null ? cachedFund.pegRatio : cachedFund.peg_ratio;
+    const pegVal = rawPeg != null ? Number(rawPeg) : null;
+    let pegClass = '';
+    if (pegVal != null) {
+      if (pegVal > 0 && pegVal <= 1.5) pegClass = 'tile-good';
+      else if (pegVal > 1.5 && pegVal <= 2.5) pegClass = 'tile-warn';
+      else pegClass = 'tile-bad';
+    }
+    const pegDisplay = pegVal != null ? pegVal.toFixed(2) : 'N/A';
+
+    // Tile 2: PAT(2Q)
+    const patRaw = cachedFund.earnings_growth != null ? cachedFund.earnings_growth : cachedFund.earningsGrowth;
+    let patClass = '';
+    let patDisplay = '—';
+    let patTitle = 'Last 2Q YoY PAT Growth';
+    if (patRaw != null) {
+      patDisplay = fmtGrowth(patRaw);
+      patTitle = `Last 2Q YoY PAT Growth: ${(Number(patRaw) * 100).toFixed(1)}%`;
+      if (patRaw >= 0.15) patClass = 'tile-good';
+      else if (patRaw >= 0) patClass = 'tile-warn';
+      else patClass = 'tile-bad';
+    }
+
+    // Tile 3: CFO / EBITDA with Progress Bar
+    const cfoRaw = cachedFund.cfo_to_ebitda;
+    let cfoClass = '';
+    let cfoDisplay = '—';
+    let cfoFillPct = 0;
+    let cfoBarColor = '#94A3B8';
+    if (cfoRaw != null) {
+      const pct = Math.round(Number(cfoRaw) * 100);
+      cfoDisplay = `${pct}%`;
+      cfoFillPct = Math.max(4, Math.min(100, pct));
+      if (pct >= 70) { cfoClass = 'tile-good'; cfoBarColor = '#059669'; }
+      else if (pct >= 50) { cfoClass = 'tile-warn'; cfoBarColor = '#D97706'; }
+      else { cfoClass = 'tile-bad'; cfoBarColor = '#E11D48'; }
+    }
+
+    miniTilesHtml = `
+      <div class="mini-tiles-grid">
+        <div class="mini-tile ${pegClass}" title="Price/Earnings-to-Growth (3-Yr CAGR anchored)">
+          <span class="mini-tile-lbl">PEG</span>
+          <span class="mini-tile-val">${pegDisplay}</span>
+        </div>
+        <div class="mini-tile ${patClass}" title="${escapeHtml(patTitle)}">
+          <span class="mini-tile-lbl">PAT (2Q)</span>
+          <span class="mini-tile-val">${patDisplay}</span>
+        </div>
+        <div class="mini-tile ${cfoClass}" title="3-Yr Cumulative CFO / EBITDA Cash Conversion">
+          <span class="mini-tile-lbl">CFO/EBITDA</span>
+          <span class="mini-tile-val">${cfoDisplay}</span>
+          ${cfoRaw != null ? `<div class="cfo-bar-track"><div class="cfo-bar-fill" style="width:${cfoFillPct}%; background:${cfoBarColor};"></div></div>` : ''}
+        </div>
+      </div>
+    `;
+  } else {
+    miniTilesHtml = `<div id="ribbon-data-${escapeHtml(stock.ticker)}"><button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Load Fundamentals (PEG, PAT, CFO)</button></div>`;
   }
 
-  // Inside collapsible drawer: DMAs (clean dot-separated specs)
-  let dmaLineHtml = '';
+  // 3-Pill DMA Trend Ladder (Always Visible on Card)
+  let dmaLadderHtml = '';
+  let dmaFullLineHtml = '';
   if (hasQuote) {
     const ltp = stock.quote.last_price;
-    const fmtDma = (label, val) => {
+    const mkDmaPill = (shortLbl, fullLbl, val) => {
       if (val == null) return null;
       const isBelow = ltp < val;
-      const color = isBelow ? '#A4453A' : '#5B7553';
-      const arrow = isBelow ? '▼' : '▲';
-      return `<span style="color:${color}; font-weight:700;" title="${label}: ₹${val} (Price is ${isBelow ? 'below' : 'above'})">${label} ₹${Math.round(val)} ${arrow}</span>`;
+      return `<span class="dma-pill ${isBelow ? 'below' : 'above'}" title="${fullLbl}: ₹${Math.round(val)} (LTP is ${isBelow ? 'below' : 'above'})">${shortLbl} ${isBelow ? '▼' : '▲'}</span>`;
     };
-    const dmaParts = [
-      fmtDma('20-DMA', stock.quote.dma_20),
-      fmtDma('50-DMA', stock.quote.dma_50),
-      fmtDma('200-DMA', stock.quote.dma_200),
+    const pills = [
+      mkDmaPill('20D', '20-DMA', stock.quote.dma_20),
+      mkDmaPill('50D', '50-DMA', stock.quote.dma_50),
+      mkDmaPill('200D', '200-DMA', stock.quote.dma_200),
     ].filter(Boolean);
 
-    let flagPart = '';
-    if (stock.quote.near_52wk_flag === 'near-high') flagPart = `<span class="ribbon-flag">52WK HIGH</span>`;
-    else if (stock.quote.near_52wk_flag === 'near-low') flagPart = `<span class="ribbon-flag">52WK LOW</span>`;
+    if (stock.quote.near_52wk_flag === 'near-high') pills.push(`<span class="dma-pill flag">52W HIGH</span>`);
+    else if (stock.quote.near_52wk_flag === 'near-low') pills.push(`<span class="dma-pill flag">52W LOW</span>`);
 
-    if (dmaParts.length || flagPart) {
-      dmaLineHtml = `<div class="spec-line">${dmaParts.join(' <span class="spec-sep">·</span> ')}${flagPart ? ' ' + flagPart : ''}</div>`;
+    if (pills.length || inlinePnlHtml) {
+      dmaLadderHtml = `
+        <div class="dma-ladder-row">
+          <div class="dma-pills">
+            ${pills.length ? '<span class="dma-lbl">DMA</span>' + pills.join('') : ''}
+          </div>
+          ${inlinePnlHtml}
+        </div>
+      `;
+    }
+
+    const fullParts = [
+      stock.quote.dma_20 != null ? `20D <strong>₹${Math.round(stock.quote.dma_20)}</strong>` : null,
+      stock.quote.dma_50 != null ? `50D <strong>₹${Math.round(stock.quote.dma_50)}</strong>` : null,
+      stock.quote.dma_200 != null ? `200D <strong>₹${Math.round(stock.quote.dma_200)}</strong>` : null,
+    ].filter(Boolean);
+    if (fullParts.length) {
+      dmaFullLineHtml = `<div class="spec-line">📈 DMAs: ${fullParts.join(' <span class="spec-sep">·</span> ')}</div>`;
     }
   }
 
-  // Inside collapsible drawer: Fundamentals (without duplicate PEG)
+  // Drawer Fundamentals Spec Line (PE, ROCE, DR, Rev(2Q), FA/CWIP)
   let fundLineHtml = '';
   if (cachedFund) {
     const fParts = [];
@@ -2524,91 +2725,81 @@ function renderEntry(stock) {
     if (roceMetric != null) fParts.push(`ROCE <strong>${(Number(roceMetric) * 100).toFixed(1)}%</strong>`);
     const debtMetric = cachedFund.debt_ratio != null ? cachedFund.debt_ratio : (cachedFund.debt_to_equity != null ? cachedFund.debt_to_equity / 100 : null);
     if (debtMetric != null) fParts.push(`DR <strong>${Number(debtMetric).toFixed(2)}</strong>`);
-    const fmtGrowth = (v) => {
-      const pct = Number(v) * 100;
-      if (pct > 999) return '>+999%';
-      if (pct < -999) return '<-999%';
-      return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    };
     if (cachedFund.revenue_growth != null) {
       const exact = `${(Number(cachedFund.revenue_growth) * 100).toFixed(1)}%`;
       fParts.push(`<span title="Last 2Q YoY Sales Growth: ${exact}">Rev(2Q) <strong>${fmtGrowth(cachedFund.revenue_growth)}</strong></span>`);
     }
-    if (cachedFund.earnings_growth != null) {
-      const exact = `${(Number(cachedFund.earnings_growth) * 100).toFixed(1)}%`;
-      fParts.push(`<span title="Last 2Q YoY PAT Growth: ${exact}">PAT(2Q) <strong>${fmtGrowth(cachedFund.earnings_growth)}</strong></span>`);
-    }
-    if (cachedFund.cfo_to_ebitda != null) {
-      const pct = Math.round(Number(cachedFund.cfo_to_ebitda) * 100);
-      const cColor = pct >= 70 ? '#5B7553' : (pct >= 50 ? '#B8923F' : '#A4453A');
-      fParts.push(`<span style="color:${cColor}; font-weight:700;" title="3-Yr Cumulative Operating Cash Flow / Operating Profit">CFO/EBITDA ${pct}%</span>`);
-    }
     if (cachedFund.fixed_asset_ratio != null) {
       const faPct = Math.round(Number(cachedFund.fixed_asset_ratio) * 100);
       const cwipTxt = cachedFund.cwip_ratio != null ? ` · CWIP ${Math.round(Number(cachedFund.cwip_ratio) * 100)}%` : '';
-      fParts.push(`<span title="Fixed Assets + CWIP as % of Total Assets">FA ${faPct}%${cwipTxt}</span>`);
+      fParts.push(`<span title="Fixed Assets + CWIP as % of Total Assets">FA <strong>${faPct}%</strong>${cwipTxt}</span>`);
     }
     if (fParts.length) {
       fundLineHtml = `<div class="spec-line" id="ribbon-data-${escapeHtml(stock.ticker)}">${fParts.join(' <span class="spec-sep">·</span> ')}</div>`;
     }
-  } else {
-    fundLineHtml = `<div id="ribbon-data-${escapeHtml(stock.ticker)}"><button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Load Fundamentals</button></div>`;
   }
 
-  // Inside collapsible drawer: Extra news articles
+  // Always-visible 1-line lead headline
+  let leadHeadlineHtml = '';
+  if (hasNews) {
+    const leadSentiment = classifySentiment(lead.title);
+    leadHeadlineHtml = `<div class="card-lead-headline" title="${escapeHtml(lead.title)}"><span class="sentiment-dot ${leadSentiment}"></span><a href="${escapeHtml(lead.url)}" target="_blank" rel="noopener">${escapeHtml(lead.title)}</a></div>`;
+  }
+
+  // Extra news inside drawer
   let moreNewsHtml = '';
   if (hasNews) {
-    moreNewsHtml = `<div class="article-meta" style="margin-top:0;">${escapeHtml(lead.source)} · ${formatPublished(lead.published)}</div>`;
+    moreNewsHtml = `<div class="article-meta">${escapeHtml(lead.source)} · ${formatPublished(lead.published)}</div>`;
     if (rest.length) {
       moreNewsHtml += rest.map(a => {
         const s = classifySentiment(a.title);
         return `<div class="more-articles" style="margin-top:4px;">
-          <div class="sub-headline" style="margin-top:2px;"><span class="sentiment-dot ${s}"></span><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid var(--rule-strong)">${escapeHtml(a.title)}</a></div>
+          <div class="sub-headline"><span class="sentiment-dot ${s}"></span><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid var(--border-strong)">${escapeHtml(a.title)}</a></div>
           <div class="article-meta">${escapeHtml(a.source)} · ${formatPublished(a.published)}</div>
         </div>`;
       }).join('');
     }
   } else {
-    moreNewsHtml = `<div class="quiet" style="margin-top:0;">No recent news found</div>`;
+    moreNewsHtml = `<div class="quiet">No recent news found</div>`;
   }
 
   const extraCountLabel = rest.length ? ` · +${rest.length} news` : '';
 
   return `<div class="entry ${cardBorderClass} ${overallSentiment === 'negative' ? 'has-negative' : ''}">
-    <div class="card-top-row">
-      <div class="card-title-group">
-        <span class="entry-name">${escapeHtml(stock.company)}</span>
-        <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
+    <div class="bento-stock-head">
+      <div class="stock-id-col">
+        <div class="stock-name-line">
+          <span class="entry-name">${escapeHtml(stock.company)}</span>
+          <span class="ribbon-code">${escapeHtml(cleanTickerForFund)}</span>
+          ${badgeHtml}
+          ${weakCashBadge}
+          ${capexBadge}
+        </div>
+        <div class="stock-price-row">
+          ${hasQuote ? `
+            <span class="card-ltp">₹${stock.quote.last_price.toFixed(2)}</span>
+            <span class="chg-pill ${chgPillClass}">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
+          ` : '<span class="quiet">Price not loaded</span>'}
+          ${signalBadge}
+        </div>
       </div>
-      ${hasQuote ? `
-      <div class="card-price-group">
-        <span class="card-ltp ${chgClass}">₹${stock.quote.last_price.toFixed(2)}</span>
-        <span class="card-chg ${chgClass}">${chg != null ? `${chgSign}${chg}%` : '—'}</span>
-      </div>` : ''}
+      ${renderGarpArcSvg(garpScore, stock.ticker)}
     </div>
 
-    <div class="card-meta-row">
-      ${scoreBadge}
-      ${pegBadge}
-      ${signalBadge}
-      ${weakCashBadge}
-      ${capexBadge}
-      ${badgeHtml}
-      ${inlinePnlHtml}
-    </div>
-
+    ${miniTilesHtml}
+    ${dmaLadderHtml}
     ${leadHeadlineHtml}
 
     <details class="card-details">
-      <summary><span>Metrics, DMAs &amp; Actions${extraCountLabel}</span></summary>
+      <summary><span>Details, Holdings &amp; Actions${extraCountLabel}</span></summary>
       <div class="card-details-body">
-        ${dmaLineHtml}
         ${fundLineHtml}
+        ${dmaFullLineHtml}
         ${fullHoldingsHtml}
         ${moreNewsHtml}
         <div class="card-actions-row">
-          <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:5px 10px; border:1px solid var(--rule-strong); background:var(--paper); border-radius:6px; cursor:pointer; font-weight:600;">📋 GARP Audit</button>
-          <button class="ribbon-ai-btn" style="margin-top:0;" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI 1-Min Briefing</button>
+          <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--border-strong); background:var(--surface); border-radius:8px; cursor:pointer; font-weight:700; color:var(--ink);">📋 GARP Audit</button>
+          <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI Thesis-Check</button>
         </div>
         <div id="ai-panel-entry-${escapeHtml(stock.ticker)}"></div>
       </div>
@@ -2636,9 +2827,15 @@ async function runBulkGarpAudit() {
   }
 
   isBulkGarpRunning = true;
+  const progWrap = document.getElementById('garp-progress-wrap');
+  const progFill = document.getElementById('garp-progress-fill');
+  const progText = document.getElementById('garp-progress-text');
+  const progPct = document.getElementById('garp-progress-pct');
+  if (progWrap) progWrap.style.display = 'block';
+  if (progFill) progFill.style.width = '2%';
   if (btn) {
     btn.classList.add('spinning');
-    btn.innerHTML = '<span>⏳ Starting Audit...</span>';
+    btn.innerHTML = '<span>⏳ Auditing...</span>';
   }
 
   const stocks = Store.getStocks();
@@ -2652,7 +2849,11 @@ async function runBulkGarpAudit() {
     const [ticker] = stocks[i];
     const cleanT = getCleanTicker(ticker);
 
-    if (btn) btn.innerHTML = `<span>⏳ Auditing ${i + 1} of ${stocks.length}...</span>`;
+    const pctDone = Math.round(((i + 1) / stocks.length) * 100);
+    if (btn) btn.innerHTML = `<span>⏳ ${i + 1}/${stocks.length} (${pctDone}%)</span>`;
+    if (progFill) progFill.style.width = `${pctDone}%`;
+    if (progText) progText.textContent = `Auditing ${cleanT} (${i + 1} of ${stocks.length})…`;
+    if (progPct) progPct.textContent = `${pctDone}%`;
 
     let fundamentals = getCachedFundamentals(cleanT);
     if (!fundamentals) {
@@ -2777,6 +2978,10 @@ async function runBulkGarpAudit() {
     }
   }
 
+  if (progWrap) {
+    if (progFill) progFill.style.width = '100%';
+    setTimeout(() => { progWrap.style.display = 'none'; }, 1200);
+  }
   isBulkGarpRunning = false;
   renderContent();
   renderPortfolioAnalytics();
