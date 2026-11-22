@@ -1123,9 +1123,11 @@ function getBackendUrl() {
 
 function updateStatusBar() {
   if (!newsData) {
-    refreshStatus.textContent = 'Not yet fetched today';
-    datelineStatus.textContent = "Tap refresh to fetch today's news";
-    datelineStatus.classList.remove('fresh');
+    if (refreshStatus) refreshStatus.textContent = 'Not yet fetched today';
+    if (datelineStatus) {
+      datelineStatus.textContent = "Tap refresh to fetch today's news";
+      datelineStatus.classList.remove('fresh');
+    }
     updatePriceStatus();
     return;
   }
@@ -1139,9 +1141,11 @@ function updateStatusBar() {
       diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
     }
   }
-  refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
-  datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
-  datelineStatus.classList.toggle('fresh', fresh);
+  if (refreshStatus) refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
+  if (datelineStatus) {
+    datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
+    datelineStatus.classList.toggle('fresh', fresh);
+  }
 
   updatePriceStatus();
   renderPortfolioAnalytics();
