@@ -215,14 +215,14 @@ function timeLabel(isoString) {
 function init() {
   datelineDate.textContent = todayLabel();
   updateGarpAuditStatus();
-  renderPortfolioAnalytics();
 
   const cached = Store.getCache();
   if (cached && cached.results) {
     newsData = cached;
     renderContent();
-    renderPortfolioAnalytics();
     updateStatusBar();
+  } else {
+    renderPortfolioAnalytics();
   }
 
   const cuesBtn = $('#global-cues-btn');
@@ -493,14 +493,18 @@ function renderPortfolioAnalytics() {
   let exitsCount = 0;
   let weakCashCount = 0;
   let activeCwipCount = 0;
+  let cachedFundCount = 0;
 
   radarSource.forEach(s => {
     const sig = getActionSignal(s, savedScores);
     if (sig && sig.type === 'buy') buysCount++;
     if (sig && sig.type === 'exit') exitsCount++;
     const f = getCachedFundamentals(getCleanTicker(s.ticker));
-    if (f && f.cfo_to_ebitda != null && f.cfo_to_ebitda < 0.50) weakCashCount++;
-    if (f && f.cwip_ratio != null && f.cwip_ratio >= 0.15) activeCwipCount++;
+    if (f) {
+      cachedFundCount++;
+      if (f.cfo_to_ebitda != null && f.cfo_to_ebitda < 0.50) weakCashCount++;
+      if (f.cwip_ratio != null && f.cwip_ratio >= 0.15) activeCwipCount++;
+    }
   });
 
   const totalPnL = totalCurrentVal - totalInvested;
@@ -854,7 +858,7 @@ function renderPortfolioAnalytics() {
       <div class="bento-card">
         <div class="bento-card-head" style="margin-bottom:10px;">
           <span class="bento-eyebrow">Action Radar</span>
-          <span style="font-size:11px; color:var(--ink-muted); font-weight:600;">Tap to filter</span>
+          <span style="font-size:11px; color:var(--ink-muted); font-weight:600;" title="Stocks with cached Screener fundamentals on this device">${cachedFundCount}/${radarSource.length} audited</span>
         </div>
         <div class="radar-grid">
           <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
