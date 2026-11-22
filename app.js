@@ -400,6 +400,12 @@ function init() {
     }
   });
 
+  // Deep Slate-Teal Dark Mode locked permanently
+  document.documentElement.setAttribute('data-theme', 'dark');
+  localStorage.setItem('ml_theme', 'dark');
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', '#0B1615');
+
   $('#settings-fab').addEventListener('click', openSettings);
   $('#settings-close').addEventListener('click', closeSettings);
   $('#settings-cancel').addEventListener('click', closeSettings);
@@ -810,9 +816,9 @@ function renderPortfolioAnalytics() {
   container.innerHTML = `
     <div class="bento-top-grid">
       <!-- Left Hero Portfolio Card -->
-      <div class="bento-card">
+      <div class="bento-card hero-card">
         <div class="bento-card-head">
-          <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
+          <span class="bento-eyebrow">Portfolio Allocation</span>
           <div class="chart-style-switch" role="group" aria-label="Chart display style">
             <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
             <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
@@ -857,7 +863,7 @@ function renderPortfolioAnalytics() {
       <!-- Right Action Radar Card -->
       <div class="bento-card">
         <div class="bento-card-head" style="margin-bottom:10px;">
-          <span class="bento-eyebrow">Action Radar</span>
+          <span class="bento-eyebrow">Action Radar For Today</span>
           <span style="font-size:11px; color:var(--ink-muted); font-weight:600;" title="Stocks with cached Screener fundamentals on this device">${cachedFundCount}/${radarSource.length} audited</span>
         </div>
         <div class="radar-grid">
@@ -1051,7 +1057,7 @@ function renderFundamentalsPanel(f) {
   let cfoValHtml = '—';
   if (f.cfo_to_ebitda != null) {
     const pct = Math.round(Number(f.cfo_to_ebitda) * 100);
-    const cColor = pct >= 70 ? '#5B7553' : (pct >= 50 ? '#B8923F' : '#A4453A');
+    const cColor = pct >= 70 ? 'var(--emerald)' : (pct >= 50 ? 'var(--amber)' : 'var(--rose)');
     const warn = pct < 50 ? ' ⚠️' : '';
     cfoValHtml = `<span style="color:${cColor}; font-weight:700;">${pct}%${warn}</span>`;
   }
@@ -2063,8 +2069,8 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
     if (data.status === 'success') {
       const b = data.briefing;
       const isHigh = (b.news_materiality || '').toUpperCase() === 'HIGH';
-      const matBg = isHigh ? '#FDECEA' : 'var(--paper-dim)';
-      const matColor = isHigh ? '#A4453A' : 'var(--ink-soft)';
+      const matBg = isHigh ? 'var(--rose-bg)' : 'var(--surface-soft)';
+      const matColor = isHigh ? 'var(--rose)' : 'var(--ink-soft)';
       const matText = isHigh ? '🔴 HIGH (Thesis Impact)' : '⚪ LOW (Routine Chatter)';
       panel.innerHTML = `
         <div class="ai-briefing-card">
@@ -2378,41 +2384,41 @@ function getActionSignal(stock, savedScoresMap) {
   // 1. High-Quality GARP Setups (Actionable Buys)
   if (garp >= 75 && (peg == null || (peg > 0 && peg <= 1.8))) {
     if (near200D && !isHeavySelling) {
-      return { type: 'buy', label: '💎 Tranche 2 (200D)', color: '#2E6F40', bg: '#E8F5E9' };
+      return { type: 'buy', label: '💎 Tranche 2 (200D)', color: 'var(--emerald)', bg: 'var(--emerald-bg)', border: 'var(--emerald-border)' };
     }
     if (trend === 'dip-buy') {
       if (isHeavySelling) {
-        return { type: 'wait', label: '⏳ Wait (High-Vol Drop)', color: '#B26A00', bg: '#FFF3E0' };
+        return { type: 'wait', label: '⏳ Wait (High-Vol Drop)', color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)' };
       }
-      return { type: 'buy', label: '🎯 Tranche 1 (Pullback)', color: '#2E6F40', bg: '#E8F5E9' };
+      return { type: 'buy', label: '🎯 Tranche 1 (Pullback)', color: 'var(--emerald)', bg: 'var(--emerald-bg)', border: 'var(--emerald-border)' };
     }
   }
 
   // 2. Momentum / Compounders
   if (garp >= 70 && trend === 'uptrend') {
-    return { type: 'hold', label: '🚀 Hold / Ride', color: '#5B7553', bg: '#F1F6F0' };
+    return { type: 'hold', label: '🚀 Hold / Ride', color: 'var(--teal-dark)', bg: 'var(--teal-soft)', border: 'var(--emerald-border)' };
   }
 
   // 3. Valuation Compression
   if (garp >= 70 && peg != null && peg > 2.5 && trend === 'below-200') {
-    return { type: 'compression', label: '🧊 Compression (Pause)', color: '#6D4C41', bg: '#EFEBE9' };
+    return { type: 'compression', label: '🧊 Compression (Pause)', color: 'var(--indigo)', bg: 'var(--indigo-bg)', border: 'var(--indigo-border)' };
   }
 
   // 4. Deteriorating / Broken Trend (Actionable Trim/Exits)
   if (garp < 65 && trend === 'below-200') {
-    return { type: 'exit', label: '⚠️ Review / Trim', color: '#A4453A', bg: '#FDECEA' };
+    return { type: 'exit', label: '⚠️ Review / Trim', color: 'var(--rose)', bg: 'var(--rose-bg)', border: 'var(--rose-border)' };
   }
 
   // 5. Fallback Status Badges (so no audited stock with a price is left blank)
   if (garp >= 75 && (trend === 'dip-buy' || near200D) && peg != null && peg > 1.8) {
-    return { type: 'hold-expensive', label: '⏸️ Hold (Expensive Dip)', color: '#9C6500', bg: '#FFF8E1' };
+    return { type: 'hold-expensive', label: '⏸️ Hold (Expensive Dip)', color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)' };
   }
 
   if (trend === 'below-200') {
-    return { type: 'watch', label: '👀 Watch (<200D)', color: '#7A5C9B', bg: '#F4EFF8' };
+    return { type: 'watch', label: '👀 Watch (<200D)', color: 'var(--violet)', bg: 'var(--violet-bg)', border: 'var(--violet-border)' };
   }
 
-  return { type: 'hold-neutral', label: '🟢 Hold', color: '#5C5852', bg: '#F3ECDD' };
+  return { type: 'hold-neutral', label: '🟢 Hold', color: 'var(--ink-soft)', bg: 'var(--surface-soft)', border: 'var(--border-strong)' };
 }
 
 function renderContent() {
@@ -2532,23 +2538,29 @@ function renderContent() {
 function renderGarpArcSvg(score, ticker) {
   const hasScore = score != null && !isNaN(score);
   const clamped = hasScore ? Math.max(0, Math.min(100, Number(score))) : 0;
-  // Semi-circle path length for r=28: pi * 28 ≈ 87.96
   const arcLen = 87.96;
   const fillLen = (clamped / 100) * arcLen;
-  let strokeColor = '#CBD5E1';
+  const gradId = `garpGrad_${String(ticker).replace(/[^A-Za-z0-9]/g, '')}`;
+  let c1 = '#64748B', c2 = '#94A3B8', textColor = 'var(--ink-muted)';
   if (hasScore) {
-    if (clamped >= 80) strokeColor = '#059669';
-    else if (clamped >= 68) strokeColor = '#D97706';
-    else strokeColor = '#E11D48';
+    if (clamped >= 80) { c1 = '#0D9488'; c2 = '#34D399'; textColor = 'var(--emerald)'; }
+    else if (clamped >= 68) { c1 = '#D97706'; c2 = '#FBBF24'; textColor = 'var(--amber)'; }
+    else { c1 = '#E11D48'; c2 = '#FB7185'; textColor = 'var(--rose)'; }
   }
   return `
     <div class="garp-gauge-wrap garp-trigger-btn" data-ticker="${escapeHtml(ticker)}" title="GARP Score: ${hasScore ? clamped + '/100' : 'Not audited'} — Tap to audit">
       <svg viewBox="0 0 72 44">
-        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="#E2EBE7" stroke-width="6.5" stroke-linecap="round"/>
-        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="${strokeColor}" stroke-width="6.5" stroke-linecap="round"
+        <defs>
+          <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="${c1}"/>
+            <stop offset="100%" stop-color="${c2}"/>
+          </linearGradient>
+        </defs>
+        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="var(--border)" stroke-width="6.5" stroke-linecap="round"/>
+        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="url(#${gradId})" stroke-width="6.5" stroke-linecap="round"
           stroke-dasharray="${fillLen.toFixed(1)} ${arcLen.toFixed(1)}"/>
       </svg>
-      <div class="garp-gauge-val" style="color:${hasScore ? strokeColor : 'var(--ink-muted)'};">${hasScore ? clamped : '—'}</div>
+      <div class="garp-gauge-val" style="color:${textColor};">${hasScore ? clamped : '—'}</div>
       <div class="garp-gauge-lbl">GARP</div>
     </div>
   `;
@@ -2577,7 +2589,7 @@ function renderEntry(stock) {
 
   const signal = hasQuote ? getActionSignal(stock, savedScores) : null;
   const signalBadge = signal
-    ? `<span class="signal-pill" style="border:1px solid ${signal.color}33; color:${signal.color}; background:${signal.bg};">${signal.label}</span>`
+    ? `<span class="signal-pill" style="border:1px solid ${signal.border || 'var(--border-strong)'}; color:${signal.color}; background:${signal.bg};">${signal.label}</span>`
     : '';
 
   const weakCashBadge = (cachedFund && cachedFund.cfo_to_ebitda != null && cachedFund.cfo_to_ebitda < 0.50)
@@ -2658,9 +2670,9 @@ function renderEntry(stock) {
       const pct = Math.round(Number(cfoRaw) * 100);
       cfoDisplay = `${pct}%`;
       cfoFillPct = Math.max(4, Math.min(100, pct));
-      if (pct >= 70) { cfoClass = 'tile-good'; cfoBarColor = '#059669'; }
-      else if (pct >= 50) { cfoClass = 'tile-warn'; cfoBarColor = '#D97706'; }
-      else { cfoClass = 'tile-bad'; cfoBarColor = '#E11D48'; }
+      if (pct >= 70) { cfoClass = 'tile-good'; cfoBarColor = 'var(--emerald)'; }
+      else if (pct >= 50) { cfoClass = 'tile-warn'; cfoBarColor = 'var(--amber)'; }
+      else { cfoClass = 'tile-bad'; cfoBarColor = 'var(--rose)'; }
     }
 
     miniTilesHtml = `

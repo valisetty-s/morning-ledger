@@ -1,9 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#F4F7F6">
+<meta name="theme-color" id="meta-theme-color" content="#0B1615">
+<script>
+  (function() {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('ml_theme', 'dark');
+    var m = document.getElementById('meta-theme-color');
+    if (m) m.setAttribute('content', '#0B1615');
+  })();
+</script>
 <title>The Morning Ledger</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -63,6 +71,81 @@
     --shadow-sm: 0 1px 3px rgba(15, 36, 32, 0.04), 0 1px 2px rgba(15, 36, 32, 0.03);
     --shadow-md: 0 4px 16px rgba(15, 36, 32, 0.06), 0 1px 3px rgba(15, 36, 32, 0.04);
     --shadow-hover: 0 8px 24px rgba(15, 36, 32, 0.09);
+    --hero-bg: linear-gradient(135deg, #FFFFFF 0%, #F4FBF8 100%);
+    --header-bg: rgba(255, 255, 255, 0.92);
+    --neg-card-bg: linear-gradient(180deg, #FFF7F8 0%, #FFFFFF 38%);
+    --cues-bg: linear-gradient(135deg, #FFFFFF 0%, #F5F7FF 100%);
+    --ticker-bg: #334E58;
+    --ticker-ink: #FFFFFF;
+    --cfo-track: rgba(15, 36, 32, 0.10);
+    --chip-active-bg: #0F2420;
+    --chip-active-ink: #FFFFFF;
+    --dma-above-ink: #047857;
+    --dma-below-ink: #BE123C;
+    --radar-mint-ink: #047857;
+    --radar-rose-ink: #BE123C;
+    --radar-amber-ink: #B45309;
+    --radar-violet-ink: #6D28D9;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0B1615;
+    --surface: #122220;
+    --surface-soft: #172B28;
+    --ink: #ECFDF5;
+    --ink-soft: #9BB5AF;
+    --ink-muted: #6C8A83;
+    --border: #1E3532;
+    --border-strong: #2C4C47;
+
+    --teal: #14B8A6;
+    --teal-dark: #2DD4BF;
+    --teal-soft: rgba(20, 184, 166, 0.15);
+
+    --emerald: #34D399;
+    --emerald-bg: rgba(16, 185, 129, 0.15);
+    --emerald-border: rgba(52, 211, 153, 0.30);
+
+    --indigo: #818CF8;
+    --indigo-bg: rgba(99, 102, 241, 0.16);
+    --indigo-border: rgba(129, 140, 248, 0.32);
+
+    --amber: #FBBF24;
+    --amber-bg: rgba(245, 158, 11, 0.15);
+    --amber-border: rgba(251, 191, 36, 0.30);
+
+    --rose: #FB7185;
+    --rose-bg: rgba(244, 63, 94, 0.15);
+    --rose-border: rgba(251, 113, 133, 0.30);
+
+    --violet: #A78BFA;
+    --violet-bg: rgba(139, 92, 246, 0.16);
+    --violet-border: rgba(167, 139, 250, 0.32);
+
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.24);
+    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.34);
+    --shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.45);
+
+    --hero-bg: linear-gradient(135deg, #122220 0%, #152D29 100%);
+    --header-bg: rgba(11, 22, 21, 0.90);
+    --neg-card-bg: linear-gradient(180deg, rgba(244, 63, 94, 0.09) 0%, #122220 42%);
+    --cues-bg: linear-gradient(135deg, #132229 0%, #172033 100%);
+    --ticker-bg: #1B3632;
+    --ticker-ink: #5EEAD4;
+    --cfo-track: rgba(255, 255, 255, 0.10);
+    --chip-active-bg: #14B8A6;
+    --chip-active-ink: #061412;
+    --dma-above-ink: #34D399;
+    --dma-below-ink: #FB7185;
+    --radar-mint-ink: #34D399;
+    --radar-rose-ink: #FB7185;
+    --radar-amber-ink: #FBBF24;
+    --radar-violet-ink: #A78BFA;
+  }
+
+  [data-theme="dark"] select option {
+    background: #122220;
+    color: #ECFDF5;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -96,7 +179,7 @@
     position: sticky;
     top: 0;
     z-index: 30;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--header-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -212,7 +295,7 @@
     transition: all 0.15s ease;
   }
   .lookup-input-wrap:focus-within {
-    background: #FFFFFF;
+    background: var(--surface);
     border-color: var(--teal);
     box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
   }
@@ -378,7 +461,7 @@
   /* ---------- AI GLOBAL CUES CARD ---------- */
   #global-cues-container { margin: 10px 0; }
   .global-cues-card {
-    background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FF 100%);
+    background: var(--cues-bg);
     border: 1px solid var(--indigo-border);
     border-radius: var(--radius-md);
     padding: 16px 18px;
@@ -436,6 +519,15 @@
   }
   @media (min-width: 768px) {
     .bento-card { padding: 18px 20px; }
+  }
+  .bento-card.hero-card {
+    background: var(--hero-bg);
+  }
+  .brand-right-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
   }
 
   .bento-card-head {
@@ -500,9 +592,9 @@
   }
   .chart-toggle-btn:hover { border-color: var(--teal); color: var(--teal); }
   .chart-toggle-btn.active {
-    background: var(--ink);
-    color: #FFFFFF;
-    border-color: var(--ink);
+    background: var(--chip-active-bg);
+    color: var(--chip-active-ink);
+    border-color: var(--chip-active-bg);
   }
 
   /* Hero KPI Strip */
@@ -592,7 +684,7 @@
     transition: all 0.15s ease;
   }
   .bar-legend-pill:hover {
-    background: #FFFFFF;
+    background: var(--surface);
     border-color: var(--teal);
     box-shadow: var(--shadow-sm);
   }
@@ -658,7 +750,7 @@
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .legend-row:hover { background: #FFFFFF; border-color: var(--teal); }
+  .legend-row:hover { background: var(--surface); border-color: var(--teal); }
   .legend-left { display: flex; align-items: center; gap: 8px; }
   .legend-name { font-weight: 700; color: var(--ink); }
   .legend-count { font-size: 10.5px; color: var(--ink-muted); }
@@ -694,7 +786,7 @@
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .pnl-stat-card:hover { border-color: var(--teal); background: #FFFFFF; box-shadow: var(--shadow-sm); }
+  .pnl-stat-card:hover { border-color: var(--teal); background: var(--surface); box-shadow: var(--shadow-sm); }
   .pnl-card-title { font-size: 11.5px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
   .pnl-card-metrics { display: flex; justify-content: space-between; align-items: baseline; }
   .pnl-card-val { font-family: 'SF Mono', monospace; font-size: 13.5px; font-weight: 800; }
@@ -733,10 +825,10 @@
     font-weight: 700;
     margin-top: 4px;
   }
-  .radar-mint { background: var(--emerald-bg); border-color: var(--emerald-border); color: #047857; }
-  .radar-rose { background: var(--rose-bg); border-color: var(--rose-border); color: #BE123C; }
-  .radar-amber { background: var(--amber-bg); border-color: var(--amber-border); color: #B45309; }
-  .radar-violet { background: var(--violet-bg); border-color: var(--violet-border); color: #6D28D9; }
+  .radar-mint { background: var(--emerald-bg); border-color: var(--emerald-border); color: var(--radar-mint-ink); }
+  .radar-rose { background: var(--rose-bg); border-color: var(--rose-border); color: var(--radar-rose-ink); }
+  .radar-amber { background: var(--amber-bg); border-color: var(--amber-border); color: var(--radar-amber-ink); }
+  .radar-violet { background: var(--violet-bg); border-color: var(--violet-border); color: var(--radar-violet-ink); }
 
   /* ---------- FILTER & SORT RAIL ---------- */
   .controls-card {
@@ -767,7 +859,7 @@
     cursor: pointer;
     outline: none;
   }
-  .ctrl-select:focus { border-color: var(--teal); background: #FFFFFF; }
+  .ctrl-select:focus { border-color: var(--teal); background: var(--surface); }
 
   .trend-toolbar {
     display: flex;
@@ -796,9 +888,9 @@
   }
   .chip:hover { border-color: var(--teal); color: var(--teal); }
   .chip.active {
-    background: var(--ink);
-    color: #FFFFFF;
-    border-color: var(--ink);
+    background: var(--chip-active-bg);
+    color: var(--chip-active-ink);
+    border-color: var(--chip-active-bg);
   }
 
   .hint-banner {
@@ -807,7 +899,7 @@
     font-weight: 500;
     color: var(--teal-dark);
     background: var(--teal-soft);
-    border: 1px solid #BEE3DB;
+    border: 1px solid var(--border-strong);
     border-radius: 10px;
     padding: 8px 14px;
     margin-bottom: 10px;
@@ -881,11 +973,11 @@
     box-shadow: var(--shadow-hover);
     border-color: var(--border-strong);
   }
-  .entry.ribbon-pos-card { border-top: 3px solid var(--emerald); }
-  .entry.ribbon-neg-card { border-top: 3px solid var(--rose); }
-  .entry.ribbon-neu-card { border-top: 3px solid var(--border-strong); }
+  .entry.ribbon-pos-card { border-top: 2.5px solid var(--emerald-border); }
+  .entry.ribbon-neg-card { border-top: 2.5px solid var(--rose-border); }
+  .entry.ribbon-neu-card { border-top: 2.5px solid var(--border-strong); }
   .entry.has-negative {
-    background: linear-gradient(180deg, #FFF7F8 0%, #FFFFFF 38%);
+    background: var(--neg-card-bg);
   }
 
   /* Card Header: Title + Ticker on Left, GARP Speedometer Arc on Right */
@@ -916,8 +1008,8 @@
     font-family: 'SF Mono', 'Courier New', monospace;
     font-size: 10.5px;
     font-weight: 700;
-    color: #FFFFFF;
-    background: #334E58;
+    color: var(--ticker-ink);
+    background: var(--ticker-bg);
     padding: 2px 7px;
     border-radius: 6px;
     letter-spacing: 0.3px;
@@ -977,12 +1069,12 @@
     color: var(--ink);
   }
   .garp-gauge-lbl {
-    font-size: 8.5px;
+    font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.6px;
     color: var(--ink-muted);
     text-transform: uppercase;
-    margin-top: 1px;
+    margin-top: 3px;
   }
 
   /* 3 Compact Pastel Mini-Metric Tiles */
@@ -1026,7 +1118,7 @@
   .cfo-bar-track {
     width: 100%;
     height: 4px;
-    background: rgba(15, 36, 32, 0.1);
+    background: var(--cfo-track);
     border-radius: 100px;
     margin-top: 5px;
     overflow: hidden;
@@ -1064,8 +1156,8 @@
     border-radius: 100px;
     cursor: help;
   }
-  .dma-pill.above { background: var(--emerald-bg); color: #047857; border: 1px solid var(--emerald-border); }
-  .dma-pill.below { background: var(--rose-bg); color: #BE123C; border: 1px solid var(--rose-border); }
+  .dma-pill.above { background: var(--emerald-bg); color: var(--dma-above-ink); border: 1px solid var(--emerald-border); }
+  .dma-pill.below { background: var(--rose-bg); color: var(--dma-below-ink); border: 1px solid var(--rose-border); }
   .dma-pill.flag  { background: var(--indigo-bg); color: var(--indigo); border: 1px solid var(--indigo-border); font-family: inherit; }
 
   .card-flags-inline {
@@ -1177,7 +1269,7 @@
     padding: 6px 12px;
     border-radius: 8px;
     background: var(--teal-soft);
-    border: 1px solid #BEE3DB;
+    border: 1px solid var(--border-strong);
     color: var(--teal-dark);
     cursor: pointer;
     width: 100%;
@@ -1265,7 +1357,7 @@
     font-weight: 700;
     color: var(--teal-dark);
     background: var(--teal-soft);
-    border: 1px solid #BEE3DB;
+    border: 1px solid var(--border-strong);
     border-radius: 10px;
     cursor: pointer;
   }
@@ -1366,7 +1458,7 @@
     color: var(--ink);
   }
   .field-textarea { min-height: 90px; resize: vertical; }
-  .field-input:focus, .field-textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; background: #fff; }
+  .field-input:focus, .field-textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; background: var(--surface); }
 
   .btn-row { display: flex; gap: 10px; margin-top: 22px; }
   .btn {
@@ -1487,13 +1579,15 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v54 · Bento</span>
+            <span class="build-tag">v55 · Dark Bento</span>
           </div>
         </div>
       </div>
-      <button class="header-settings-btn" id="settings-fab" aria-label="Settings" title="Settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
+      <div class="brand-right-btns">
+        <button class="header-settings-btn" id="settings-fab" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="lookup-bar">
