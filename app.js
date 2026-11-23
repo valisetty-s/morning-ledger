@@ -896,13 +896,13 @@ function renderPortfolioAnalytics() {
 
           const sellChipsHtml = urgentSellItems.length
             ? urgentSellItems.slice(0, 8).map(item =>
-                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.label.split(' ')[1] || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
               ).join('') + (urgentSellItems.length > 8 ? `<span class="urgent-empty-note">+${urgentSellItems.length - 8} more</span>` : '')
             : `<span class="urgent-empty-note">No negative news shocks detected</span>`;
 
           const buyChipsHtml = urgentBuyItems.length
             ? urgentBuyItems.slice(0, 8).map(item =>
-                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.label.split(' ')[1] || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
               ).join('') + (urgentBuyItems.length > 8 ? `<span class="urgent-empty-note">+${urgentBuyItems.length - 8} more</span>` : '')
             : `<span class="urgent-empty-note">No fresh positive catalysts detected</span>`;
 
@@ -1001,7 +1001,7 @@ function renderPortfolioAnalytics() {
       const t = (btn.dataset.urgentTicker || '').trim();
       if (!t) return;
       const match = stocks.find(([sym]) => sym.toUpperCase() === t.toUpperCase());
-      runSingleStockLookup(t, match ? match[1] : t);
+      runSingleStockLookup(t, match ? match[1] : t, true);
       if (lookupResult) lookupResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });
@@ -1710,6 +1710,7 @@ function getNewsUrgentAction(stock, savedScoresMap) {
   if (negHits > 0 && (negHits >= posHits || hasSharpDrop)) {
     return {
       action: 'sell',
+      ticker: stock.ticker,
       label: `🚨 ${stock.ticker}${chg != null ? ` (${chg > 0 ? '+' : ''}${chg}%)` : ''}`,
       reason: reasons[0] || `Negative news with ${chg}% move`
     };
@@ -1717,6 +1718,7 @@ function getNewsUrgentAction(stock, savedScoresMap) {
   if (hasSharpDrop && articles.length > 0) {
     return {
       action: 'sell',
+      ticker: stock.ticker,
       label: `🚨 ${stock.ticker} (${chg}%)`,
       reason: articles[0].title || `Sharp drop of ${chg}%`
     };
@@ -1729,6 +1731,7 @@ function getNewsUrgentAction(stock, savedScoresMap) {
   if (posHits > negHits && isStrongFundamental && (chg == null || chg > -3.0)) {
     return {
       action: 'buy',
+      ticker: stock.ticker,
       label: `🟢 ${stock.ticker}${chg != null ? ` (${chg > 0 ? '+' : ''}${chg}%)` : ''}`,
       reason: reasons[0] || 'Positive news catalyst'
     };
@@ -2203,7 +2206,7 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
   }
 }
 
-async function runSingleStockLookup(tickerTyped, companyTyped) {
+async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = false) {
   const stocks = Store.getStocks();
   const known = stocks.find(([t, c]) =>
     t.toLowerCase() === tickerTyped.toLowerCase() || c.toLowerCase() === companyTyped.toLowerCase());
@@ -2255,7 +2258,12 @@ async function runSingleStockLookup(tickerTyped, companyTyped) {
   const fundBtn = document.getElementById('fundamentals-btn');
   if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
   const aiBtn = document.getElementById('ai-briefing-btn');
-  if (aiBtn) aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
+  if (aiBtn) {
+    aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
+    if (autoAiBriefing) {
+      fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier);
+    }
+  }
 }
 
 async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
