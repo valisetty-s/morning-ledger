@@ -2378,6 +2378,96 @@ async function fetchAndShowAIBriefing(ticker, company, articles, targetPanelId, 
   }
 }
 
+function evaluateLookupVerdict(ticker, company, isExistingHolding, fundamentals, garpScore, articles) {
+  const cleanT = getCleanTicker(ticker);
+  const f = fundamentals || getCachedFundamentals(cleanT) || {};
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  const garp = garpScore != null ? Number(garpScore) : (savedScores[ticker] ? Number(savedScores[ticker].score) : null);
+
+  const roceVal = f.roce != null ? Number(f.roce) * 100 : (f.return_on_equity != null ? Number(f.return_on_equity) * 100 : null);
+  const opmVal = f.operating_margin != null ? Number(f.operating_margin) * 100 : (f.profit_margin != null ? Number(f.profit_margin) * 100 : null);
+  const deRaw = f.debt_to_equity != null ? Number(f.debt_to_equity) / 100 : (f.debt_ratio != null ? Number(f.debt_ratio) : null);
+  const pegRaw = f.pegRatio != null ? Number(f.pegRatio) : (f.peg_ratio != null ? Number(f.peg_ratio) : null);
+  const patGrowth = f.earnings_growth != null ? Number(f.earnings_growth) * 100 : (f.earningsGrowth != null ? Number(f.earningsGrowth) * 100 : null);
+  const revGrowth = f.revenue_growth != null ? Number(f.revenue_growth) * 100 : (f.revenueGrowth != null ? Number(f.revenueGrowth) * 100 : null);
+  const cfoPct = f.cfo_to_ebitda != null ? Math.round(Number(f.cfo_to_ebitda) * 100) : null;
+
+  let negCount = 0;
+  let posCount = 0;
+  (articles || []).slice(0, 4).forEach(a => {
+    const s = classifySentiment(a.title || '');
+    if (s === 'negative') negCount++;
+    else if (s === 'positive') posCount++;
+  });
+
+  const isKnownCoreCompounder = CORE_COMPOUNDERS_SET.has(cleanT) || CORE_COMPOUNDERS_SET.has(ticker);
+  const highQualityFundamentals = (roceVal == null || roceVal >= 18) && (deRaw == null || deRaw <= 0.6) && (cfoPct == null || cfoPct >= 50);
+  const weakFundamentals = (roceVal != null && roceVal < 12) || (deRaw != null && deRaw > 1.2) || (cfoPct != null && cfoPct < 35) || (garp != null && garp < 55);
+
+  let verdict = 'Worth considering';
+  let badgeStyle = 'background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border);';
+  let thesisSummary = '';
+  let actionPoints = [];
+
+  if ((isKnownCoreCompounder || (garp != null && garp >= 82)) && highQualityFundamentals && negCount === 0) {
+    verdict = 'Core-Compounder';
+    badgeStyle = 'background:var(--emerald-bg); color:var(--emerald); border:1px solid var(--emerald-border);';
+    thesisSummary = `${company} (${cleanT}) fits a **Core-Compounder** profile: durable return ratios, manageable leverage, and clean cash/news signals.`;
+    actionPoints.push(`**Positioning:** Treat as a long-term core anchor rather than a short-term flip${isExistingHolding ? ' (already in your holdings)' : ''}.`);
+    actionPoints.push(`**Entry & Sizing:** Accumulate in tranches on market pullbacks or near key moving averages rather than chasing sharp single-day spikes.`);
+    if (pegRaw != null && pegRaw > 2.2) {
+      actionPoints.push(`**Valuation Check:** PEG is elevated (${pegRaw.toFixed(2)}), so size conservatively on initial entry and add on better valuations.`);
+    }
+  } else if (weakFundamentals || (negCount >= 2 && posCount === 0)) {
+    verdict = 'Not worth it';
+    badgeStyle = 'background:var(--rose-bg); color:var(--rose); border:1px solid var(--rose-border);';
+    thesisSummary = `${company} (${cleanT}) screens as **Not worth it** right now due to stretched/weak return or cash metrics, leverage, or negative headline risk.`;
+    actionPoints.push(`**Risk Warning:** Avoid deploying fresh capital until return ratios, cash conversion, or negative news flow visibly improve.`);
+    if (isExistingHolding) {
+      actionPoints.push(`**Existing Holding Check:** Review position size and avoid averaging down blindly if trend/fundamentals are slipping.`);
+    }
+    if (cfoPct != null && cfoPct < 50) {
+      actionPoints.push(`**Cash Conversion:** 3-Yr CFO/EBITDA is ${cfoPct}% (<50%), meaning reported profits are converting slowly into cash.`);
+    }
+  } else {
+    verdict = 'Worth considering';
+    badgeStyle = 'background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border);';
+    thesisSummary = `${company} (${cleanT}) is **Worth considering** for tactical or selective allocation—promising in spots, but needs closer verification before full conviction.`;
+    actionPoints.push(`**Selective Approach:** Keep initial sizing measured until fundamentals, growth durability, and headline catalysts align.`);
+    if (revGrowth != null || patGrowth != null) {
+      const rTxt = revGrowth != null ? `Sales ${revGrowth >= 0 ? '+' : ''}${revGrowth.toFixed(1)}%` : null;
+      const pTxt = patGrowth != null ? `PAT ${patGrowth >= 0 ? '+' : ''}${patGrowth.toFixed(1)}%` : null;
+      actionPoints.push(`**Growth & Margin Check:** Recent growth read (${[rTxt, pTxt].filter(Boolean).join(', ')}) alongside OPM ${opmVal != null ? opmVal.toFixed(1) + '%' : '—'}—confirm sustainability.`);
+    }
+    if (!fundamentals || Object.keys(fundamentals).length === 0) {
+      actionPoints.push(`**Data Tip:** Click *"Show fundamentals"* below to pull live Screener metrics and refine this assessment.`);
+    }
+  }
+
+  const metricChips = [
+    roceVal != null ? `ROCE ${roceVal.toFixed(1)}%` : null,
+    opmVal != null ? `OPM ${opmVal.toFixed(1)}%` : null,
+    pegRaw != null ? `PEG ${pegRaw.toFixed(2)}` : null,
+    deRaw != null ? `D/E ${deRaw.toFixed(2)}x` : null,
+    cfoPct != null ? `CFO/EBITDA ${cfoPct}%` : null,
+    garp != null ? `GARP ${garp}` : null
+  ].filter(Boolean);
+
+  return `
+    <div id="lookup-verdict-box" style="margin:10px 0 12px; padding:12px 14px; border-radius:12px; background:var(--surface-soft); border:1px solid var(--border-strong);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+        <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-soft);">Stock Fit Verdict</span>
+        <span style="font-size:12px; font-weight:800; padding:3px 10px; border-radius:999px; ${badgeStyle}">${escapeHtml(verdict)}</span>
+      </div>
+      <div style="font-size:12.5px; line-height:1.45; color:var(--ink); margin-bottom:8px;">${escapeHtml(thesisSummary).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
+      ${metricChips.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${metricChips.map(m => `<span class="ribbon-fund-pill">${escapeHtml(m)}</span>`).join('')}</div>` : ''}
+      <ul style="margin-left:16px; display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--ink-soft); line-height:1.4;">
+        ${actionPoints.map(pt => `<li>${escapeHtml(pt).replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--ink);">$1</strong>')}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+}
+
 async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = false) {
   const stocks = Store.getStocks();
   const known = stocks.find(([t, c]) =>
@@ -2408,6 +2498,9 @@ async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = 
   }
 
   const stockObj = { ticker: displayTicker, company: searchTerm, tier: stockTier, qty, avgPrice, articles };
+  const isExistingHolding = Boolean(known);
+  const cachedFundLookup = getCachedFundamentals(getCleanTicker(displayTicker));
+  const verdictHtml = evaluateLookupVerdict(displayTicker, searchTerm, isExistingHolding, cachedFundLookup, null, articles);
   const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn">✨ Generate AI 1-Minute Briefing</button>`;
   const errorNote = lookupError
     ? `<div class="quiet" style="color:var(--clay)">Backend error: ${escapeHtml(lookupError)}</div>`
@@ -2419,6 +2512,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = 
       <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
     </div>
     ${renderEntry(stockObj)}
+    ${verdictHtml}
     ${aiBtnHtml}
     <div id="ai-briefing-panel"></div>
     <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (Screener: PE, ROCE, CFO...)</button>
@@ -2552,6 +2646,15 @@ async function fetchAndShowFundamentals(ticker) {
 
     setCachedFundamentals(cleanTicker, data.fundamentals);
     panel.innerHTML = renderFundamentalsPanel(data.fundamentals);
+    const verdictEl = document.getElementById('lookup-verdict-box');
+    if (verdictEl) {
+      const stocksNow = Store.getStocks();
+      const isHeldNow = stocksNow.some(([t]) => t.toUpperCase() === ticker.toUpperCase());
+      const curArticles = (newsData && newsData.results)
+        ? ((newsData.results.find(r => r.ticker.toUpperCase() === ticker.toUpperCase()) || {}).articles || [])
+        : [];
+      verdictEl.outerHTML = evaluateLookupVerdict(ticker, ticker, isHeldNow, data.fundamentals, null, curArticles);
+    }
     if (btn) btn.style.display = 'none';
   } catch (e) {
     panel.innerHTML = `<div class="quiet" style="color:var(--clay)">${escapeHtml(formatFundamentalsError(e.message || String(e)))}</div>`;
