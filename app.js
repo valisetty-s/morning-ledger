@@ -139,7 +139,7 @@ const SECTOR_MAP = {
   "SAILIFE": "Healthcare & Pharma", "SANSERA": "Aerospace & Defense", "SBCL": "Auto Ancillary & EV",
   "SEDEMAC": "Auto Ancillary & EV", "SETL": "Capital Goods & Power Grid", "SHILPAMED": "Healthcare & Pharma",
   "SHRIRAMFIN": "Financials & NBFC", "SIGMAADV": "Aerospace & Defense", "SJS": "Auto Ancillary & EV",
-  "SKYGOLD": "Jewellery & Certification", "SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
+  "SKYGOLD": "Jewellery & Certification", "GOLDIAM": "Jewellery & Certification","SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
   "SRF": "Specialty & Green Chemistry", "STALLION": "Specialty & Green Chemistry", "STEELCAS": "Capital Goods & Power Grid",
   "STLTECH": "Telecom & Fibre Optic", "SUDEEPPHRM": "Healthcare & Pharma", "SUPRIYA": "Healthcare & Pharma",
   "SUZLON": "Clean Energy & Renewables", "SYRMA": "EMS", "TANFACIND": "Specialty & Green Chemistry",
@@ -191,7 +191,8 @@ let currentAnalyticsMode = 'tier';
 let currentChartStyle = localStorage.getItem('ml_chart_style') || 'bar';
 let selectedSliceKey = null;
 let lastFetchDiagnostics = { errorCount: 0, emptyCount: 0, totalCount: 0, lastError: null };
-let activeGarpTicker = null; 
+let activeGarpTicker = null;
+let activeLookupState = null; 
 
 const $ = (sel) => document.querySelector(sel);
 const contentEl = $('#content');
@@ -254,7 +255,7 @@ function init() {
     });
   }
 
-  contentEl.addEventListener('click', (e) => {
+  const handleCardActionClick = (e) => {
     const fundBtn = e.target.closest('.ribbon-fund-btn');
     if (fundBtn) {
       fetchAndShowInlineFundamentals(fundBtn.dataset.fundTicker, fundBtn.dataset.fundTarget, fundBtn);
@@ -270,12 +271,17 @@ function init() {
       const ticker = aiBtn.dataset.ticker;
       const company = aiBtn.dataset.company;
       const tier = aiBtn.dataset.tier || 'Watch';
-      const stockData = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null;
+      const fromLookup = activeLookupState && activeLookupState.displayTicker === ticker;
+      const stockData = fromLookup
+        ? activeLookupState
+        : (newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker) : null);
       const articles = stockData ? stockData.articles : [];
       fetchAndShowAIBriefing(ticker, company, articles, `ai-panel-entry-${ticker}`, aiBtn, tier);
       return;
     }
-  });
+  };
+  contentEl.addEventListener('click', handleCardActionClick);
+  if (lookupResult) lookupResult.addEventListener('click', handleCardActionClick);
 
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -2440,7 +2446,7 @@ function evaluateLookupVerdict(ticker, company, isExistingHolding, fundamentals,
       actionPoints.push(`**Growth & Margin Check:** Recent growth read (${[rTxt, pTxt].filter(Boolean).join(', ')}) alongside OPM ${opmVal != null ? opmVal.toFixed(1) + '%' : '—'}—confirm sustainability.`);
     }
     if (!fundamentals || Object.keys(fundamentals).length === 0) {
-      actionPoints.push(`**Data Tip:** Click *"Show fundamentals"* below to pull live Screener metrics and refine this assessment.`);
+      actionPoints.push(`**Data Tip:** Click *"Load Fundamentals"* or *"Show fundamentals"* to pull live Screener metrics and refine this assessment.`);
     }
   }
 
@@ -2453,11 +2459,13 @@ function evaluateLookupVerdict(ticker, company, isExistingHolding, fundamentals,
     garp != null ? `GARP ${garp}` : null
   ].filter(Boolean);
 
-  return `
+  const badgeHtml = `<span style="font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px; ${badgeStyle}">${escapeHtml(verdict)}</span>`;
+
+  const html = `
     <div id="lookup-verdict-box" style="margin:10px 0 12px; padding:12px 14px; border-radius:12px; background:var(--surface-soft); border:1px solid var(--border-strong);">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
         <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-soft);">Stock Fit Verdict</span>
-        <span style="font-size:12px; font-weight:800; padding:3px 10px; border-radius:999px; ${badgeStyle}">${escapeHtml(verdict)}</span>
+        ${badgeHtml}
       </div>
       <div style="font-size:12.5px; line-height:1.45; color:var(--ink); margin-bottom:8px;">${escapeHtml(thesisSummary).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
       ${metricChips.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${metricChips.map(m => `<span class="ribbon-fund-pill">${escapeHtml(m)}</span>`).join('')}</div>` : ''}
@@ -2466,6 +2474,45 @@ function evaluateLookupVerdict(ticker, company, isExistingHolding, fundamentals,
       </ul>
     </div>
   `;
+
+  return { verdict, badgeStyle, badgeHtml, html };
+}
+
+function renderSingleStockLookupCard() {
+  if (!activeLookupState) return;
+  const { displayTicker, searchTerm, stockTier, qty, avgPrice, articles, quote, isExistingHolding, lookupError } = activeLookupState;
+  const cachedFundLookup = getCachedFundamentals(getCleanTicker(displayTicker));
+  const verdictObj = evaluateLookupVerdict(displayTicker, searchTerm, isExistingHolding, cachedFundLookup, null, articles);
+  const stockObj = { ticker: displayTicker, company: searchTerm, tier: stockTier, qty, avgPrice, articles, quote: quote || null };
+  const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn">✨ Generate AI 1-Minute Briefing</button>`;
+  const errorNote = lookupError
+    ? `<div class="quiet" style="color:var(--clay)">Backend error: ${escapeHtml(lookupError)}</div>`
+    : '';
+
+  lookupResult.innerHTML = `<div class="lookup-result-card">
+    <div class="lookup-result-head">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="lookup-result-title">${escapeHtml(searchTerm)} <span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--ink-soft)">${escapeHtml(displayTicker)}</span></span>
+        ${verdictObj.badgeHtml}
+      </div>
+      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
+    </div>
+    ${renderEntry(stockObj)}
+    ${verdictObj.html}
+    ${aiBtnHtml}
+    <div id="ai-briefing-panel"></div>
+    <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (Screener: PE, ROCE, CFO...)</button>
+    <div id="fundamentals-panel"></div>
+    ${errorNote}
+  </div>`;
+
+  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
+  const fundBtn = document.getElementById('fundamentals-btn');
+  if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
+  const aiBtn = document.getElementById('ai-briefing-btn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
+  }
 }
 
 async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = false) {
@@ -2483,7 +2530,7 @@ async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = 
       <span class="lookup-result-title">${escapeHtml(searchTerm)}</span>
       <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
     </div>
-    <div class="lookup-loading">Fetching latest news for ${escapeHtml(displayTicker)}…</div>
+    <div class="lookup-loading">Fetching latest news &amp; price for ${escapeHtml(displayTicker)}…</div>
   </div>`;
   $('#lookup-close-btn').addEventListener('click', clearLookupResult);
 
@@ -2497,36 +2544,44 @@ async function runSingleStockLookup(tickerTyped, companyTyped, autoAiBriefing = 
     lookupError = e.message || String(e);
   }
 
-  const stockObj = { ticker: displayTicker, company: searchTerm, tier: stockTier, qty, avgPrice, articles };
-  const isExistingHolding = Boolean(known);
-  const cachedFundLookup = getCachedFundamentals(getCleanTicker(displayTicker));
-  const verdictHtml = evaluateLookupVerdict(displayTicker, searchTerm, isExistingHolding, cachedFundLookup, null, articles);
-  const aiBtnHtml = `<button id="ai-briefing-btn" class="ai-briefing-btn">✨ Generate AI 1-Minute Briefing</button>`;
-  const errorNote = lookupError
-    ? `<div class="quiet" style="color:var(--clay)">Backend error: ${escapeHtml(lookupError)}</div>`
-    : '';
+  // Pull quote from cache if available, or fetch live quote from backend for this ticker
+  const cleanT = getCleanTicker(displayTicker);
+  const cachedEntry = newsData && newsData.results
+    ? newsData.results.find(r => r.ticker.toUpperCase() === displayTicker.toUpperCase() || getCleanTicker(r.ticker).toUpperCase() === cleanT.toUpperCase())
+    : null;
+  let quote = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote : null;
 
-  lookupResult.innerHTML = `<div class="lookup-result-card">
-    <div class="lookup-result-head">
-      <span class="lookup-result-title">${escapeHtml(searchTerm)} <span style="font-family:'SF Mono',monospace;font-size:11px;color:var(--ink-soft)">${escapeHtml(displayTicker)}</span></span>
-      <button class="lookup-close" id="lookup-close-btn">✕ Close</button>
-    </div>
-    ${renderEntry(stockObj)}
-    ${verdictHtml}
-    ${aiBtnHtml}
-    <div id="ai-briefing-panel"></div>
-    <button id="fundamentals-btn" class="fundamentals-toggle-btn">📊 Show fundamentals (Screener: PE, ROCE, CFO...)</button>
-    <div id="fundamentals-panel"></div>
-    ${errorNote}
-  </div>`;
+  const backendUrl = getBackendUrl();
+  if (!quote && backendUrl) {
+    try {
+      const symParam = displayTicker === cleanT ? displayTicker : `${displayTicker},${cleanT}`;
+      const qResp = await fetch(`${backendUrl}/api/quotes?symbols=${encodeURIComponent(symParam)}`);
+      const qData = await qResp.json();
+      if (qResp.ok && qData.status === 'success' && qData.quotes) {
+        quote = qData.quotes[displayTicker] || qData.quotes[cleanT] || null;
+        if (quote && quote.error) quote = null;
+      }
+    } catch (e) {}
+  }
 
-  $('#lookup-close-btn').addEventListener('click', clearLookupResult);
-  const fundBtn = document.getElementById('fundamentals-btn');
-  if (fundBtn) fundBtn.addEventListener('click', () => fetchAndShowFundamentals(displayTicker));
-  const aiBtn = document.getElementById('ai-briefing-btn');
-  if (aiBtn) {
-    aiBtn.addEventListener('click', () => fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier));
-    if (autoAiBriefing) {
+  activeLookupState = {
+    ticker: displayTicker,
+    displayTicker,
+    searchTerm,
+    stockTier,
+    qty,
+    avgPrice,
+    articles,
+    quote,
+    isExistingHolding: Boolean(known),
+    lookupError
+  };
+
+  renderSingleStockLookupCard();
+
+  if (autoAiBriefing) {
+    const aiBtn = document.getElementById('ai-briefing-btn');
+    if (aiBtn) {
       fetchAndShowAIBriefing(displayTicker, searchTerm, articles, 'ai-briefing-panel', aiBtn, stockTier);
     }
   }
@@ -2565,6 +2620,9 @@ async function fetchAndShowInlineFundamentals(ticker, targetId, btn) {
 
     setCachedFundamentals(ticker, data.fundamentals);
     renderContent();
+    if (activeLookupState && getCleanTicker(activeLookupState.displayTicker) === getCleanTicker(ticker)) {
+      renderSingleStockLookupCard();
+    }
   } catch (e) {
     btn.outerHTML = `<span class="ribbon-fund-pill ribbon-fund-error" title="${escapeHtml(formatFundamentalsError(e.message || String(e)))}">⚠ error</span>`;
   }
@@ -2663,6 +2721,7 @@ async function fetchAndShowFundamentals(ticker) {
 }
 
 function clearLookupResult() {
+  activeLookupState = null;
   lookupResult.innerHTML = '';
   lookupInput.value = '';
   lookupSuggestions.classList.remove('open');
@@ -3217,7 +3276,7 @@ function renderEntry(stock) {
         ${dmaFullLineHtml}
         ${fullHoldingsHtml}
         ${moreNewsHtml}
-        <div class="card-actions-row">
+        <div class="card-actions-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:4px;">
           <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--border-strong); background:var(--surface); border-radius:8px; cursor:pointer; font-weight:700; color:var(--ink);">📋 GARP Audit</button>
           <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI Thesis-Check</button>
         </div>
@@ -3462,6 +3521,9 @@ document.addEventListener('click', (e) => {
     if ($('#garp-overlay')) $('#garp-overlay').style.display = 'none';
     
     renderContent();
+    if (activeLookupState && activeLookupState.displayTicker === activeGarpTicker) {
+      renderSingleStockLookupCard();
+    }
     if (typeof renderPortfolioAnalytics === 'function') {
       renderPortfolioAnalytics();
     }
