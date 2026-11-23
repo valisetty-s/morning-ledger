@@ -931,45 +931,62 @@
     margin-bottom: 12px;
     box-shadow: var(--shadow-sm);
   }
-  .compact-controls {
+  .controls-inline-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .controls-inline-row::-webkit-scrollbar { display: none; }
+
+  .compact-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
   }
   .ctrl-select {
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 6px 10px;
-    border-radius: 8px;
+    padding: 4px 7px;
+    border-radius: 7px;
     border: 1px solid var(--border-strong);
     background: var(--surface-soft);
     color: var(--ink);
     cursor: pointer;
     outline: none;
+    max-width: 122px;
   }
+  .ctrl-select#sort-select { max-width: 112px; }
+  .ctrl-select#filter-select { max-width: 124px; }
+  .ctrl-select#sentiment-select { max-width: 96px; }
   .ctrl-select:focus { border-color: var(--teal); background: var(--surface); }
 
-  .trend-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding-top: 10px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  .rail-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    flex-shrink: 0;
+    margin: 0 2px;
   }
-  .trend-toolbar::-webkit-scrollbar { display: none; }
+
+  .trend-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
 
   .chip {
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
-    padding: 6px 13px;
+    padding: 4px 9px;
     border-radius: 100px;
     border: 1px solid var(--border-strong);
     background: var(--surface);
@@ -1004,6 +1021,43 @@
     color: var(--ink-soft);
     padding: 4px 4px 10px;
   }
+
+  /* ---------- INLINE HOLDINGS LIST FILTER BAR ---------- */
+  .holdings-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .holdings-filter-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .holdings-filter-input::placeholder { color: var(--ink-muted); }
+  .holdings-filter-clear {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: none;
+  }
+  .holdings-filter-clear.visible { display: inline-flex; }
 
   /* ---------- MOVERS SUMMARY STRIP ---------- */
   .movers-summary {
@@ -1671,7 +1725,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v59 · Dark Bento</span>
+            <span class="build-tag">v61 · Dark Bento</span>
           </div>
         </div>
       </div>
@@ -1745,40 +1799,44 @@
 
   <!-- Compact Filter & Sort Rail -->
   <div class="controls-card">
-    <div class="compact-controls">
-      <select id="sort-select" class="ctrl-select" aria-label="Sort stocks">
-        <option value="garp-desc" selected>Sort: GARP ↓</option>
-        <option value="garp-asc">Sort: GARP ↑</option>
-        <option value="peg-asc">Sort: PEG ↑</option>
-        <option value="peg-desc">Sort: PEG ↓</option>
-        <option value="pat-desc">Sort: PAT ↓</option>
-        <option value="pat-asc">Sort: PAT ↑</option>
-        <option value="change-desc">Sort: % Chg ↓</option>
-        <option value="change-asc">Sort: % Chg ↑</option>
-        <option value="default">Sort: A–Z</option>
-      </select>
-      <select id="filter-select" class="ctrl-select" aria-label="Filter holdings">
-        <option value="all" selected>All holdings</option>
-        <option value="fresh">Fresh news only</option>
-        <option value="strong-cash">💰 Strong Cash (≥70%)</option>
-        <option value="weak-cash">⚠️ Weak Cash (&lt;50%)</option>
-        <option value="capex-heavy">🏗️ Capex Heavy</option>
-        <option value="active-cwip">🏭 Active Expansion (CWIP ≥15%)</option>
-      </select>
-      <select id="sentiment-select" class="ctrl-select" aria-label="Filter sentiment">
-        <option value="all" selected>All tone</option>
-        <option value="negative">⚠ Negative</option>
-        <option value="positive">✓ Positive</option>
-      </select>
-    </div>
+    <div class="controls-inline-row">
+      <div class="compact-controls">
+        <select id="sort-select" class="ctrl-select" aria-label="Sort stocks">
+          <option value="garp-desc" selected>Sort: GARP ↓</option>
+          <option value="garp-asc">Sort: GARP ↑</option>
+          <option value="peg-asc">Sort: PEG ↑</option>
+          <option value="peg-desc">Sort: PEG ↓</option>
+          <option value="pat-desc">Sort: PAT ↓</option>
+          <option value="pat-asc">Sort: PAT ↑</option>
+          <option value="change-desc">Sort: % Chg ↓</option>
+          <option value="change-asc">Sort: % Chg ↑</option>
+          <option value="default">Sort: A–Z</option>
+        </select>
+        <select id="filter-select" class="ctrl-select" aria-label="Filter holdings">
+          <option value="all" selected>All holdings</option>
+          <option value="fresh">Fresh news</option>
+          <option value="strong-cash">💰 Cash ≥70%</option>
+          <option value="weak-cash">⚠️ Cash &lt;50%</option>
+          <option value="capex-heavy">🏗️ Capex</option>
+          <option value="active-cwip">🏭 CWIP ≥15%</option>
+        </select>
+        <select id="sentiment-select" class="ctrl-select" aria-label="Filter sentiment">
+          <option value="all" selected>All tone</option>
+          <option value="negative">⚠ Negative</option>
+          <option value="positive">✓ Positive</option>
+        </select>
+      </div>
 
-    <div class="trend-toolbar">
-      <button class="chip active" data-trend="all">All</button>
-      <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Buys</button>
-      <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Trim/Exits</button>
-      <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend</button>
-      <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy</button>
-      <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ &lt;200D</button>
+      <span class="rail-divider" aria-hidden="true"></span>
+
+      <div class="trend-toolbar">
+        <button class="chip active" data-trend="all">All</button>
+        <button class="chip" data-trend="actionable-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">💎 Buys</button>
+        <button class="chip" data-trend="actionable-exits" title="GARP < 65 and trading below 200-DMA">✂️ Trim/Exits</button>
+        <button class="chip" data-trend="uptrend" title="Price > 20D, 50D & 200D">🚀 Uptrend</button>
+        <button class="chip" data-trend="dip-buy" title="Price < 50D but > 200D">🎯 Dip-Buy</button>
+        <button class="chip" data-trend="below-200" title="Price < 200D">⚠️ &lt;200D</button>
+      </div>
     </div>
   </div>
 
@@ -1787,6 +1845,12 @@
   <div id="filterCountBar" class="count-banner"></div>
 
   <div id="movers-summary"></div>
+
+  <div class="holdings-filter-bar" id="holdings-list-filter-bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" id="holdings-list-search" class="holdings-filter-input" placeholder="Filter holdings list by stock name or symbol (e.g. APLAPOLLO, CAMS, Max)..." autocomplete="off">
+    <button type="button" id="holdings-list-search-clear" class="holdings-filter-clear" title="Clear list filter">Clear</button>
+  </div>
 
   <div id="content">
     <div class="empty-state">

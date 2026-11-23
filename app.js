@@ -177,6 +177,7 @@ let currentFilter = 'all';
 let currentSentiment = 'all';
 let currentSort = 'garp-desc'; 
 let currentTrend = 'all';
+let currentListQuery = '';
 let newsData = null;
 let currentAnalyticsMode = 'tier';
 let currentChartStyle = localStorage.getItem('ml_chart_style') || 'bar';
@@ -372,6 +373,35 @@ function init() {
   refreshBtn.addEventListener('click', fetchAllNews);
   const priceBtn = $('#price-refresh-btn');
   if (priceBtn) priceBtn.addEventListener('click', fetchLatestPrices);
+
+  const listSearchInput = $('#holdings-list-search');
+  const listSearchClear = $('#holdings-list-search-clear');
+  if (listSearchInput) {
+    listSearchInput.addEventListener('input', () => {
+      currentListQuery = listSearchInput.value.trim();
+      if (listSearchClear) {
+        listSearchClear.classList.toggle('visible', currentListQuery.length > 0);
+      }
+      renderContent();
+    });
+    listSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        listSearchInput.value = '';
+        currentListQuery = '';
+        if (listSearchClear) listSearchClear.classList.remove('visible');
+        renderContent();
+      }
+    });
+  }
+  if (listSearchClear) {
+    listSearchClear.addEventListener('click', () => {
+      if (listSearchInput) listSearchInput.value = '';
+      currentListQuery = '';
+      listSearchClear.classList.remove('visible');
+      renderContent();
+      if (listSearchInput) listSearchInput.focus();
+    });
+  }
 
   let lookupDebounceTimer = null;
   lookupInput.addEventListener('input', () => {
@@ -2703,9 +2733,19 @@ function renderContent() {
     }
   }
 
+  if (currentListQuery) {
+    const qLower = currentListQuery.toLowerCase();
+    filtered = filtered.filter(s => {
+      const sym = String(s.ticker || '').toLowerCase();
+      const cleanSym = getCleanTicker(s.ticker || '').toLowerCase();
+      const comp = String(s.company || '').toLowerCase();
+      return sym.includes(qLower) || cleanSym.includes(qLower) || comp.includes(qLower);
+    });
+  }
+
   const countBar = document.getElementById('filterCountBar');
   if (countBar) {
-    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all';
+    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all' || Boolean(currentListQuery);
     if (isFiltered) {
       const labels = {
         'strong-cash': '💰 Strong Cash (≥70%)',
@@ -2722,7 +2762,8 @@ function renderContent() {
       const activeTags = [
         labels[currentFilter],
         currentSentiment !== 'all' ? `Tone: ${currentSentiment}` : null,
-        labels[currentTrend]
+        labels[currentTrend],
+        currentListQuery ? `Search: "${currentListQuery}"` : null
       ].filter(Boolean).join(' + ');
 
       countBar.textContent = `Showing ${filtered.length} of ${newsData.results.length} stocks (${activeTags})`;
