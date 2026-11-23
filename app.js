@@ -185,6 +185,7 @@ let currentSentiment = 'all';
 let currentSort = 'garp-desc'; 
 let currentTrend = 'all';
 let currentListQuery = '';
+let isPrivacyMasked = localStorage.getItem('ml_privacy_mask') === 'true';
 let newsData = null;
 let currentAnalyticsMode = 'tier';
 let currentChartStyle = localStorage.getItem('ml_chart_style') || 'bar';
@@ -844,10 +845,10 @@ function renderPortfolioAnalytics() {
         </div>
         <div class="pnl-card-metrics">
           <div class="pnl-card-val ${colorClass}">
-            ${sign}₹${Math.abs(Math.round(slice.pnl)).toLocaleString('en-IN')}
+            ${isPrivacyMasked ? '±₹00,000' : `${sign}₹${Math.abs(Math.round(slice.pnl)).toLocaleString('en-IN')}`}
           </div>
           <div class="pnl-card-sub ${colorClass}">
-            ${sign}${slice.pnlPct.toFixed(1)}%
+            ${isPrivacyMasked ? '0.0%' : `${sign}${slice.pnlPct.toFixed(1)}%`}
           </div>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--ink-muted); margin-top:4px; border-top:1px dotted var(--border); padding-top:4px;">
@@ -864,25 +865,30 @@ function renderPortfolioAnalytics() {
       <div class="bento-card hero-card">
         <div class="bento-card-head">
           <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
-          <div class="chart-style-switch" role="group" aria-label="Chart display style">
-            <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
-            <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="style-switch-btn ${isPrivacyMasked ? 'active' : ''}" id="btn-privacy-toggle" title="${isPrivacyMasked ? 'Show portfolio amounts' : 'Hide amounts (mask in zeroes)'}">
+              ${isPrivacyMasked ? '🔒 Masked' : '👁️ Hide ₹'}
+            </button>
+            <div class="chart-style-switch" role="group" aria-label="Chart display style">
+              <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
+              <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
+            </div>
           </div>
         </div>
 
         <div class="hero-kpi-row">
           <div>
             <div class="hero-val-lbl">Portfolio Value</div>
-            <div class="hero-val-main">₹${Math.round(totalCurrentVal).toLocaleString('en-IN')}</div>
+            <div class="hero-val-main">${maskAmt(totalCurrentVal)}</div>
           </div>
           <div class="hero-sub-metrics">
             <div>
               <div class="hero-val-lbl">Total Invested</div>
-              <div class="hero-sub-val">₹${Math.round(totalInvested).toLocaleString('en-IN')}</div>
+              <div class="hero-sub-val">${maskAmt(totalInvested)}</div>
             </div>
             <div>
               <div class="hero-val-lbl">Overall P&amp;L</div>
-              <div class="pnl-hero-pill ${pnlClass}">${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)</div>
+              <div class="pnl-hero-pill ${pnlClass}">${isPrivacyMasked ? '±₹0,00,000 (0.00%)' : `${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)`}</div>
             </div>
           </div>
         </div>
@@ -988,6 +994,13 @@ function renderPortfolioAnalytics() {
     renderPortfolioAnalytics();
   });
 
+  const btnPrivacy = document.getElementById('btn-privacy-toggle');
+  if (btnPrivacy) btnPrivacy.addEventListener('click', () => {
+    isPrivacyMasked = !isPrivacyMasked;
+    localStorage.setItem('ml_privacy_mask', isPrivacyMasked ? 'true' : 'false');
+    renderPortfolioAnalytics();
+  });
+
   // Analytics Mode Buttons
   const bindMode = (id, mode) => {
     const btn = document.getElementById(id);
@@ -1073,10 +1086,10 @@ function renderDrilldownTable(slice) {
           <div style="font-size: 11px; font-weight: 400; color:var(--ink-soft); font-family: -apple-system, sans-serif;">${escapeHtml(item.company)}</div>
         </td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: center;">${item.qty}</td>
-        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;">₹${item.avgPrice ? item.avgPrice.toFixed(1) : '—'}</td>
-        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${Math.round(item.currentVal || item.invested).toLocaleString('en-IN')}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;">${isPrivacyMasked ? '₹00.0' : (item.avgPrice ? `₹${item.avgPrice.toFixed(1)}` : '—')}</td>
+        <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">${isPrivacyMasked ? '₹00,000' : `₹${Math.round(item.currentVal || item.invested).toLocaleString('en-IN')}`}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;" class="${pnlClass}">
-          ${pnlSign}₹${Math.abs(Math.round(item.pnl)).toLocaleString('en-IN')} (${pnlSign}${item.pnlPct.toFixed(1)}%)
+          ${isPrivacyMasked ? '±₹00,000 (0.00%)' : `${pnlSign}₹${Math.abs(Math.round(item.pnl)).toLocaleString('en-IN')} (${pnlSign}${item.pnlPct.toFixed(1)}%)`}
         </td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">₹${item.ltp ? item.ltp.toFixed(1) : '—'}</td>
         <td style="padding: 8px 6px; color:var(--ink-soft); font-size: 11px;">${escapeHtml(item.sector)}</td>
@@ -1134,6 +1147,19 @@ function renderDrilldownTable(slice) {
 /* ==========================================================================
    PART 2: DATA FETCHING, QUOTES, SETTINGS & DOM RENDERING PIPELINE
    ========================================================================== */
+
+function maskAmt(num, isSigned = false) {
+  if (isPrivacyMasked) {
+    return isSigned ? '±₹0,00,000' : '₹0,00,000';
+  }
+  const rounded = Math.round(Number(num) || 0);
+  const formatted = Math.abs(rounded).toLocaleString('en-IN');
+  if (isSigned) {
+    const s = rounded >= 0 ? '+' : '-';
+    return `${s}₹${formatted}`;
+  }
+  return `₹${formatted}`;
+}
 
 function fmtRatio(v, suffix) {
   if (v == null) return '—';
