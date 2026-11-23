@@ -903,7 +903,7 @@ function renderPortfolioAnalytics() {
 
         ${allocationVisualHtml}
 
-        <details class="pnl-breakdown-details">
+        <details class="pnl-breakdown-details" open>
           <summary>📊 Segregated P&amp;L Contribution (tap any slice to inspect stocks)</summary>
           <div class="pnl-stats-grid">${pnlCardsHtml}</div>
         </details>
