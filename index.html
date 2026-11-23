@@ -836,6 +836,67 @@
   .radar-amber { background: var(--amber-bg); border-color: var(--amber-border); color: var(--radar-amber-ink); }
   .radar-violet { background: var(--violet-bg); border-color: var(--violet-border); color: var(--radar-violet-ink); }
 
+  /* Urgent News Action Blocks inside Action Radar for Today */
+  .urgent-radar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .urgent-box {
+    border-radius: 12px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+  }
+  .urgent-box.urgent-sell {
+    background: var(--rose-bg);
+    border-color: var(--rose-border);
+  }
+  .urgent-box.urgent-buy {
+    background: var(--emerald-bg);
+    border-color: var(--emerald-border);
+  }
+  .urgent-box-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+  .urgent-box.urgent-sell .urgent-box-head { color: var(--rose); }
+  .urgent-box.urgent-buy .urgent-box-head { color: var(--emerald); }
+  .urgent-pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .urgent-stock-chip {
+    font-family: 'SF Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .urgent-stock-chip:hover {
+    transform: translateY(-1px);
+    border-color: var(--teal);
+  }
+  .urgent-empty-note {
+    font-size: 11px;
+    color: var(--ink-muted);
+    font-style: italic;
+  }
+
+
   /* ---------- FILTER & SORT RAIL ---------- */
   .controls-card {
     background: var(--surface);
@@ -1585,7 +1646,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v56 · Dark Bento</span>
+            <span class="build-tag">v57 · Dark Bento</span>
           </div>
         </div>
       </div>

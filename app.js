@@ -818,7 +818,7 @@ function renderPortfolioAnalytics() {
       <!-- Left Hero Portfolio Card -->
       <div class="bento-card hero-card">
         <div class="bento-card-head">
-          <span class="bento-eyebrow">Portfolio Allocation</span>
+          <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
           <div class="chart-style-switch" role="group" aria-label="Chart display style">
             <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
             <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
@@ -860,13 +860,13 @@ function renderPortfolioAnalytics() {
         </details>
       </div>
 
-      <!-- Right Action Radar Card -->
+      <!-- Right Action Radar for Today Card -->
       <div class="bento-card">
         <div class="bento-card-head" style="margin-bottom:10px;">
-          <span class="bento-eyebrow">Action Radar For Today</span>
+          <span class="bento-eyebrow">Action Radar for Today</span>
           <span style="font-size:11px; color:var(--ink-muted); font-weight:600;" title="Stocks with cached Screener fundamentals on this device">${cachedFundCount}/${radarSource.length} audited</span>
         </div>
-        <div class="radar-grid">
+        <div class="radar-grid" style="height:auto;">
           <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
             <div class="radar-num">${buysCount}</div>
             <div class="radar-lbl">💎 Buys</div>
@@ -884,6 +884,47 @@ function renderPortfolioAnalytics() {
             <div class="radar-lbl">🏭 Active CWIP</div>
           </div>
         </div>
+        ${(() => {
+          const urgentSellItems = [];
+          const urgentBuyItems = [];
+          radarSource.forEach(s => {
+            const u = getNewsUrgentAction(s, savedScores);
+            if (!u) return;
+            if (u.action === 'sell') urgentSellItems.push(u);
+            else if (u.action === 'buy') urgentBuyItems.push(u);
+          });
+
+          const sellChipsHtml = urgentSellItems.length
+            ? urgentSellItems.slice(0, 8).map(item =>
+                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.label.split(' ')[1] || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+              ).join('') + (urgentSellItems.length > 8 ? `<span class="urgent-empty-note">+${urgentSellItems.length - 8} more</span>` : '')
+            : `<span class="urgent-empty-note">No negative news shocks detected</span>`;
+
+          const buyChipsHtml = urgentBuyItems.length
+            ? urgentBuyItems.slice(0, 8).map(item =>
+                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.label.split(' ')[1] || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+              ).join('') + (urgentBuyItems.length > 8 ? `<span class="urgent-empty-note">+${urgentBuyItems.length - 8} more</span>` : '')
+            : `<span class="urgent-empty-note">No fresh positive catalysts detected</span>`;
+
+          return `
+            <div class="urgent-radar-stack">
+              <div class="urgent-box urgent-sell">
+                <div class="urgent-box-head">
+                  <span>🚨 Urgent Action - Sell/Trim</span>
+                  <span>${urgentSellItems.length}</span>
+                </div>
+                <div class="urgent-pill-list">${sellChipsHtml}</div>
+              </div>
+              <div class="urgent-box urgent-buy">
+                <div class="urgent-box-head">
+                  <span>🟢 Urgent Action - Buy</span>
+                  <span>${urgentBuyItems.length}</span>
+                </div>
+                <div class="urgent-pill-list">${buyChipsHtml}</div>
+              </div>
+            </div>
+          `;
+        })()}
       </div>
     </div>
   `;
@@ -954,6 +995,15 @@ function renderPortfolioAnalytics() {
   };
   container.querySelectorAll('[data-slice-key]').forEach(el => {
     el.addEventListener('click', () => handleSliceClick(el.dataset.sliceKey));
+  });
+  container.querySelectorAll('[data-urgent-ticker]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = (btn.dataset.urgentTicker || '').trim();
+      if (!t) return;
+      const match = stocks.find(([sym]) => sym.toUpperCase() === t.toUpperCase());
+      runSingleStockLookup(t, match ? match[1] : t);
+      if (lookupResult) lookupResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   });
 
   if (selectedSliceKey) {
@@ -1581,7 +1631,9 @@ const NEGATIVE_WORDS = [
   'misses estimate', 'falls short', 'below estimate', 'disappoint', 'muted outlook',
   'margin contraction', 'margin pressure', 'margin squeeze', 'cost overrun', 'profit warning',
   'shares fall', 'shares slide', 'shares drop', 'shares tank', 'shares tumble', 'shares crash',
-  'stock falls', 'stock slips', 'stock slides', 'stock drops', 'stock declines', 'stock tanks',
+  'shares plunge', 'shares slump', 'stock falls', 'stock slips', 'stock slides', 'stock drops',
+  'stock declines', 'stock tanks', 'stock plunges', 'stock slumps', 'plunge', 'bloodbath',
+  'lower circuit', 'sell-off', 'selloff', 'dilution', 'equity dilution', 'leverage',
   '52-week low', 'underperform', 'sell rating', 'red flag', 'warns of', 'demand slowdown',
   'resign', 'steps down', 'quits', 'sacked', 'fired', 'lawsuit', 'penalty', 'fine imposed',
   'halted', 'delisted', 'strike', 'shutdown', 'layoff', 'recall', 'cyberattack', 'data leak'
@@ -1593,8 +1645,8 @@ const POSITIVE_WORDS = [
   'raises guidance', 'raises outlook', 'margin expansion', 'strong growth', 'demand surge',
   'shares jump', 'shares rise', 'shares gain', 'shares surge', 'shares rally', 'shares soar',
   'stock jumps', 'stock rises', 'stock gains', 'stock surges', 'stock rallies', 'stock climbs',
-  '52-week high', 'record high', 'outperform', 'buy rating', 'target price raised', 'upgrade',
-  'wins order', 'wins contract', 'wins deal', 'secures order', 'bags order', 'gets approval',
+  'upper circuit', '52-week high', 'record high', 'outperform', 'buy rating', 'target price raised', 'upgrade',
+  'wins order', 'wins contract', 'wins deal', 'secures order', 'bags order', 'order win', 'gets approval',
   'expansion plan', 'capacity expansion', 'buyback', 'dividend announce', 'bonus issue',
   'strategic tie-up', 'joint venture', 'debt-free', 'turns profitable'
 ];
@@ -1629,6 +1681,60 @@ function classifyStockOverallSentiment(articles) {
   const latest = findMostRecentArticle(articles);
   if (!latest) return null;
   return classifySentiment(latest.title) === 'negative' ? 'negative' : 'positive';
+}
+
+function getNewsUrgentAction(stock, savedScoresMap) {
+  const articles = (stock && stock.articles) || [];
+  const q = stock && stock.quote ? stock.quote : null;
+  const chg = q && q.change_pct != null ? Number(q.change_pct) : null;
+
+  let negHits = 0;
+  let posHits = 0;
+  let reasons = [];
+
+  for (const a of articles.slice(0, 3)) {
+    const title = (a && a.title) || '';
+    if (!title) continue;
+    const s = classifySentiment(title);
+    if (s === 'negative') {
+      negHits++;
+      reasons.push(title);
+    } else if (s === 'positive') {
+      posHits++;
+      reasons.push(title);
+    }
+  }
+
+  // Sharp negative price shock (>= 5% drop) with headline context also flags Urgent Sell/Trim review
+  const hasSharpDrop = chg != null && chg <= -5.0;
+  if (negHits > 0 && (negHits >= posHits || hasSharpDrop)) {
+    return {
+      action: 'sell',
+      label: `🚨 ${stock.ticker}${chg != null ? ` (${chg > 0 ? '+' : ''}${chg}%)` : ''}`,
+      reason: reasons[0] || `Negative news with ${chg}% move`
+    };
+  }
+  if (hasSharpDrop && articles.length > 0) {
+    return {
+      action: 'sell',
+      label: `🚨 ${stock.ticker} (${chg}%)`,
+      reason: articles[0].title || `Sharp drop of ${chg}%`
+    };
+  }
+
+  const scores = savedScoresMap || JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  const garp = scores[stock.ticker] ? scores[stock.ticker].score : null;
+  const isStrongFundamental = garp == null || garp >= 70;
+
+  if (posHits > negHits && isStrongFundamental && (chg == null || chg > -3.0)) {
+    return {
+      action: 'buy',
+      label: `🟢 ${stock.ticker}${chg != null ? ` (${chg > 0 ? '+' : ''}${chg}%)` : ''}`,
+      reason: reasons[0] || 'Positive news catalyst'
+    };
+  }
+
+  return null;
 }
 
 function applySorting(stocks, sortType) {
