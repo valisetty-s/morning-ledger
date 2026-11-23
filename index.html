@@ -282,7 +282,7 @@
     position: relative;
   }
   @media (min-width: 768px) {
-    .lookup-bar { flex: 1 1 240px; width: auto; }
+    .lookup-bar { flex: 0 1 230px; width: auto; max-width: 240px; }
   }
   .lookup-input-wrap {
     display: flex;
@@ -466,6 +466,31 @@
 
   /* ---------- AI GLOBAL CUES CARD ---------- */
   #global-cues-container { margin: 10px 0; }
+  .mc-open-strip {
+    margin: 0 0 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+    box-shadow: var(--shadow-sm);
+  }
+  .mc-open-strip strong { color: var(--ink); }
+  .mc-open-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--teal);
+    background: var(--teal-soft);
+    border: 1px solid var(--border-strong);
+    padding: 1px 6px;
+    border-radius: 6px;
+    margin-right: 6px;
+  }
   .global-cues-card {
     background: var(--cues-bg);
     border: 1px solid var(--indigo-border);
@@ -1646,7 +1671,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v58 · Dark Bento</span>
+            <span class="build-tag">v59 · Dark Bento</span>
           </div>
         </div>
       </div>
@@ -1657,16 +1682,19 @@
       </div>
     </div>
 
-    <div class="lookup-bar">
-      <div class="lookup-input-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" id="lookup-input" class="lookup-input" placeholder="Search stock — e.g. AARTIIND, CAMS, STLTECH..." autocomplete="off">
+    <div style="display:flex; align-items:center; gap:8px; flex:1 1 280px; min-width:0;">
+      <div class="lookup-bar" style="flex:0 1 220px; max-width:220px;">
+        <div class="lookup-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lookup-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="lookup-input" class="lookup-input" placeholder="Search stock..." autocomplete="off">
+        </div>
+        <div id="lookup-suggestions" class="lookup-suggestions"></div>
       </div>
-      <div id="lookup-suggestions" class="lookup-suggestions"></div>
+      <button class="pill-btn pill-cues" id="global-cues-btn"><span>🌐 Global Cues</span></button>
     </div>
 
     <div class="header-actions">
-      <button class="pill-btn pill-cues" id="global-cues-btn"><span>🌐 Global Cues</span></button>
+      <button class="pill-btn" id="analytics-toggle-chip" title="Toggle Analysis Charts"><span>📊 Analysis Charts</span></button>
       <button class="pill-btn pill-garp" id="bulk-garp-btn"><span>🤖 GARP Auto-Audit</span></button>
     </div>
   </div>
@@ -1680,21 +1708,14 @@
       <div class="sync-item">
         <button class="refresh-btn" id="refresh-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
-          <span id="refresh-label">Fetch today's news</span>
+          <span id="refresh-label">Stocks' news</span>
         </button>
-        <span class="status" id="refresh-status">Not yet fetched today</span>
+        <span class="status" id="refresh-status"></span>
       </div>
       <div class="sync-item">
         <button class="refresh-btn" id="price-refresh-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-          <span id="price-refresh-label">Fetch latest prices</span>
-        </button>
-        <span class="status" id="price-status">Prices: tap to fetch</span>
-      </div>
-      <div class="sync-item">
-        <button class="refresh-btn active" id="analytics-toggle-chip" title="Toggle Portfolio Overview & Pie Chart">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-          <span id="analytics-toggle-label">📊 Overview</span>
+          <span id="price-refresh-label">Latest prices</span>
         </button>
       </div>
     </div>
@@ -1714,6 +1735,9 @@
 
   <div id="global-cues-container" style="display: none;"></div>
   <div id="lookup-result"></div>
+
+  <!-- Moneycontrol Market-Open Sector/Stock Reaction Summary (2 lines, maintained all day) -->
+  <div id="mc-market-open-summary" class="mc-open-strip" style="display: none;"></div>
 
   <!-- Design 2: Asymmetric Bento Portfolio Overview + Action Radar -->
   <div id="portfolio-analytics-container" style="display: block;"></div>

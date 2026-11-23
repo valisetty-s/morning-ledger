@@ -230,6 +230,7 @@ function init() {
 
   const analyticsChip = $('#analytics-toggle-chip');
   if (analyticsChip) {
+    analyticsChip.classList.add('active');
     analyticsChip.addEventListener('click', () => {
       const isHidden = analyticsContainer.style.display === 'none';
       if (!isHidden) {
@@ -438,6 +439,8 @@ function init() {
 
   const bulkGarpBtn = $('#bulk-garp-btn');
   if (bulkGarpBtn) bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
+
+  pullDailyGlobalCuesOnce();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -1178,26 +1181,19 @@ function getBackendUrl() {
 }
 
 function updateStatusBar() {
-  if (!newsData) {
-    if (refreshStatus) refreshStatus.textContent = 'Not yet fetched today';
+  if (!newsData || !newsData.fetchedAt) {
+    if (refreshStatus) refreshStatus.textContent = '';
     if (datelineStatus) {
-      datelineStatus.textContent = "Tap refresh to fetch today's news";
+      datelineStatus.textContent = '';
       datelineStatus.classList.remove('fresh');
     }
     updatePriceStatus();
     return;
   }
   const fresh = isToday(newsData.fetchedAt);
-  const d = lastFetchDiagnostics;
-  let diagSuffix = '';
-  if (d && d.totalCount > 0 && d.errorCount > 0) {
-    if (d.errorCount === d.totalCount) {
-      diagSuffix = ` — ⚠ backend could not be reached for any stock (${escapeHtml(d.lastError || 'unknown error')}). Check your backend URL in Settings.`;
-    } else if (d.errorCount > d.totalCount * 0.3) {
-      diagSuffix = ` — ⚠ ${d.errorCount}/${d.totalCount} stocks failed to fetch (${escapeHtml(d.lastError || 'see details')})`;
-    }
+  if (refreshStatus) {
+    refreshStatus.textContent = `As on ${timeLabel(newsData.fetchedAt)}`;
   }
-  if (refreshStatus) refreshStatus.textContent = `Last fetched ${timeLabel(newsData.fetchedAt)}${fresh ? ' today' : ' (older — refresh for today)'}${diagSuffix}`;
   if (datelineStatus) {
     datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
     datelineStatus.classList.toggle('fresh', fresh);
@@ -1209,9 +1205,7 @@ function updateStatusBar() {
 
 function updatePriceStatus() {
   const priceStatusEl = $('#price-status');
-  if (!priceStatusEl) return;
-  const hasAnyQuote = newsData && newsData.results && newsData.results.some(r => r.quote && r.quote.last_price != null);
-  priceStatusEl.textContent = hasAnyQuote ? 'Prices updated' : 'Prices: tap to fetch';
+  if (priceStatusEl) priceStatusEl.textContent = '';
 }
 
 function updateGarpAuditStatus() {
@@ -1427,20 +1421,20 @@ async function fetchLatestPrices() {
     if (priceBtn) priceBtn.classList.remove('spinning');
 
     if (!resp.ok || data.status !== 'success') {
-      priceStatusUpdate(`Prices unavailable: ${data.error || `HTTP ${resp.status}`}`);
+      
       return;
     }
 
     applyFetchedQuotes(data.quotes || {});
     const successCount = Object.values(data.quotes || {}).filter(q => !q.error).length;
-    priceStatusUpdate(`Prices updated (${successCount}/${stocks.length})`);
+    
     renderPortfolioAnalytics();
 
     // Auto-trigger GARP Audit immediately after prices finish loading
     runBulkGarpAudit();
   } catch (e) {
     if (priceBtn) priceBtn.classList.remove('spinning');
-    priceStatusUpdate(`Prices unavailable: ${e.message || e}`);
+    
   }
 }
 
@@ -1931,7 +1925,7 @@ async function fetchAllNews() {
   Store.setCache(newsData);
 
   refreshBtn.classList.remove('spinning');
-  refreshLabel.textContent = "Fetch today's news";
+  refreshLabel.textContent = "Stocks' news";
   updateStatusBar();
   renderContent();
   fetchLatestPrices();
@@ -1998,6 +1992,111 @@ function renderSuggestions(query) {
   });
 }
 
+
+const MC_DAILY_OPEN_KEY = 'ml_mc_open_brief_v1';
+
+function todayDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function deriveMoneycontrolReactionLines(cues, stocksList) {
+  const headlineText = [
+    ...(cues && Array.isArray(cues.global_headlines) ? cues.global_headlines : []),
+    cues && cues.indian_impact ? cues.indian_impact : '',
+    cues && cues.usa_market ? cues.usa_market : '',
+    cues && cues.china_market ? cues.china_market : ''
+  ].join(' ').toLowerCase();
+
+  const sectorWatch = [];
+  if (/ai|chip|nasdaq|tech|gpu|cloud|semiconductor/.test(headlineText)) {
+    sectorWatch.push('IT, AI & Data Center');
+  }
+  if (/oil|crude|brent|energy|gas|middle east/.test(headlineText)) {
+    sectorWatch.push('Oil/Gas & Chemicals');
+  }
+  if (/gold|silver|bullion|metal|steel|copper/.test(headlineText)) {
+    sectorWatch.push('Metals & Jewellery');
+  }
+  if (/defense|defence|order|infra|power|grid/.test(headlineText)) {
+    sectorWatch.push('Defense & Power Grid');
+  }
+  if (/fii|dii|rate|fed|bank|nifty|sensex/.test(headlineText)) {
+    sectorWatch.push('Banks & Financials');
+  }
+
+  const matchedTickers = [];
+  const watchlist = Array.isArray(stocksList) ? stocksList : Store.getStocks();
+  for (const row of watchlist) {
+    const sym = String(row[0] || '').toUpperCase();
+    const comp = String(row[1] || '').toLowerCase();
+    const sec = String(SECTOR_MAP[getCleanTicker(sym)] || SECTOR_MAP[sym] || '').toLowerCase();
+    const hitBySector =
+      (sec.includes('ai') && /ai|tech|nasdaq|cloud/.test(headlineText)) ||
+      (sec.includes('chemical') && /oil|crude|chemical|commodity/.test(headlineText)) ||
+      (sec.includes('capital') && /steel|metal|power|infra|grid/.test(headlineText)) ||
+      (sec.includes('defense') && /defense|defence|order/.test(headlineText)) ||
+      (sec.includes('financial') && /fii|bank|rate|market/.test(headlineText));
+    const hitByName = comp && comp.length > 3 && headlineText.includes(comp.split(' ')[0]);
+    if ((hitBySector || hitByName) && !matchedTickers.includes(sym)) {
+      matchedTickers.push(sym);
+    }
+    if (matchedTickers.length >= 6) break;
+  }
+
+  const line1 = cues && cues.indian_impact
+    ? cues.indian_impact
+    : 'Moneycontrol cues point to selective opening moves across global and domestic triggers.';
+
+  const sectorsText = sectorWatch.length ? sectorWatch.slice(0, 3).join(', ') : 'Broad Market & Cyclicals';
+  const stocksText = matchedTickers.length ? matchedTickers.join(', ') : 'Portfolio Movers';
+  const line2 = `Likely early reaction on open: Sectors — ${sectorsText}; Stocks to watch — ${stocksText}.`;
+
+  return { line1, line2 };
+}
+
+function renderMaintainedMarketOpenStrip(linesObj) {
+  const el = document.getElementById('mc-market-open-summary');
+  if (!el || !linesObj || (!linesObj.line1 && !linesObj.line2)) return;
+  el.style.display = 'block';
+  el.innerHTML = `<span class="mc-open-tag">Moneycontrol Open Watch</span><div>${escapeHtml(linesObj.line1)}</div><div style="margin-top:3px;"><strong>${escapeHtml(linesObj.line2)}</strong></div>`;
+}
+
+async function pullDailyGlobalCuesOnce() {
+  const todayKey = todayDateKey();
+  const savedDaily = JSON.parse(localStorage.getItem(MC_DAILY_OPEN_KEY) || 'null');
+  if (savedDaily && savedDaily.dateKey === todayKey && savedDaily.lines) {
+    renderMaintainedMarketOpenStrip(savedDaily.lines);
+    if (savedDaily.cues) {
+      const cuesContainer = document.getElementById('global-cues-container');
+      if (cuesContainer && cuesContainer.innerHTML.trim() === '') {
+        renderGlobalCues(savedDaily.cues, cuesContainer);
+        cuesContainer.style.display = 'none';
+      }
+    }
+    return;
+  }
+
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) return;
+
+  try {
+    const resp = await fetch(`${backendUrl}/api/market/global-cues`);
+    const data = await resp.json();
+    if (resp.ok && data.status === 'success' && data.cues) {
+      const lines = deriveMoneycontrolReactionLines(data.cues, Store.getStocks());
+      localStorage.setItem(MC_DAILY_OPEN_KEY, JSON.stringify({
+        dateKey: todayKey,
+        savedAt: new Date().toISOString(),
+        cues: data.cues,
+        lines
+      }));
+      renderMaintainedMarketOpenStrip(lines);
+    }
+  } catch (e) {
+    // Keep silent on background auto-pull failure so user workflow isn't interrupted
+  }
+}
+
 async function fetchAndRenderGlobalCues() {
   const backendUrl = getBackendUrl();
   const btn = $('#global-cues-btn');
@@ -2033,6 +2132,14 @@ async function fetchAndRenderGlobalCues() {
 
     if (resp.ok && data.status === 'success') {
       localStorage.setItem('ml_global_cues', JSON.stringify({ time: Date.now(), cues: data.cues }));
+      const lines = deriveMoneycontrolReactionLines(data.cues, Store.getStocks());
+      localStorage.setItem(MC_DAILY_OPEN_KEY, JSON.stringify({
+        dateKey: todayDateKey(),
+        savedAt: new Date().toISOString(),
+        cues: data.cues,
+        lines
+      }));
+      renderMaintainedMarketOpenStrip(lines);
       renderGlobalCues(data.cues, container);
     } else {
       container.style.display = 'block';
