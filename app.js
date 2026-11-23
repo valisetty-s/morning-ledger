@@ -73,8 +73,15 @@ const DEFAULT_STOCKS = [
   ["TRIVENIPT","Triveni Power Transmission","Top51-75",0,0],["VENUSPIPES","Venus Pipes & Tubes","Top31-50",0,0],
   ["VIKRAMTH","Vikram Thermo (India)","Top51-75",0,0],["WELCORP","Welspun Corp","Top51-75",0,0]
 ];
+const CORE_COMPOUNDERS_SET = new Set([
+  'APLAPOLLO', 'BSE', 'CAMS', 'COFORGE', 'INDHOTEL', 'KALYANKJIL',
+  'LALPATHLAB', 'MAXHEALTH', 'MCX', 'NAM-INDIA', 'RAINBOW', 'SCHAEFFLER',
+  'SHAILY', 'SONACOMS', 'SRF', 'SUPRIYA', 'THYROCARE', 'TIPSMUSIC',
+  'UNOMINDA', 'YATHARTH', 'ZYDUSLIFE', 'COALINDIA'
+]);
 const TIER_COLORS = {
-  "Top30":    "#059669",
+  "Compounders": "#0F766E",
+  "Top30":       "#059669",
   "Top31-50": "#4F46E5",
   "Top51-75": "#D97706",
   "Watch":    "#E11D48",
@@ -496,8 +503,12 @@ function renderPortfolioAnalytics() {
   let totalCurrentVal = 0;
 
   const enriched = stocks.map(([ticker, company, originalTier, qty = 0, avgPrice = 0]) => {
+    const cleanT = getCleanTicker(ticker);
     let tier = originalTier;
-    if (savedScores[ticker] && savedScores[ticker].status) {
+
+    if (CORE_COMPOUNDERS_SET.has(cleanT) || CORE_COMPOUNDERS_SET.has(ticker)) {
+      tier = 'Compounders';
+    } else if (savedScores[ticker] && savedScores[ticker].status) {
       const status = savedScores[ticker].status;
       if (status === 'ACCUMULATE_CORE') tier = 'Top30';
       else if (status === 'HOLD_SATELLITE') tier = 'Top31-50';
@@ -556,10 +567,11 @@ function renderPortfolioAnalytics() {
 
   if (currentAnalyticsMode === 'tier') {
     const tierMap = {
-      "Top30": { name: "Accumulate", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
-      "Top31-50": { name: "Hold", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
-      "Top51-75": { name: "Trim", val: 0, inv: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
-      "Watch": { name: "Exit", val: 0, inv: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
+      "Compounders": { name: "Compounders", val: 0, inv: 0, count: 0, color: TIER_COLORS["Compounders"], items: [] },
+      "Top30":       { name: "Accumulate",  val: 0, inv: 0, count: 0, color: TIER_COLORS["Top30"], items: [] },
+      "Top31-50":    { name: "Hold",        val: 0, inv: 0, count: 0, color: TIER_COLORS["Top31-50"], items: [] },
+      "Top51-75":    { name: "Trim",        val: 0, inv: 0, count: 0, color: TIER_COLORS["Top51-75"], items: [] },
+      "Watch":       { name: "Exit",        val: 0, inv: 0, count: 0, color: TIER_COLORS["Watch"], items: [] },
     };
 
     enriched.forEach(item => {
@@ -828,7 +840,7 @@ function renderPortfolioAnalytics() {
       <div class="pnl-stat-card" data-slice-key="${escapeHtml(slice.key)}">
         <div class="pnl-card-title">
           <span class="legend-swatch" style="background: ${slice.color}"></span>
-          <span>${escapeHtml(slice.name)}</span>
+          <span>${escapeHtml(slice.name)} <span style="font-weight:600; color:var(--ink-muted); font-size:11px;">(${slice.count || 0})</span></span>
         </div>
         <div class="pnl-card-metrics">
           <div class="pnl-card-val ${colorClass}">
@@ -1222,7 +1234,7 @@ function updateStatusBar() {
   }
   const fresh = isToday(newsData.fetchedAt);
   if (refreshStatus) {
-    refreshStatus.textContent = `As on ${timeLabel(newsData.fetchedAt)}`;
+    refreshStatus.textContent = `${timeLabel(newsData.fetchedAt)}`;
   }
   if (datelineStatus) {
     datelineStatus.textContent = fresh ? 'Updated this morning' : 'Stale — tap refresh';
@@ -1243,19 +1255,18 @@ function updateGarpAuditStatus() {
   if (!el) return;
   const iso = localStorage.getItem('ml_last_garp_audit');
   if (!iso) {
-    el.textContent = 'Last audit: never';
+    el.textContent = '';
     return;
   }
   const d = new Date(iso);
   if (isNaN(d)) {
-    el.textContent = 'Last audit: never';
+    el.textContent = '';
     return;
   }
-  const datePart = isToday(iso)
-    ? 'Today'
-    : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   const timePart = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  el.textContent = `Last audit: ${datePart}, ${timePart}`;
+  el.textContent = isToday(iso)
+    ? `${timePart}`
+    : `${d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${timePart}`;
 }
 
 function openSettings() {
@@ -3251,12 +3262,12 @@ async function runBulkGarpAudit() {
     btn.classList.remove('spinning');
     if (stoppedEarly) {
       btn.innerHTML = `<span style="color:var(--clay);">⚠ Paused: Yahoo rate limit hit. Try again in 15 mins.</span>`;
-      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 6000);
+      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit</span>'; }, 6000);
     } else if (failedCount > 0) {
       btn.innerHTML = `<span style="color:var(--clay);">⚠ Done (${failedCount} skipped by Yahoo).</span>`;
-      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>'; }, 5000);
+      setTimeout(() => { btn.innerHTML = '<span>🤖 GARP Auto-Audit</span>'; }, 5000);
     } else {
-      btn.innerHTML = '<span>🤖 GARP Auto-Audit All</span>';
+      btn.innerHTML = '<span>🤖 GARP Auto-Audit</span>';
     }
   }
 
