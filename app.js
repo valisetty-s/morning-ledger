@@ -521,8 +521,6 @@ function renderPortfolioAnalytics() {
     const avg = Number(avgPrice) || 0;
     const invested = q * avg;
     totalInvested += invested;
-
-    const cleanT = getCleanTicker(ticker);
     const cachedEntry = newsData && newsData.results ? newsData.results.find(r => r.ticker === ticker || r.ticker === cleanT) : null;
     let ltp = cachedEntry && cachedEntry.quote && cachedEntry.quote.last_price != null ? cachedEntry.quote.last_price : avg;
     const currentVal = q > 0 ? (q * ltp) : 0;
