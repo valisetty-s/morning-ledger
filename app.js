@@ -139,7 +139,7 @@ const SECTOR_MAP = {
   "SAILIFE": "Healthcare & Pharma", "SANSERA": "Aerospace & Defense", "SBCL": "Auto Ancillary & EV",
   "SEDEMAC": "Auto Ancillary & EV", "SETL": "Capital Goods & Power Grid", "SHILPAMED": "Healthcare & Pharma",
   "SHRIRAMFIN": "Financials & NBFC", "SIGMAADV": "Aerospace & Defense", "SJS": "Auto Ancillary & EV",
-  "SKYGOLD": "Jewellery & Certification", "GOLDIAM": "Jewellery & Certification", "SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
+  "SKYGOLD": "Jewellery & Certification", "SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
   "SRF": "Specialty & Green Chemistry", "STALLION": "Specialty & Green Chemistry", "STEELCAS": "Capital Goods & Power Grid",
   "STLTECH": "Telecom & Fibre Optic", "SUDEEPPHRM": "Healthcare & Pharma", "SUPRIYA": "Healthcare & Pharma",
   "SUZLON": "Clean Energy & Renewables", "SYRMA": "EMS", "TANFACIND": "Specialty & Green Chemistry",
