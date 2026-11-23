@@ -139,7 +139,7 @@ const SECTOR_MAP = {
   "SAILIFE": "Healthcare & Pharma", "SANSERA": "Aerospace & Defense", "SBCL": "Auto Ancillary & EV",
   "SEDEMAC": "Auto Ancillary & EV", "SETL": "Capital Goods & Power Grid", "SHILPAMED": "Healthcare & Pharma",
   "SHRIRAMFIN": "Financials & NBFC", "SIGMAADV": "Aerospace & Defense", "SJS": "Auto Ancillary & EV",
-  "SKYGOLD": "Jewellery & Certification", "GOLDIAM": "Jewellery & Certification","SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
+  "SKYGOLD": "Jewellery & Certification", "GOLDIAM": "Jewellery & Certification", "SONACOMS": "Auto Ancillary & EV", "SPICEJET": "Commodity Converters & Distressed",
   "SRF": "Specialty & Green Chemistry", "STALLION": "Specialty & Green Chemistry", "STEELCAS": "Capital Goods & Power Grid",
   "STLTECH": "Telecom & Fibre Optic", "SUDEEPPHRM": "Healthcare & Pharma", "SUPRIYA": "Healthcare & Pharma",
   "SUZLON": "Clean Energy & Renewables", "SYRMA": "EMS", "TANFACIND": "Specialty & Green Chemistry",
@@ -3366,7 +3366,7 @@ async function runBulkGarpAudit() {
       }
     }
 
-    let score = 60; // 60 Base points
+    let score = 50; // 50 Base points
     let inputs = {
       'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0",
       'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5"
@@ -3403,16 +3403,30 @@ async function runBulkGarpAudit() {
         else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
       }
 
-      // Gate 6: Valuation Bonus (P/E vs Industry P/E, or fallback to <50 / 50-75 bands)
-      const pe = fundamentals.trailing_pe != null ? fundamentals.trailing_pe : null;
+      // Gate 6: P/E Valuation Ladder (<30 highest; -5 pts per 10-point step up)
+      const pe = fundamentals.trailing_pe != null ? Number(fundamentals.trailing_pe) : null;
       if (pe != null && pe > 0) {
-        if (fundamentals.industry_pe) {
-          if (pe <= fundamentals.industry_pe * 1.2) { score += 10; inputs['garp-g6'] = "45"; }
-          else if (pe <= fundamentals.industry_pe * 1.8) { score += 5; inputs['garp-g6'] = "40"; }
+        let peBonus = 0;
+        let g6Val = "25";
+        if (pe < 30) {
+          peBonus = 25;
+          g6Val = "45";
+        } else if (pe < 40) {
+          peBonus = 10;
+          g6Val = "40";
+        } else if (pe < 50) {
+          peBonus = 5;
+          g6Val = "35";
+        } else if (pe < 60) {
+          peBonus = 0;
+          g6Val = "25";
         } else {
-          if (pe < 50) { score += 10; inputs['garp-g6'] = "45"; }
-          else if (pe <= 75) { score += 5; inputs['garp-g6'] = "40"; }
+          const stepsAbove50 = Math.floor((pe - 50) / 10); // pe>=60 -> stepsAbove50 >= 1
+          peBonus = -(stepsAbove50 * 5);
+          g6Val = "0";
         }
+        score += peBonus;
+        inputs['garp-g6'] = g6Val;
       }
 
       // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
@@ -3434,7 +3448,7 @@ async function runBulkGarpAudit() {
     else if (score >= 70) status = 'HOLD_SATELLITE';
     else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
-    // Don't overwrite a previously good cached score with a 60 if Yahoo failed
+    // Don't overwrite a previously good cached score with a 50 if Yahoo failed
     if (fundamentals || !savedScores[ticker]) {
       savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
     }
