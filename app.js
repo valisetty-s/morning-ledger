@@ -256,11 +256,6 @@ function init() {
   }
 
   const handleCardActionClick = (e) => {
-    const singleGarpBtn = e.target.closest('.single-auto-garp-btn');
-    if (singleGarpBtn) {
-      runSingleStockGarpAutoAudit(singleGarpBtn.dataset.autoGarpTicker, singleGarpBtn);
-      return;
-    }
     const fundBtn = e.target.closest('.ribbon-fund-btn');
     if (fundBtn) {
       fetchAndShowInlineFundamentals(fundBtn.dataset.fundTicker, fundBtn.dataset.fundTarget, fundBtn);
@@ -3321,7 +3316,6 @@ function renderEntry(stock) {
         ${fullHoldingsHtml}
         ${moreNewsHtml}
         <div class="card-actions-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:4px;">
-          <button class="action-btn single-auto-garp-btn" data-auto-garp-ticker="${escapeHtml(stock.ticker)}" title="Re-calculate automatic GARP score for this stock only" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--emerald-border); background:var(--emerald-bg); border-radius:8px; cursor:pointer; font-weight:700; color:var(--emerald);">⚡ Auto GARP</button>
           <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--border-strong); background:var(--surface); border-radius:8px; cursor:pointer; font-weight:700; color:var(--ink);">📋 GARP Audit</button>
           <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI Thesis-Check</button>
         </div>
@@ -3586,6 +3580,65 @@ async function runBulkGarpAudit() {
    ========================================================================== */
 document.addEventListener('click', (e) => {
   const garpBtn = e.target.closest('.garp-trigger-btn');
+  const garpRefreshBtn = e.target.closest('#garp-refresh-btn');
+  if (garpRefreshBtn) {
+    if (!activeGarpTicker) return;
+    const cleanT = getCleanTicker(activeGarpTicker);
+    const backendUrl = getBackendUrl();
+    garpRefreshBtn.disabled = true;
+    garpRefreshBtn.textContent = '🔄 Refreshing…';
+
+    (async () => {
+      let fundamentals = null;
+      if (backendUrl) {
+        try {
+          const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
+          const data = await resp.json();
+          if (resp.ok && data.status === 'success' && data.fundamentals) {
+            fundamentals = data.fundamentals;
+            setCachedFundamentals(cleanT, fundamentals);
+          }
+        } catch (err) {}
+      }
+      if (!fundamentals) {
+        fundamentals = getCachedFundamentals(cleanT);
+      }
+
+      const computed = computeAutoGarpForStock(activeGarpTicker, fundamentals);
+
+      // 1. Update popup dropdowns to match newly computed parameters
+      if (computed.inputs) {
+        document.querySelectorAll('.garp-input').forEach(select => {
+          if (computed.inputs[select.id] !== undefined) {
+            select.value = computed.inputs[select.id];
+          }
+        });
+      }
+
+      // 2. Update popup live score & status label
+      updateLiveGarpScore();
+
+      // 3. Immediately persist updated score to local storage
+      const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+      savedScores[activeGarpTicker] = computed;
+      if (cleanT !== activeGarpTicker) savedScores[cleanT] = computed;
+      localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
+
+      // 4. Update the meter and allocation view right away
+      renderContent();
+      if (activeLookupState && getCleanTicker(activeLookupState.displayTicker) === cleanT) {
+        renderSingleStockLookupCard();
+      }
+      if (typeof renderPortfolioAnalytics === 'function') {
+        renderPortfolioAnalytics();
+      }
+
+      garpRefreshBtn.disabled = false;
+      garpRefreshBtn.textContent = '🔄 Refresh';
+    })();
+    return;
+  }
+
   if (garpBtn) {
     activeGarpTicker = garpBtn.dataset.ticker;
     if ($('#garp-modal-title')) $('#garp-modal-title').textContent = `GARP Audit: ${activeGarpTicker}`;
