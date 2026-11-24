@@ -256,6 +256,11 @@ function init() {
   }
 
   const handleCardActionClick = (e) => {
+    const singleGarpBtn = e.target.closest('.single-auto-garp-btn');
+    if (singleGarpBtn) {
+      runSingleStockGarpAutoAudit(singleGarpBtn.dataset.autoGarpTicker, singleGarpBtn);
+      return;
+    }
     const fundBtn = e.target.closest('.ribbon-fund-btn');
     if (fundBtn) {
       fetchAndShowInlineFundamentals(fundBtn.dataset.fundTicker, fundBtn.dataset.fundTarget, fundBtn);
@@ -3316,6 +3321,7 @@ function renderEntry(stock) {
         ${fullHoldingsHtml}
         ${moreNewsHtml}
         <div class="card-actions-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:4px;">
+          <button class="action-btn single-auto-garp-btn" data-auto-garp-ticker="${escapeHtml(stock.ticker)}" title="Re-calculate automatic GARP score for this stock only" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--emerald-border); background:var(--emerald-bg); border-radius:8px; cursor:pointer; font-weight:700; color:var(--emerald);">⚡ Auto GARP</button>
           <button class="action-btn garp-trigger-btn" data-ticker="${escapeHtml(stock.ticker)}" style="font-size:11.5px; padding:6px 11px; border:1px solid var(--border-strong); background:var(--surface); border-radius:8px; cursor:pointer; font-weight:700; color:var(--ink);">📋 GARP Audit</button>
           <button class="ribbon-ai-btn" data-ticker="${escapeHtml(stock.ticker)}" data-company="${escapeHtml(stock.company)}" data-tier="${escapeHtml(stock.tier || 'Watch')}">✨ AI Thesis-Check</button>
         </div>
@@ -3331,6 +3337,144 @@ function renderEntry(stock) {
 /* ==========================================================================
    BULK GARP AUTO-AUDIT ENGINE (WITH CIRCUIT BREAKER & CALIBRATED GATES)
    ========================================================================== */
+function computeAutoGarpForStock(ticker, fundamentals) {
+  const cleanT = getCleanTicker(ticker);
+  let score = 50; // 50 Base points
+  let inputs = {
+    'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0",
+    'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5"
+  };
+  let isSub12 = false;
+  let isSuper18 = false;
+  const missingFields = [];
+
+  if (!fundamentals) {
+    missingFields.push('Fundamentals');
+  } else {
+    const cachedRoceObj = getCachedRoce(cleanT);
+    const hasRoce = fundamentals.roce != null || (cachedRoceObj && cachedRoceObj.roce != null) || fundamentals.return_on_equity != null;
+    if (!hasRoce) missingFields.push('ROCE');
+
+    const hasOpm = fundamentals.operating_margin != null || fundamentals.profit_margin != null;
+    if (!hasOpm) missingFields.push('OPM');
+
+    const hasDe = fundamentals.debt_to_equity != null || fundamentals.debt_ratio != null;
+    if (!hasDe) missingFields.push('D/E');
+
+    const pe = fundamentals.trailing_pe != null ? Number(fundamentals.trailing_pe) : null;
+    if (pe == null || pe <= 0) missingFields.push('P/E');
+
+    const revGrowth = fundamentals.revenueGrowth != null ? Number(fundamentals.revenueGrowth) : (fundamentals.revenue_growth != null ? Number(fundamentals.revenue_growth) : null);
+    const earnGrowth = fundamentals.earningsGrowth != null ? Number(fundamentals.earningsGrowth) : (fundamentals.earnings_growth != null ? Number(fundamentals.earnings_growth) : null);
+    if (revGrowth == null && earnGrowth == null) missingFields.push('Growth');
+
+    const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
+    const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
+    const returnPct = returnMetric * 100;
+    if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
+    else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
+
+    const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
+    const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
+    if (opm != null) {
+      if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
+      else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
+    } else {
+      if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
+      else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
+    }
+
+    const deRaw = fundamentals.debt_to_equity;
+    const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
+    if (de != null) {
+      if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
+      else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
+    }
+
+    if (pe != null && pe > 0) {
+      let peBonus = 0;
+      let g6Val = "25";
+      if (pe < 30) {
+        peBonus = 25;
+        g6Val = "45";
+      } else if (pe < 40) {
+        peBonus = 10;
+        g6Val = "40";
+      } else if (pe < 50) {
+        peBonus = 5;
+        g6Val = "35";
+      } else if (pe < 60) {
+        peBonus = 0;
+        g6Val = "25";
+      } else {
+        const stepsAbove50 = Math.floor((pe - 50) / 10);
+        peBonus = -(stepsAbove50 * 5);
+        g6Val = "0";
+        const maxGrowth = Math.max(earnGrowth != null ? earnGrowth : 0, revGrowth != null ? revGrowth : 0);
+        if (maxGrowth >= 0.25) {
+          peBonus += 15;
+          g6Val = "35";
+        } else if (maxGrowth >= 0.15) {
+          peBonus += 10;
+          g6Val = "25";
+        }
+      }
+      score += peBonus;
+      inputs['garp-g6'] = g6Val;
+    }
+
+    let primaryGrowth = null;
+    if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
+    else if (revGrowth != null) primaryGrowth = revGrowth;
+    else if (earnGrowth != null) primaryGrowth = earnGrowth;
+    else primaryGrowth = returnMetric;
+
+    isSub12 = (primaryGrowth < 0.12);
+    isSuper18 = (primaryGrowth >= 0.18);
+  }
+
+  let status = 'PRUNE_GTT_EXIT';
+  if (score >= 85) status = 'ACCUMULATE_CORE';
+  else if (score >= 70) status = 'HOLD_SATELLITE';
+  else if (score >= 50) status = 'MONITOR_WATCHLIST';
+
+  return { score, status, inputs, isSub12, isSuper18, missingFields };
+}
+
+async function runSingleStockGarpAutoAudit(ticker, btnEl = null) {
+  const cleanT = getCleanTicker(ticker);
+  const backendUrl = getBackendUrl();
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = '⚡ Scoring…';
+  }
+  let fundamentals = getCachedFundamentals(cleanT);
+  if (!fundamentals && backendUrl) {
+    try {
+      const resp = await fetch(`${backendUrl}/api/fundamentals?symbol=${encodeURIComponent(cleanT)}`);
+      const data = await resp.json();
+      if (resp.ok && data.status === 'success' && data.fundamentals) {
+        fundamentals = data.fundamentals;
+        setCachedFundamentals(cleanT, fundamentals);
+      }
+    } catch (e) {}
+  }
+
+  const computed = computeAutoGarpForStock(ticker, fundamentals);
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
+  savedScores[ticker] = computed;
+  if (cleanT !== ticker) savedScores[cleanT] = computed;
+  localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
+
+  renderContent();
+  if (activeLookupState && getCleanTicker(activeLookupState.displayTicker) === cleanT) {
+    renderSingleStockLookupCard();
+  }
+  if (typeof renderPortfolioAnalytics === 'function') {
+    renderPortfolioAnalytics();
+  }
+}
+
 let isBulkGarpRunning = false;
 
 async function runBulkGarpAudit() {
@@ -3405,119 +3549,9 @@ async function runBulkGarpAudit() {
       }
     }
 
-    let score = 50; // 50 Base points
-    let inputs = {
-      'garp-g1': "0", 'garp-g2': "0", 'garp-g3': "0",
-      'garp-g4': "10", 'garp-g5': "10", 'garp-g6': "35", 'garp-g7': "5"
-    };
-
-    let isSub12 = false;
-    let isSuper18 = false;
-    const missingFields = [];
-
-    if (!fundamentals) {
-      missingFields.push('Fundamentals');
-    } else {
-      // 1. Detect missing crucial metrics:
-      const cachedRoceObj = getCachedRoce(cleanT);
-      const hasRoce = fundamentals.roce != null || (cachedRoceObj && cachedRoceObj.roce != null) || fundamentals.return_on_equity != null;
-      if (!hasRoce) missingFields.push('ROCE');
-
-      const hasOpm = fundamentals.operating_margin != null || fundamentals.profit_margin != null;
-      if (!hasOpm) missingFields.push('OPM');
-
-      const hasDe = fundamentals.debt_to_equity != null || fundamentals.debt_ratio != null;
-      if (!hasDe) missingFields.push('D/E');
-
-      const pe = fundamentals.trailing_pe != null ? Number(fundamentals.trailing_pe) : null;
-      if (pe == null || pe <= 0) missingFields.push('P/E');
-
-      const revGrowth = fundamentals.revenueGrowth != null ? Number(fundamentals.revenueGrowth) : (fundamentals.revenue_growth != null ? Number(fundamentals.revenue_growth) : null);
-      const earnGrowth = fundamentals.earningsGrowth != null ? Number(fundamentals.earningsGrowth) : (fundamentals.earnings_growth != null ? Number(fundamentals.earnings_growth) : null);
-      if (revGrowth == null && earnGrowth == null) missingFields.push('Growth');
-
-      // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
-      const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
-      const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
-      const returnPct = returnMetric * 100;
-      if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
-      else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
-
-      // Gate 2: True Operating Margin (OPM) first; fallback to Net Profit Margin
-      const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
-      const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
-      if (opm != null) {
-        if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
-        else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
-      } else {
-        if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
-        else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
-      }
-
-      // Gate 3: D/E Solvency (Yahoo reports Gross D/E as %, so 0.6x accounts for gross vs net)
-      const deRaw = fundamentals.debt_to_equity;
-      const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
-      if (de != null) {
-        if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
-        else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
-      }
-
-      // Gate 6: P/E Valuation Ladder (<30 highest; step down for higher multiples)
-      if (pe != null && pe > 0) {
-        let peBonus = 0;
-        let g6Val = "25";
-        if (pe < 30) {
-          peBonus = 25;
-          g6Val = "45";
-        } else if (pe < 40) {
-          peBonus = 10;
-          g6Val = "40";
-        } else if (pe < 50) {
-          peBonus = 5;
-          g6Val = "35";
-        } else if (pe < 60) {
-          peBonus = 0;
-          g6Val = "25";
-        } else {
-          // P/E >= 60 base step-down penalty (-5 per 10 pts above 50)
-          const stepsAbove50 = Math.floor((pe - 50) / 10);
-          peBonus = -(stepsAbove50 * 5);
-          g6Val = "0";
-
-          // Growth Cushion for high P/E compounders:
-          // If company is delivering high growth (PAT >= 20% or Revenue >= 18%), cushion the high-multiple penalty!
-          const maxGrowth = Math.max(earnGrowth != null ? earnGrowth : 0, revGrowth != null ? revGrowth : 0);
-          if (maxGrowth >= 0.25) {
-            peBonus += 15; // Strong growth cushion
-            g6Val = "35";
-          } else if (maxGrowth >= 0.15) {
-            peBonus += 10; // Moderate growth cushion
-            g6Val = "25";
-          }
-        }
-        score += peBonus;
-        inputs['garp-g6'] = g6Val;
-      }
-
-      // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
-      let primaryGrowth = null;
-      if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
-      else if (revGrowth != null) primaryGrowth = revGrowth;
-      else if (earnGrowth != null) primaryGrowth = earnGrowth;
-      else primaryGrowth = returnMetric;
-
-      isSub12 = (primaryGrowth < 0.12);
-      isSuper18 = (primaryGrowth >= 0.18);
-    }
-
-    let status = 'PRUNE_GTT_EXIT';
-    if (score >= 85) status = 'ACCUMULATE_CORE';
-    else if (score >= 70) status = 'HOLD_SATELLITE';
-    else if (score >= 50) status = 'MONITOR_WATCHLIST';
-
-    // Don't overwrite a previously good cached score with a 50 if Yahoo failed
+    const computed = computeAutoGarpForStock(ticker, fundamentals);
     if (fundamentals || !savedScores[ticker]) {
-      savedScores[ticker] = { score, status, inputs, isSub12, isSuper18, missingFields };
+      savedScores[ticker] = computed;
     }
   }
 
