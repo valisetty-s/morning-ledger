@@ -936,6 +936,31 @@
     color: var(--ink-muted);
     font-style: italic;
   }
+  .urgent-extra-chips {
+    display: contents;
+  }
+  .urgent-toggle-btn {
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 7px;
+    border: 1px dashed var(--border-strong);
+    background: var(--surface);
+    color: var(--teal);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .urgent-toggle-btn:hover {
+    background: var(--teal-soft);
+    border-color: var(--teal);
+  }
+  .urgent-toggle-btn.expanded {
+    background: var(--surface-soft);
+    color: var(--ink-muted);
+    border-style: solid;
+  }
 
 
   /* ---------- FILTER & SORT RAIL ---------- */
@@ -1741,7 +1766,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v68 · Dark Bento</span>
+            <span class="build-tag">v69 · Dark Bento</span>
           </div>
         </div>
       </div>

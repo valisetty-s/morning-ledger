@@ -949,17 +949,33 @@ function renderPortfolioAnalytics() {
             else if (u.action === 'buy') urgentBuyItems.push(u);
           });
 
-          const sellChipsHtml = urgentSellItems.length
-            ? urgentSellItems.slice(0, 8).map(item =>
-                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
-              ).join('') + (urgentSellItems.length > 8 ? `<span class="urgent-empty-note">+${urgentSellItems.length - 8} more</span>` : '')
-            : `<span class="urgent-empty-note">No negative news shocks detected</span>`;
+          function renderUrgentChips(items, emptyMsg, expandId) {
+            if (!items.length) {
+              return `<span class="urgent-empty-note">${emptyMsg}</span>`;
+            }
+            const visibleCount = 8;
+            const primary = items.slice(0, visibleCount);
+            const remaining = items.slice(visibleCount);
 
-          const buyChipsHtml = urgentBuyItems.length
-            ? urgentBuyItems.slice(0, 8).map(item =>
-                `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
-              ).join('') + (urgentBuyItems.length > 8 ? `<span class="urgent-empty-note">+${urgentBuyItems.length - 8} more</span>` : '')
-            : `<span class="urgent-empty-note">No fresh positive catalysts detected</span>`;
+            const primaryHtml = primary.map(item =>
+              `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+            ).join('');
+
+            if (!remaining.length) return primaryHtml;
+
+            const remainingHtml = remaining.map(item =>
+              `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+            ).join('');
+
+            return `
+              ${primaryHtml}
+              <span id="${expandId}-extra" class="urgent-extra-chips" style="display:none;">${remainingHtml}</span>
+              <button type="button" class="urgent-toggle-btn" data-expand-target="${expandId}-extra" data-count="${remaining.length}">+${remaining.length} more</button>
+            `;
+          }
+
+          const sellChipsHtml = renderUrgentChips(urgentSellItems, 'No negative news shocks detected', 'urgent-sell');
+          const buyChipsHtml = renderUrgentChips(urgentBuyItems, 'No fresh positive catalysts detected', 'urgent-buy');
 
           return `
             <div class="urgent-radar-stack">
@@ -1058,6 +1074,20 @@ function renderPortfolioAnalytics() {
   container.querySelectorAll('[data-slice-key]').forEach(el => {
     el.addEventListener('click', () => handleSliceClick(el.dataset.sliceKey));
   });
+  container.querySelectorAll('[data-expand-target]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetId = btn.dataset.expandTarget;
+      const count = btn.dataset.count;
+      const extraEl = document.getElementById(targetId);
+      if (!extraEl) return;
+      const isHidden = extraEl.style.display === 'none';
+      extraEl.style.display = isHidden ? 'contents' : 'none';
+      btn.textContent = isHidden ? 'Show less' : `+${count} more`;
+      btn.classList.toggle('expanded', isHidden);
+    });
+  });
+
   container.querySelectorAll('[data-urgent-ticker]').forEach(btn => {
     btn.addEventListener('click', () => {
       const t = (btn.dataset.urgentTicker || '').trim();
