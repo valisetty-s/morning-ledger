@@ -3024,7 +3024,7 @@ function renderContent() {
   }
 }
 
-function renderGarpArcSvg(score, ticker) {
+function renderGarpArcSvg(score, ticker, missingFields = []) {
   const hasScore = score != null && !isNaN(score);
   const clamped = hasScore ? Math.max(0, Math.min(100, Number(score))) : 0;
   const arcLen = 87.96;
@@ -3036,6 +3036,14 @@ function renderGarpArcSvg(score, ticker) {
     else if (clamped >= 68) { c1 = '#D97706'; c2 = '#FBBF24'; textColor = 'var(--amber)'; }
     else { c1 = '#E11D48'; c2 = '#FB7185'; textColor = 'var(--rose)'; }
   }
+
+  let missingBadgeHtml = '';
+  if (Array.isArray(missingFields) && missingFields.length > 0) {
+    const listTxt = missingFields.join(', ');
+    const displayTxt = missingFields.length === 1 ? `Missing ${missingFields[0]}` : `Missing ${missingFields[0]} +${missingFields.length - 1}`;
+    missingBadgeHtml = `<span class="garp-missing-pill" title="Missing crucial data: ${escapeHtml(listTxt)} — Tap to audit manually">⚠ ${escapeHtml(displayTxt)}</span>`;
+  }
+
   return `
     <div class="garp-gauge-wrap garp-trigger-btn" data-ticker="${escapeHtml(ticker)}" title="GARP Score: ${hasScore ? clamped + '/100' : 'Not audited'} — Tap to audit">
       <svg viewBox="0 0 72 44">
@@ -3051,6 +3059,7 @@ function renderGarpArcSvg(score, ticker) {
       </svg>
       <div class="garp-gauge-val" style="color:${textColor};">${hasScore ? clamped : '—'}</div>
       <div class="garp-gauge-lbl">GARP</div>
+      ${missingBadgeHtml}
     </div>
   `;
 }
@@ -3292,7 +3301,7 @@ function renderEntry(stock) {
           ${signalBadge}
         </div>
       </div>
-      ${renderGarpArcSvg(garpScore, stock.ticker)}
+      ${renderGarpArcSvg(garpScore, stock.ticker, scoreData ? scoreData.missingFields : [])}
     </div>
 
     ${miniTilesHtml}
@@ -3404,10 +3413,30 @@ async function runBulkGarpAudit() {
 
     let isSub12 = false;
     let isSuper18 = false;
+    const missingFields = [];
 
-    if (fundamentals) {
-      // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
+    if (!fundamentals) {
+      missingFields.push('Fundamentals');
+    } else {
+      // 1. Detect missing crucial metrics:
       const cachedRoceObj = getCachedRoce(cleanT);
+      const hasRoce = fundamentals.roce != null || (cachedRoceObj && cachedRoceObj.roce != null) || fundamentals.return_on_equity != null;
+      if (!hasRoce) missingFields.push('ROCE');
+
+      const hasOpm = fundamentals.operating_margin != null || fundamentals.profit_margin != null;
+      if (!hasOpm) missingFields.push('OPM');
+
+      const hasDe = fundamentals.debt_to_equity != null || fundamentals.debt_ratio != null;
+      if (!hasDe) missingFields.push('D/E');
+
+      const pe = fundamentals.trailing_pe != null ? Number(fundamentals.trailing_pe) : null;
+      if (pe == null || pe <= 0) missingFields.push('P/E');
+
+      const revGrowth = fundamentals.revenueGrowth != null ? Number(fundamentals.revenueGrowth) : (fundamentals.revenue_growth != null ? Number(fundamentals.revenue_growth) : null);
+      const earnGrowth = fundamentals.earningsGrowth != null ? Number(fundamentals.earningsGrowth) : (fundamentals.earnings_growth != null ? Number(fundamentals.earnings_growth) : null);
+      if (revGrowth == null && earnGrowth == null) missingFields.push('Growth');
+
+      // Gate 1: RoCE (>= 18% -> 10 pts) or ROE proxy (>= 18% -> 10 pts, >= 15% -> 5 pts)
       const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
       const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
       const returnPct = returnMetric * 100;
@@ -3433,8 +3462,7 @@ async function runBulkGarpAudit() {
         else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
       }
 
-      // Gate 6: P/E Valuation Ladder (<30 highest; -5 pts per 10-point step up)
-      const pe = fundamentals.trailing_pe != null ? Number(fundamentals.trailing_pe) : null;
+      // Gate 6: P/E Valuation Ladder (<30 highest; step down for higher multiples)
       if (pe != null && pe > 0) {
         let peBonus = 0;
         let g6Val = "25";
@@ -3451,18 +3479,27 @@ async function runBulkGarpAudit() {
           peBonus = 0;
           g6Val = "25";
         } else {
-          const stepsAbove50 = Math.floor((pe - 50) / 10); // pe>=60 -> stepsAbove50 >= 1
+          // P/E >= 60 base step-down penalty (-5 per 10 pts above 50)
+          const stepsAbove50 = Math.floor((pe - 50) / 10);
           peBonus = -(stepsAbove50 * 5);
           g6Val = "0";
+
+          // Growth Cushion for high P/E compounders:
+          // If company is delivering high growth (PAT >= 20% or Revenue >= 18%), cushion the high-multiple penalty!
+          const maxGrowth = Math.max(earnGrowth != null ? earnGrowth : 0, revGrowth != null ? revGrowth : 0);
+          if (maxGrowth >= 0.25) {
+            peBonus += 15; // Strong growth cushion
+            g6Val = "35";
+          } else if (maxGrowth >= 0.15) {
+            peBonus += 10; // Moderate growth cushion
+            g6Val = "25";
+          }
         }
         score += peBonus;
         inputs['garp-g6'] = g6Val;
       }
 
       // Dynamic Growth Flags (Sub-12% Laggards & Super Growth >18%)
-      const revGrowth = fundamentals.revenueGrowth != null ? fundamentals.revenueGrowth : fundamentals.revenue_growth;
-      const earnGrowth = fundamentals.earningsGrowth != null ? fundamentals.earningsGrowth : fundamentals.earnings_growth;
-
       let primaryGrowth = null;
       if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
       else if (revGrowth != null) primaryGrowth = revGrowth;
@@ -3480,7 +3517,7 @@ async function runBulkGarpAudit() {
 
     // Don't overwrite a previously good cached score with a 50 if Yahoo failed
     if (fundamentals || !savedScores[ticker]) {
-      savedScores[ticker] = { score, status, inputs, isSub12, isSuper18 };
+      savedScores[ticker] = { score, status, inputs, isSub12, isSuper18, missingFields };
     }
   }
 
@@ -3558,7 +3595,8 @@ document.addEventListener('click', (e) => {
       status: $('#garp-status-label').textContent, 
       inputs: inputs,
       isSub12: oldData.isSub12,
-      isSuper18: oldData.isSuper18
+      isSuper18: oldData.isSuper18,
+      missingFields: []
     };
     localStorage.setItem('ml_garp_scores', JSON.stringify(savedScores));
     
