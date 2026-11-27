@@ -324,6 +324,7 @@ function init() {
     'weak-cash': '3-Yr Cumulative CFO / EBITDA < 50% — Caution: profits may be stuck in unpaid receivables or inventory. Check if the company is also flagged 🏗️ Capex (temporary expansion) before judging.',
     'capex-heavy': 'Fixed Assets + CWIP ≥ 40% of Total Assets OR CWIP ≥ 15% of Fixed Assets — Capital-intensive or actively expanding plants. Trailing ROCE/cash may look temporarily depressed until new capacity ramps up.',
     'active-cwip': 'Capital Work in Progress (CWIP) ≥ 15% of Fixed Assets — New factories or lines are actively under construction right now. High future revenue trigger once commissioned, but watch debt and execution timelines.',
+    'pledged-shares': 'Promoter Pledged / Mortgaged Shares ≥ 15% — Higher pledged promoter stake can create margin-call / forced-sale overhang during sharp market sell-offs.',
     'fresh': 'Showing only stocks with recent news headlines fetched from Google News.'
   };
 
@@ -1289,6 +1290,34 @@ function fmtPct(v) {
   return `${(Number(v) * 100).toFixed(1)}%`;
 }
 
+function getPromoterPledgePct(f) {
+  if (!f || typeof f !== 'object') return null;
+  const candidates = [
+    f.promoter_pledge_pct,
+    f.promoterPledgePct,
+    f.pledged_pct,
+    f.pledgedPct,
+    f.pledge_percentage,
+    f.pledged_shares_pct,
+    f.pledgedSharesPct,
+    f.promoter_pledge,
+    f.pledged_shares
+  ];
+  for (const val of candidates) {
+    if (val == null || val === '') continue;
+    const cleaned = String(val).replace(/%/g, '').trim();
+    const num = Number(cleaned);
+    if (!Number.isNaN(num) && Number.isFinite(num) && num >= 0) {
+      // Normalize decimal ratios like 0.15 into percentage 15.0 if clearly a fraction (< 1 and not a raw share count)
+      if (num > 0 && num < 1 && (val === f.promoter_pledge_pct || val === f.pledged_pct || val === f.pledge_percentage || val === f.pledged_shares_pct)) {
+        return num * 100;
+      }
+      return num;
+    }
+  }
+  return null;
+}
+
 function renderFundamentalsPanel(f) {
   const peg = f.pegRatio != null ? f.pegRatio : f.peg_ratio;
   const debtMetric = f.debt_ratio != null ? f.debt_ratio : (f.debt_to_equity != null ? (f.debt_to_equity / 100) : null);
@@ -1321,6 +1350,12 @@ function renderFundamentalsPanel(f) {
     <div class="fund-row"><span class="fund-label">Profit Growth (2Q YoY)</span><span class="fund-val">${fmtPct(f.earnings_growth)}</span></div>
     <div class="fund-row"><span class="fund-label">3-Yr CFO / EBITDA</span><span class="fund-val">${cfoValHtml}</span></div>
     <div class="fund-row"><span class="fund-label">Capex Profile</span><span class="fund-val">${capexValHtml}</span></div>
+    <div class="fund-row"><span class="fund-label">Promoter Pledge %</span><span class="fund-val">${(() => {
+      const pPct = getPromoterPledgePct(f);
+      if (pPct == null) return '—';
+      const pColor = pPct >= 25 ? 'var(--rose)' : (pPct >= 15 ? 'var(--amber)' : 'var(--emerald)');
+      return `<span style="color:${pColor}; font-weight:700;">${pPct.toFixed(1)}%${pPct >= 15 ? ' 🔒' : ''}</span>`;
+    })()}</span></div>
   </div>`;
 }
 
@@ -3087,6 +3122,12 @@ function renderContent() {
       const f = getCachedFundamentals(getCleanTicker(s.ticker));
       return f && f.cwip_ratio != null && f.cwip_ratio >= 0.15;
     });
+  } else if (currentFilter === 'pledged-shares') {
+    filtered = filtered.filter(s => {
+      const f = getCachedFundamentals(getCleanTicker(s.ticker));
+      const pPct = getPromoterPledgePct(f);
+      return pPct != null && pPct >= 15;
+    });
   }
 
   if (currentSentiment !== 'all') {
@@ -3136,6 +3177,7 @@ function renderContent() {
         'weak-cash': '⚠️ Weak Cash (<50%)',
         'capex-heavy': '🏗️ Capex Heavy',
         'active-cwip': '🏭 Active Expansion (CWIP ≥15%)',
+        'pledged-shares': '🔒 Pledge ≥15%',
         'fresh': 'Fresh News',
         'actionable-buys': '💎 Buys',
         'actionable-exits': '✂️ Trim/Exits',
@@ -3253,6 +3295,11 @@ function renderEntry(stock) {
 
   const capexBadge = (cachedFund && cachedFund.is_capex_heavy)
     ? `<span class="ribbon-fund-pill" style="border:1px solid var(--violet-border); color:var(--violet); background:var(--violet-bg);" title="Capex-Heavy: FA ${cachedFund.fixed_asset_ratio != null ? Math.round(cachedFund.fixed_asset_ratio * 100) + '%' : '—'}, CWIP ${cachedFund.cwip_ratio != null ? Math.round(cachedFund.cwip_ratio * 100) + '%' : '0%'}">🏗️ Capex</span>`
+    : '';
+
+  const pledgePct = getPromoterPledgePct(cachedFund);
+  const pledgeBadge = (pledgePct != null && pledgePct >= 15)
+    ? `<span class="ribbon-fund-pill" style="border:1px solid var(--rose-border); color:var(--rose); background:var(--rose-bg);" title="Promoter Pledged / Mortgaged Shares: ${pledgePct.toFixed(1)}%">🔒 Pledge ${pledgePct.toFixed(1)}%</span>`
     : '';
 
   const badgeHtml = hasNews
@@ -3426,6 +3473,9 @@ function renderEntry(stock) {
       const cwipTxt = cachedFund.cwip_ratio != null ? ` · CWIP ${Math.round(Number(cachedFund.cwip_ratio) * 100)}%` : '';
       fParts.push(`<span title="Fixed Assets + CWIP as % of Total Assets">FA <strong>${faPct}%</strong>${cwipTxt}</span>`);
     }
+    if (pledgePct != null) {
+      fParts.push(`<span title="Promoter Pledged / Mortgaged Shares">Pledge <strong>${pledgePct.toFixed(1)}%</strong></span>`);
+    }
     if (fParts.length) {
       fundLineHtml = `<div class="spec-line" id="ribbon-data-${escapeHtml(stock.ticker)}">${fParts.join(' <span class="spec-sep">·</span> ')}</div>`;
     }
@@ -3466,6 +3516,7 @@ function renderEntry(stock) {
           ${badgeHtml}
           ${weakCashBadge}
           ${capexBadge}
+          ${pledgeBadge}
         </div>
         <div class="stock-price-row">
           ${hasQuote ? `
@@ -3684,6 +3735,16 @@ function computeAutoGarpForStock(ticker, fundamentals) {
       score += 2;
     } else if (cfoRatio < 0.50) {
       score -= fundamentals.is_capex_heavy ? 2 : 5;
+    }
+  }
+
+  // Promoter Pledged / Mortgaged Shares check
+  const pledgePctForGarp = getPromoterPledgePct(fundamentals);
+  if (pledgePctForGarp != null) {
+    if (pledgePctForGarp >= 30) {
+      score -= 8;
+    } else if (pledgePctForGarp >= 15) {
+      score -= 4;
     }
   }
 
