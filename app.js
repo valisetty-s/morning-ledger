@@ -1108,10 +1108,28 @@ function renderDrilldownTable(slice) {
   if (!drilldownContainer) return;
 
   const sortedItems = [...(slice.items || [])].sort((a, b) => (b.currentVal || b.invested) - (a.currentVal || a.invested));
+  const savedScores = JSON.parse(localStorage.getItem('ml_garp_scores') || '{}');
 
   const rowsHtml = sortedItems.map((item) => {
     const pnlSign = item.pnl >= 0 ? '+' : '';
     const pnlClass = item.pnl >= 0 ? 'price-up' : 'price-down';
+
+    const cleanT = getCleanTicker(item.ticker);
+    const scoreData = savedScores[item.ticker] || savedScores[cleanT];
+    const scoreVal = scoreData ? scoreData.score : null;
+
+    let scoreColor = 'var(--ink-muted)';
+    let scoreBg = 'var(--surface-soft)';
+    let scoreBorder = 'var(--border)';
+    if (scoreVal != null) {
+      if (scoreVal >= 75) { scoreColor = 'var(--emerald)'; scoreBg = 'var(--emerald-bg)'; scoreBorder = 'var(--emerald-border)'; }
+      else if (scoreVal >= 60) { scoreColor = 'var(--amber)'; scoreBg = 'var(--amber-bg)'; scoreBorder = 'var(--amber-border)'; }
+      else { scoreColor = 'var(--rose)'; scoreBg = 'var(--rose-bg)'; scoreBorder = 'var(--rose-border)'; }
+    }
+
+    const garpBadge = scoreVal != null
+      ? `<span style="font-family:'SF Mono',monospace; font-weight:800; font-size:11px; padding:2px 7px; border-radius:6px; background:${scoreBg}; color:${scoreColor}; border:1px solid ${scoreBorder};">${scoreVal}</span>`
+      : `<span style="color:var(--ink-muted); font-size:11px;">—</span>`;
 
     return `
       <tr style="border-bottom: 1px solid var(--rule); font-size: 12px;">
@@ -1120,6 +1138,7 @@ function renderDrilldownTable(slice) {
           <div style="font-size: 11px; font-weight: 400; color:var(--ink-soft); font-family: -apple-system, sans-serif;">${escapeHtml(item.company)}</div>
         </td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: center;">${item.qty}</td>
+        <td style="padding: 8px 6px; text-align: center;">${garpBadge}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;">${isPrivacyMasked ? '₹00.0' : (item.avgPrice ? `₹${item.avgPrice.toFixed(1)}` : '—')}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right; font-weight: 700;">${isPrivacyMasked ? '₹00,000' : `₹${Math.round(item.currentVal || item.invested).toLocaleString('en-IN')}`}</td>
         <td style="padding: 8px 6px; font-family:'SF Mono',monospace; text-align: right;" class="${pnlClass}">
@@ -1154,6 +1173,7 @@ function renderDrilldownTable(slice) {
             <tr style="border-bottom: 2px solid var(--rule-strong); font-size: 10.5px; text-transform: uppercase; color: var(--ink-soft); letter-spacing: 0.5px;">
               <th style="padding: 6px;">Stock</th>
               <th style="padding: 6px; text-align: center;">Qty</th>
+              <th style="padding: 6px; text-align: center;">GARP</th>
               <th style="padding: 6px; text-align: right;">Avg Buy</th>
               <th style="padding: 6px; text-align: right;">Current Value</th>
               <th style="padding: 6px; text-align: right;">P&amp;L</th>
@@ -3362,29 +3382,33 @@ function computeAutoGarpForStock(ticker, fundamentals) {
     const earnGrowth = fundamentals.earningsGrowth != null ? Number(fundamentals.earningsGrowth) : (fundamentals.earnings_growth != null ? Number(fundamentals.earnings_growth) : null);
     if (revGrowth == null && earnGrowth == null) missingFields.push('Growth');
 
+    // 1. RoCE / ROE Gate
     const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
     const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
     const returnPct = returnMetric * 100;
     if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
-    else if (returnPct >= 15) { score += 5; inputs['garp-g1'] = "5"; }
+    else if (returnPct >= 12) { score += 5; inputs['garp-g1'] = "5"; }
 
+    // 2. OPM / Margin Floor Gate
     const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
     const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
     if (opm != null) {
       if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
-      else if (opm >= 12) { score += 5; inputs['garp-g2'] = "5"; }
+      else if (opm >= 10) { score += 5; inputs['garp-g2'] = "5"; }
     } else {
       if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
-      else if (npm >= 7) { score += 5; inputs['garp-g2'] = "5"; }
+      else if (npm >= 6) { score += 5; inputs['garp-g2'] = "5"; }
     }
 
+    // 3. D/E Solvency Gate
     const deRaw = fundamentals.debt_to_equity;
     const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
     if (de != null) {
-      if (de <= 0.15) { score += 10; inputs['garp-g3'] = "10"; }
-      else if (de <= 0.60) { score += 5; inputs['garp-g3'] = "5"; }
+      if (de <= 0.25) { score += 10; inputs['garp-g3'] = "10"; }
+      else if (de <= 0.75) { score += 5; inputs['garp-g3'] = "5"; }
     }
 
+    // 4. Valuation Gate with Capped Penalty
     if (pe != null && pe > 0) {
       let peBonus = 0;
       let g6Val = "25";
@@ -3402,14 +3426,15 @@ function computeAutoGarpForStock(ticker, fundamentals) {
         g6Val = "25";
       } else {
         const stepsAbove50 = Math.floor((pe - 50) / 10);
-        peBonus = -(stepsAbove50 * 5);
-        g6Val = "0";
+        peBonus = Math.max(-15, -(stepsAbove50 * 3)); // Hard floor at -15 pts
+        g6Val = "15";
+
         const maxGrowth = Math.max(earnGrowth != null ? earnGrowth : 0, revGrowth != null ? revGrowth : 0);
-        if (maxGrowth >= 0.25) {
-          peBonus += 15;
+        if (maxGrowth >= 0.30) {
+          peBonus = Math.max(peBonus, 5); // Full relief for hyper-growth
           g6Val = "35";
         } else if (maxGrowth >= 0.15) {
-          peBonus += 10;
+          peBonus = Math.max(peBonus, 0); // Neutralized for solid growth
           g6Val = "25";
         }
       }
@@ -3417,24 +3442,42 @@ function computeAutoGarpForStock(ticker, fundamentals) {
       inputs['garp-g6'] = g6Val;
     }
 
-    let primaryGrowth = null;
-    if (revGrowth != null && earnGrowth != null) primaryGrowth = Math.max(revGrowth, earnGrowth);
-    else if (revGrowth != null) primaryGrowth = revGrowth;
-    else if (earnGrowth != null) primaryGrowth = earnGrowth;
-    else primaryGrowth = returnMetric;
+    // 5. Wave Riding / Earnings Acceleration Points
+    const maxEarn = earnGrowth != null ? earnGrowth : 0;
+    const maxRev = revGrowth != null ? revGrowth : 0;
+    if (maxEarn >= 0.50) {
+      score += 15; // Wave Riding Acceleration
+    } else if (maxEarn >= 0.25 || maxRev >= 0.20) {
+      score += 10;
+    } else if (maxEarn >= 0.15 || maxRev >= 0.12) {
+      score += 5;
+    }
 
+    // Trend Confirmation
+    const cachedStock = newsData && newsData.results
+      ? newsData.results.find(r => r.ticker === ticker || getCleanTicker(r.ticker) === cleanT)
+      : null;
+    if (cachedStock && cachedStock.quote && cachedStock.quote.last_price != null) {
+      const q = cachedStock.quote;
+      if (q.dma_50 != null && q.dma_200 != null && q.last_price > q.dma_50 && q.last_price > q.dma_200) {
+        score += 5; // Technical trend alignment
+      }
+    }
+
+    let primaryGrowth = Math.max(maxEarn, maxRev) || returnMetric;
     isSub12 = (primaryGrowth < 0.12);
     isSuper18 = (primaryGrowth >= 0.18);
   }
 
+  score = Math.max(20, Math.min(100, Math.round(score)));
+
   let status = 'PRUNE_GTT_EXIT';
-  if (score >= 85) status = 'ACCUMULATE_CORE';
-  else if (score >= 70) status = 'HOLD_SATELLITE';
+  if (score >= 80) status = 'ACCUMULATE_CORE';
+  else if (score >= 65) status = 'HOLD_SATELLITE';
   else if (score >= 50) status = 'MONITOR_WATCHLIST';
 
   return { score, status, inputs, isSub12, isSuper18, missingFields };
 }
-
 async function runSingleStockGarpAutoAudit(ticker, btnEl = null) {
   const cleanT = getCleanTicker(ticker);
   const backendUrl = getBackendUrl();
