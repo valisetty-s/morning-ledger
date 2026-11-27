@@ -593,6 +593,24 @@ function init() {
       syncBrokerButtonLabel();
     });
   }
+  const keyPresetEl = $('#api-key-preset-select');
+  if (keyPresetEl) {
+    keyPresetEl.addEventListener('change', () => {
+      if (keyPresetEl.value !== 'custom' && $('#kite-api-key-input')) {
+        $('#kite-api-key-input').value = keyPresetEl.value;
+      }
+    });
+  }
+  const keyInputEl = $('#kite-api-key-input');
+  if (keyInputEl) {
+    keyInputEl.addEventListener('input', () => {
+      if (keyPresetEl) {
+        const list = getSavedApiKeysList();
+        const v = keyInputEl.value.trim();
+        keyPresetEl.value = list.includes(v) ? v : 'custom';
+      }
+    });
+  }
 
   pullDailyGlobalCuesOnce();
 
@@ -1520,6 +1538,35 @@ function updateGarpAuditStatus() {
     : `${d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${timePart}`;
 }
 
+function getSavedApiKeysList() {
+  const keys = new Set(['av7jcofmfblpij52']);
+  ['self', 'wife', 'custom'].forEach(p => {
+    const k = localStorage.getItem(`ml_kite_api_key_${p}`);
+    if (k && k.trim()) keys.add(k.trim());
+  });
+  const legacy = localStorage.getItem('ml_kite_api_key');
+  if (legacy && legacy.trim()) keys.add(legacy.trim());
+  return Array.from(keys);
+}
+
+function refreshApiKeyPresetDropdown(currentVal = '') {
+  const sel = $('#api-key-preset-select');
+  if (!sel) return;
+  const list = getSavedApiKeysList();
+  const opts = ['<option value="custom">Custom / Manual Entry</option>'];
+  for (const k of list) {
+    const label = k === 'av7jcofmfblpij52' ? `Default Key (${k})` : `Saved Key (${k})`;
+    opts.push(`<option value="${escapeHtml(k)}">${escapeHtml(label)}</option>`);
+  }
+  sel.innerHTML = opts.join('');
+  const trimmed = (currentVal || '').trim();
+  if (trimmed && list.includes(trimmed)) {
+    sel.value = trimmed;
+  } else {
+    sel.value = 'custom';
+  }
+}
+
 function syncBrokerButtonLabel() {
   const broker = $('#broker-select') ? $('#broker-select').value : getActiveBroker();
   const lbl = $('#broker-import-label');
@@ -1550,8 +1597,9 @@ function openSettings() {
     return `${s[0]},${s[1]},${s[2]}`;
   }).join('\n');
 
-  const savedKey = Store.getKiteApiKey();
-  if (savedKey) $('#kite-api-key-input').value = savedKey;
+  const savedKey = Store.getKiteApiKey() || 'av7jcofmfblpij52';
+  $('#kite-api-key-input').value = savedKey;
+  refreshApiKeyPresetDropdown(savedKey);
   const savedBackend = localStorage.getItem(KITE_BACKEND_URL_KEY);
   if (savedBackend) $('#kite-backend-url-input').value = savedBackend;
   $('#settings-overlay').classList.add('open');
