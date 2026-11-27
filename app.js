@@ -1763,7 +1763,18 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
   });
 
   Store.setStocks(merged);
-  $('#stocklist-input').value = merged.map(s => `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`).join('\n');
+  const stocklistEl = $('#stocklist-input');
+  if (stocklistEl) {
+    stocklistEl.value = merged.map(s => `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`).join('\n');
+  }
+  if (newsData && Array.isArray(newsData.results)) {
+    const mergedBySym = new Map(merged.map(([t, c, tier, q, a]) => [t.toUpperCase(), { company: c, tier, qty: q, avgPrice: a }]));
+    newsData.results = newsData.results.map(r => {
+      const m = mergedBySym.get((r.ticker || '').toUpperCase());
+      return m ? { ...r, company: m.company, tier: m.tier, qty: m.qty, avgPrice: m.avgPrice } : r;
+    });
+    Store.setCache(newsData);
+  }
 
   const userName = (data.user && data.user.user_name) || 'your account';
   showKiteStatus(
