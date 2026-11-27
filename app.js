@@ -155,28 +155,71 @@ function getCleanTicker(ticker) {
   return ticker.replace(/-(BE|SM|IL|BL|N1|N2)$/i, '');
 }
 
+function getActiveProfile() {
+  return localStorage.getItem('ml_active_profile') || 'self';
+}
+function setActiveProfile(p) {
+  localStorage.setItem('ml_active_profile', p || 'self');
+}
+function getActiveBroker() {
+  return localStorage.getItem(`ml_broker_${getActiveProfile()}`) || localStorage.getItem('ml_active_broker') || 'kite';
+}
+function setActiveBroker(b) {
+  const prof = getActiveProfile();
+  localStorage.setItem(`ml_broker_${prof}`, b || 'kite');
+  localStorage.setItem('ml_active_broker', b || 'kite');
+}
+function getCustomProfileLabel() {
+  return localStorage.getItem('ml_custom_profile_label') || 'Other Profile';
+}
+function setCustomProfileLabel(lbl) {
+  localStorage.setItem('ml_custom_profile_label', (lbl || '').trim() || 'Other Profile');
+}
+function scopedKey(baseKey, profile = null) {
+  const p = profile || getActiveProfile();
+  return `${baseKey}_${p}`;
+}
+function getSavedGarpScores() {
+  const k = scopedKey('ml_garp_scores');
+  const raw = localStorage.getItem(k);
+  if (raw) {
+    try { return JSON.parse(raw); } catch { return {}; }
+  }
+  const legacy = localStorage.getItem('ml_garp_scores');
+  if (legacy) {
+    try { return JSON.parse(legacy); } catch { return {}; }
+  }
+  return {};
+}
+function setSavedGarpScores(obj) {
+  const k = scopedKey('ml_garp_scores');
+  localStorage.setItem(k, JSON.stringify(obj));
+}
+
 const Store = {
   getApiKey: () => localStorage.getItem('ml_api_key') || '',
   setApiKey: (v) => localStorage.setItem('ml_api_key', v),
   getStocks: () => {
-    const raw = localStorage.getItem('ml_stocks');
-    if (!raw) return DEFAULT_STOCKS;
+    const k = scopedKey('ml_stocks');
+    const raw = localStorage.getItem(k) || (getActiveProfile() === 'self' ? localStorage.getItem('ml_stocks') : null);
+    if (!raw) return getActiveProfile() === 'self' ? DEFAULT_STOCKS : [];
     try {
       const parsed = JSON.parse(raw);
       return parsed.map(s => [s[0], s[1] || s[0], s[2] || 'Watch', Number(s[3]) || 0, Number(s[4]) || 0]);
     } catch {
-      return DEFAULT_STOCKS;
+      return getActiveProfile() === 'self' ? DEFAULT_STOCKS : [];
     }
   },
-  setStocks: (arr) => localStorage.setItem('ml_stocks', JSON.stringify(arr)),
+  setStocks: (arr) => localStorage.setItem(scopedKey('ml_stocks'), JSON.stringify(arr)),
   getCache: () => {
-    const raw = localStorage.getItem('ml_news_cache');
+    const k = scopedKey('ml_news_cache');
+    const raw = localStorage.getItem(k) || (getActiveProfile() === 'self' ? localStorage.getItem('ml_news_cache') : null);
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   },
-  setCache: (obj) => localStorage.setItem('ml_news_cache', JSON.stringify(obj)),
-  getKiteApiKey: () => localStorage.getItem('ml_kite_api_key') || '',
-  setKiteApiKey: (v) => localStorage.setItem('ml_kite_api_key', v),
+  setCache: (obj) => localStorage.setItem(scopedKey('ml_news_cache'), JSON.stringify(obj)),
+  getKiteApiKey: () => localStorage.getItem(scopedKey('ml_kite_api_key')) || localStorage.getItem('ml_kite_api_key') || '',
+  setKiteApiKey: (v) => localStorage.setItem(scopedKey('ml_kite_api_key'), v),
 };
 const KITE_BACKEND_URL_KEY = 'ml_kite_backend_url';
 
@@ -521,6 +564,35 @@ function init() {
 
   const bulkGarpBtn = $('#bulk-garp-btn');
   if (bulkGarpBtn) bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
+
+  const profSelEl = $('#profile-select');
+  if (profSelEl) {
+    profSelEl.addEventListener('change', () => {
+      const nextProf = profSelEl.value;
+      setActiveProfile(nextProf);
+      const customWrap = $('#custom-profile-name-wrap');
+      if (customWrap) customWrap.style.display = nextProf === 'custom' ? 'block' : 'none';
+      if ($('#broker-select')) $('#broker-select').value = getActiveBroker();
+      syncBrokerButtonLabel();
+      const pStocks = Store.getStocks();
+      if ($('#stocklist-input')) {
+        $('#stocklist-input').value = pStocks.map(s => (s[3] || s[4]) ? `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}` : `${s[0]},${s[1]},${s[2]}`).join('\n');
+      }
+      const pKey = Store.getKiteApiKey();
+      if ($('#kite-api-key-input') && pKey) $('#kite-api-key-input').value = pKey;
+      const pCache = Store.getCache();
+      newsData = pCache && pCache.results ? pCache : null;
+      renderContent();
+      renderPortfolioAnalytics();
+    });
+  }
+  const brokSelEl = $('#broker-select');
+  if (brokSelEl) {
+    brokSelEl.addEventListener('change', () => {
+      setActiveBroker(brokSelEl.value);
+      syncBrokerButtonLabel();
+    });
+  }
 
   pullDailyGlobalCuesOnce();
 
@@ -1448,7 +1520,30 @@ function updateGarpAuditStatus() {
     : `${d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${timePart}`;
 }
 
+function syncBrokerButtonLabel() {
+  const broker = $('#broker-select') ? $('#broker-select').value : getActiveBroker();
+  const lbl = $('#broker-import-label');
+  if (lbl) {
+    lbl.textContent = broker === 'groww'
+      ? 'Connect to Groww & import holdings'
+      : 'Log in to Kite & import holdings';
+  }
+}
+
 function openSettings() {
+  const activeProf = getActiveProfile();
+  const activeBrok = getActiveBroker();
+  const profSel = $('#profile-select');
+  const brokSel = $('#broker-select');
+  const customWrap = $('#custom-profile-name-wrap');
+  const customInp = $('#custom-profile-label-input');
+
+  if (profSel) profSel.value = activeProf;
+  if (brokSel) brokSel.value = activeBrok;
+  if (customInp) customInp.value = getCustomProfileLabel();
+  if (customWrap) customWrap.style.display = activeProf === 'custom' ? 'block' : 'none';
+  syncBrokerButtonLabel();
+
   const stocks = Store.getStocks();
   $('#stocklist-input').value = stocks.map(s => {
     if (s[3] || s[4]) return `${s[0]},${s[1]},${s[2]},${s[3]},${s[4]}`;
@@ -1467,6 +1562,13 @@ function closeSettings() {
 }
 
 function saveSettings() {
+  const profSel = $('#profile-select');
+  const brokSel = $('#broker-select');
+  const customInp = $('#custom-profile-label-input');
+  if (profSel) setActiveProfile(profSel.value);
+  if (brokSel) setActiveBroker(brokSel.value);
+  if (customInp) setCustomProfileLabel(customInp.value);
+
   const kiteKey = $('#kite-api-key-input').value.trim();
   if (kiteKey) Store.setKiteApiKey(kiteKey);
   const backendUrl = $('#kite-backend-url-input').value.trim();
@@ -1483,8 +1585,11 @@ function saveSettings() {
     return [ticker, company, tier, qty, avgPrice];
   }).filter(p => p[0]);
 
-  if (parsed.length) Store.setStocks(parsed);
+  Store.setStocks(parsed);
+  const cached = Store.getCache();
+  newsData = cached && cached.results ? cached : null;
   closeSettings();
+  renderContent();
   renderPortfolioAnalytics();
 }
 
@@ -1679,6 +1784,39 @@ async function startKiteLogin(intent) {
   showKiteStatus('Opening Kite login… After you log in, you\'ll be redirected back here automatically.', 'info');
   localStorage.setItem('ml_kite_pending_key', apiKey);
 
+  const profile = ($('#profile-select') && $('#profile-select').value) || getActiveProfile();
+  const broker = ($('#broker-select') && $('#broker-select').value) || getActiveBroker();
+  setActiveProfile(profile);
+  setActiveBroker(broker);
+  localStorage.setItem('ml_kite_pending_profile', profile);
+  localStorage.setItem('ml_kite_pending_broker', broker);
+
+  if (broker === 'groww') {
+    try {
+      const gResp = await fetch(`${backendUrl}/api/groww/holdings?profile=${encodeURIComponent(profile)}&broker=groww`);
+      const gData = await gResp.json();
+      if (gResp.ok && gData.status === 'success' && Array.isArray(gData.holdings)) {
+        const mergedG = gData.holdings.map(h => [
+          (h.ticker || '').toUpperCase(),
+          h.company || (h.ticker || '').toUpperCase(),
+          'Watch',
+          Number(h.quantity) || 0,
+          Number(h.average_price) || 0
+        ]).filter(r => r[0]);
+        Store.setStocks(mergedG);
+        if ($('#stocklist-input')) $('#stocklist-input').value = mergedG.map(s => s.join(',')).join('\n');
+        showKiteStatus(`✓ Loaded ${mergedG.length} holdings via Groww (${profile})`, 'success');
+        renderPortfolioAnalytics();
+        return;
+      }
+      showKiteStatus(`Groww endpoint responded: ${gData.error || 'Ensure /api/groww/holdings is configured on your Render backend.'}`, 'error');
+      return;
+    } catch (e) {
+      showKiteStatus(`Could not reach Groww backend route (${e.message || e}). Check your Render backend configuration.`, 'error');
+      return;
+    }
+  }
+
   const loginUrl = `https://kite.zerodha.com/connect/login?api_key=${encodeURIComponent(apiKey)}&v=3`;
   window.open(loginUrl, '_self');
 }
@@ -1732,10 +1870,12 @@ async function completeKiteLogin(requestToken, apiKey, backendUrl) {
 
   let resp, data;
   try {
+    const pendingProfile = localStorage.getItem('ml_kite_pending_profile') || getActiveProfile();
+    const pendingBroker = localStorage.getItem('ml_kite_pending_broker') || getActiveBroker();
     resp = await fetch(`${backendUrl}/api/kite/exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request_token: requestToken }),
+      body: JSON.stringify({ request_token: requestToken, profile: pendingProfile, broker: pendingBroker }),
     });
     data = await resp.json();
   } catch (e) {
