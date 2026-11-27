@@ -3357,12 +3357,12 @@ function computeAutoGarpForStock(ticker, fundamentals) {
     'garp-g1': "0",
     'garp-g2': "0",
     'garp-g3': "0",
-    'garp-g4': "10",
-    'garp-g5': "10",
-    'garp-g6': "10",
+    'garp-g4': "5",
+    'garp-g5': "5",
+    'garp-g6': "8",
     'garp-g7': "5",
-    'garp-g8': "5",
-    'garp-g9': "5"
+    'garp-g8': "10",
+    'garp-g9': "6"
   };
   let isSub12 = false;
   let isSuper18 = false;
@@ -3391,63 +3391,60 @@ function computeAutoGarpForStock(ticker, fundamentals) {
     const rawPeg = fundamentals.pegRatio != null ? fundamentals.pegRatio : fundamentals.peg_ratio;
     const peg = rawPeg != null ? Number(rawPeg) : null;
 
-    // 1. Gate 1: RoCE (Stepped, Max 10 pts)
+    // 1. Gate 1: RoCE (Stepped, Max 15 pts)
     const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
     const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
     const returnPct = Number(returnMetric) * 100;
     let g1 = 0;
-    if (returnPct >= 18) g1 = 10;
-    else if (returnPct >= 15) g1 = 7;
-    else if (returnPct >= 12) g1 = 4;
-    else if (returnPct >= 10) g1 = 2;
+    if (returnPct >= 20) g1 = 15;
+    else if (returnPct >= 16) g1 = 12;
+    else if (returnPct >= 13) g1 = 8;
+    else if (returnPct >= 10) g1 = 4;
     else g1 = 0;
     inputs['garp-g1'] = String(g1);
 
-    // 2. Gate 2: OPM Floor (Stepped, Max 10 pts)
+    // 2. Gate 2: OPM Floor (Stepped, Max 15 pts - pricing power & compounding)
     const opm = fundamentals.operating_margin != null ? Number(fundamentals.operating_margin) * 100 : null;
     const npm = fundamentals.profit_margin != null ? Number(fundamentals.profit_margin) * 100 : 0;
     const marginPct = opm != null ? opm : npm;
     let g2 = 0;
-    if (marginPct >= 18) g2 = 10;
-    else if (marginPct >= 15) g2 = 7;
-    else if (marginPct >= 12) g2 = 5;
-    else if (marginPct >= 8) g2 = 3;
+    if (marginPct >= 22) g2 = 15;
+    else if (marginPct >= 18) g2 = 12;
+    else if (marginPct >= 14) g2 = 9;
+    else if (marginPct >= 10) g2 = 6;
+    else if (marginPct >= 7) g2 = 3;
     else g2 = 0;
     inputs['garp-g2'] = String(g2);
 
     // 3. Gate 3: D/E Solvency (Max 10 pts)
     const deRaw = fundamentals.debt_to_equity;
     const de = deRaw != null ? (deRaw / 100) : (fundamentals.debt_ratio != null ? fundamentals.debt_ratio : null);
-    let g3 = 0;
+    let g3 = 5;
     if (de != null) {
       if (de <= 0.25) g3 = 10;
       else if (de <= 0.75) g3 = 5;
       else g3 = 0;
-    } else {
-      g3 = 5;
     }
     inputs['garp-g3'] = String(g3);
 
-    // 4. Gate 4: Order Book QoQ (Default 10 pts)
-    inputs['garp-g4'] = "10";
+    // 4. Gate 4: Order Book QoQ (Max 5 pts, Default 5)
+    inputs['garp-g4'] = "5";
 
-    // 5. Gate 5: Book-to-Bill / Visibility (Default 10 pts)
-    inputs['garp-g5'] = "10";
+    // 5. Gate 5: Book-to-Bill / Visibility (Max 5 pts, Default 5)
+    inputs['garp-g5'] = "5";
 
-    // 6. Gate 6: P/E Multiple Score (Max 20 pts)
-    let g6 = 10;
+    // 6. Gate 6: P/E Multiple Score (Max 15 pts with Hyper-Growth Cushion)
+    let g6 = 8;
     if (pe != null && pe > 0) {
-      if (pe < 25) g6 = 20;
-      else if (pe < 35) g6 = 15;
-      else if (pe < 50) g6 = 10;
-      else if (pe < 70) g6 = 5;
+      if (pe < 25) g6 = 15;
+      else if (pe < 35) g6 = 12;
+      else if (pe < 50) g6 = 8;
+      else if (pe < 70) g6 = 4;
       else g6 = 0;
-      // Hyper-growth cushion for premium valuation multiples
+
       const maxG = Math.max(earnGrowth != null ? earnGrowth : 0, revGrowth != null ? revGrowth : 0);
-      if (maxG >= 0.30 && g6 < 15) g6 = 15;
-      else if (maxG >= 0.20 && g6 < 10) g6 = 10;
-    } else {
-      g6 = 10;
+      if (maxG >= 0.30 && g6 < 12) g6 = 12; // Hyper-growth valuation cushion
+      else if (maxG >= 0.20 && g6 < 8) g6 = 8;
     }
     inputs['garp-g6'] = String(g6);
 
@@ -3465,37 +3462,61 @@ function computeAutoGarpForStock(ticker, fundamentals) {
     }
     inputs['garp-g7'] = String(g7);
 
-    // 8. Gate 8: Wave Riding / Acceleration (Max 15 pts)
-    const maxEarn = earnGrowth != null ? earnGrowth : 0;
-    const maxRev = revGrowth != null ? revGrowth : 0;
-    let g8 = 0;
-    if (maxEarn >= 0.50) g8 = 15;
-    else if (maxEarn >= 0.25 || maxRev >= 0.20) g8 = 10;
-    else if (maxEarn >= 0.15 || maxRev >= 0.12) g8 = 5;
-    else g8 = 0;
+    // 8. Gate 8: Sector Tailwinds (Max 15 pts, derived directly from SECTOR_MAP!)
+    const sector = SECTOR_MAP[cleanT] || SECTOR_MAP[ticker] || "Other";
+    let g8 = 5;
+    const HIGH_TAILWIND_SECTORS = new Set([
+      "Aerospace & Defense",
+      "Capital Goods & Power Grid",
+      "Specialty & Green Chemistry",
+      "AI Cooling, Data Center & IT",
+      "EMS",
+      "Healthcare & Pharma",
+      "Auto Ancillary & EV",
+      "Clean Energy & Renewables"
+    ]);
+    const MOD_TAILWIND_SECTORS = new Set([
+      "Financial Tollbooths",
+      "Financials & NBFC",
+      "Telecom & Fibre Optic",
+      "Jewellery & Certification",
+      "Digital IP, Media & Consumer"
+    ]);
+
+    if (HIGH_TAILWIND_SECTORS.has(sector)) {
+      g8 = 15;
+    } else if (MOD_TAILWIND_SECTORS.has(sector)) {
+      g8 = 10;
+    } else if (sector === "Commodity Converters & Distressed") {
+      g8 = 0;
+    } else {
+      g8 = 5;
+    }
     inputs['garp-g8'] = String(g8);
 
-    // 9. Gate 9: FII / DII Flow & Trend (Max 5 pts)
-    let g9 = 3;
+    // 9. Gate 9: FII / DII Flow & Trend (Max 10 pts, derived from technical trend structure)
+    let g9 = 6;
     const cachedStock = newsData && newsData.results
       ? newsData.results.find(r => r.ticker === ticker || getCleanTicker(r.ticker) === cleanT)
       : null;
     if (cachedStock && cachedStock.quote && cachedStock.quote.last_price != null) {
       const q = cachedStock.quote;
       if (q.dma_50 != null && q.dma_200 != null && q.last_price > q.dma_50 && q.last_price > q.dma_200) {
-        g9 = 5;
+        g9 = 10; // Accumulation and strong structural uptrend
       } else if (q.dma_200 != null && q.last_price < q.dma_200) {
-        g9 = 0;
+        g9 = 0;  // Broken trend / distribution
       }
     }
     inputs['garp-g9'] = String(g9);
 
+    const maxEarn = earnGrowth != null ? earnGrowth : 0;
+    const maxRev = revGrowth != null ? revGrowth : 0;
     let primaryGrowth = Math.max(maxEarn, maxRev) || returnMetric;
     isSub12 = (primaryGrowth < 0.12);
     isSuper18 = (primaryGrowth >= 0.18);
   }
 
-  // Total score is the exact sum of all 9 gate inputs (Max 100)
+  // Exact sum of all 9 gates (Max 100 pts)
   let score = 0;
   for (let k in inputs) {
     score += parseInt(inputs[k], 10) || 0;

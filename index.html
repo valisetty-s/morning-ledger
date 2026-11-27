@@ -1787,7 +1787,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v74 · Dark Bento</span>
+            <span class="build-tag">v75 · Dark Bento</span>
           </div>
         </div>
       </div>
@@ -1984,27 +1984,28 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
     
     <div id="garp-checklist" style="display:flex; flex-direction:column; gap:10px; padding-right: 5px; font-size:13px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>1. RoCE (Stepped)</label>
+        <label>1. RoCE Stepped (Max 15)</label>
         <select id="garp-g1" class="garp-input ctrl-select">
-          <option value="10">≥ 18% (10 pts)</option>
-          <option value="7">15–18% (7 pts)</option>
-          <option value="4">12–15% (4 pts)</option>
-          <option value="2">10–12% (2 pts)</option>
+          <option value="15">≥ 20% (15 pts)</option>
+          <option value="12">16–20% (12 pts)</option>
+          <option value="8">13–16% (8 pts)</option>
+          <option value="4">10–13% (4 pts)</option>
           <option value="0">&lt; 10% (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>2. OPM Floor (Stepped)</label>
+        <label>2. OPM Floor (Max 15)</label>
         <select id="garp-g2" class="garp-input ctrl-select">
-          <option value="10">≥ 18% (10 pts)</option>
-          <option value="7">15–18% (7 pts)</option>
-          <option value="5">12–15% (5 pts)</option>
-          <option value="3">8–12% (3 pts)</option>
-          <option value="0">&lt; 8% (0 pts)</option>
+          <option value="15">≥ 22% · Strong Moat (15 pts)</option>
+          <option value="12">18–22% (12 pts)</option>
+          <option value="9">14–18% (9 pts)</option>
+          <option value="6">10–14% (6 pts)</option>
+          <option value="3">7–10% (3 pts)</option>
+          <option value="0">&lt; 7% (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>3. D/E Solvency</label>
+        <label>3. D/E Solvency (Max 10)</label>
         <select id="garp-g3" class="garp-input ctrl-select">
           <option value="10">Debt Free / ≤0.25x (10 pts)</option>
           <option value="5">Manageable ≤0.75x (5 pts)</option>
@@ -2012,59 +2013,61 @@ AARTIIND,Aarti Industries,Top31-50"></textarea>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>4. Order Book QoQ</label>
+        <label>4. Order Book QoQ (Max 5)</label>
         <select id="garp-g4" class="garp-input ctrl-select">
-          <option value="10">Expanding (10 pts)</option>
-          <option value="5">Stagnant (5 pts)</option>
+          <option value="5">Expanding (5 pts)</option>
+          <option value="3">Stagnant (3 pts)</option>
           <option value="0">Depleting (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>5. Book-to-Bill / Visibility</label>
+        <label>5. Book-to-Bill / Visibility (Max 5)</label>
         <select id="garp-g5" class="garp-input ctrl-select">
-          <option value="10">Strong ≥2x (10 pts)</option>
-          <option value="5">Moderate 1.2–2x (5 pts)</option>
+          <option value="5">Strong ≥2x (5 pts)</option>
+          <option value="3">Moderate 1.2–2x (3 pts)</option>
           <option value="0">Low &lt;1.2x (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>6. P/E Multiple Score</label>
+        <label>6. P/E Multiple Score (Max 15)</label>
         <select id="garp-g6" class="garp-input ctrl-select">
-          <option value="20">P/E &lt; 25 · Undervalued (20 pts)</option>
-          <option value="15">P/E 25–35 · Fair (15 pts)</option>
-          <option value="10">P/E 35–50 · Moderate (10 pts)</option>
-          <option value="5">P/E 50–70 · Premium (5 pts)</option>
-          <option value="0">P/E &gt; 70 · Expensive (0 pts)</option>
+          <option value="15">P/E &lt; 25 · Undervalued (15 pts)</option>
+          <option value="12">P/E 25–35 · Fair (12 pts)</option>
+          <option value="8">P/E 35–50 · Moderate (8 pts)</option>
+          <option value="4">P/E 50–70 · Premium (4 pts)</option>
+          <option value="0">P/E &gt; 70 · Stretched (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>7. PEG &amp; Growth Valuation</label>
+        <label>7. PEG &amp; Growth Valuation (Max 10)</label>
         <select id="garp-g7" class="garp-input ctrl-select">
           <option value="10">PEG ≤ 1.5 / High Value (10 pts)</option>
           <option value="5">PEG 1.5–2.5 / Fair (5 pts)</option>
-          <option value="0">PEG &gt; 2.5 / Stretched (0 pts)</option>
+          <option value="0">PEG &gt; 2.5 / Expensive (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>8. Wave Riding / Acceleration</label>
+        <label>8. Sector Tailwinds (Max 15)</label>
         <select id="garp-g8" class="garp-input ctrl-select">
-          <option value="15">Explosive (PAT &gt;50%) (15 pts)</option>
-          <option value="10">Strong (PAT &gt;25% / Rev &gt;20%) (10 pts)</option>
-          <option value="5">Steady (PAT &gt;15%) (5 pts)</option>
-          <option value="0">Flat / Sub-12% (0 pts)</option>
+          <option value="15">High Secular Tailwind (15 pts)</option>
+          <option value="10">Moderate Growth Theme (10 pts)</option>
+          <option value="5">Cyclical / Neutral Sector (5 pts)</option>
+          <option value="0">Sector Headwind (0 pts)</option>
         </select>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <label>9. FII / DII Flow &amp; Trend</label>
+        <label>9. FII / DII Flow &amp; Trend (Max 10)</label>
         <select id="garp-g9" class="garp-input ctrl-select">
-          <option value="5">Accumulating / Above DMAs (5 pts)</option>
-          <option value="3">Domestic Absorbed (3 pts)</option>
+          <option value="10">Accumulation / Above 50D &amp; 200D (10 pts)</option>
+          <option value="6">Neutral / Mixed Trend (6 pts)</option>
           <option value="0">Dumping / Below 200-DMA (0 pts)</option>
         </select>
       </div>
     </div>
 
-    id="garp-live-score" style="font-size:28px; font-weight:800; color:var(--emerald); font-family:'SF Mono',monospace;">100 / 100</div>
+    <div style="margin-top:18px; padding:12px; background:var(--surface-soft); border:1px solid var(--border); border-radius:12px; text-align:center;">
+      <div style="font-size:11px; color:var(--ink-soft); font-weight:700; letter-spacing:0.6px;">LIVE SCORE</div>
+      <div  style="font-size:28px; font-weight:800; color:var(--emerald); font-family:'SF Mono',monospace;">100 / 100</div>
       <div id="garp-status-label" style="font-size:13px; font-weight:800; margin-top:4px; color:var(--emerald);">ACCUMULATE_CORE</div>
     </div>
 
