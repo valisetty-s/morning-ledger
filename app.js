@@ -267,6 +267,7 @@ function timeLabel(isoString) {
 
 function init() {
   datelineDate.textContent = todayLabel();
+  renderActiveProfileBadge();
   updateGarpAuditStatus();
 
   const cached = Store.getCache();
@@ -1491,7 +1492,23 @@ function getBackendUrl() {
   return localStorage.getItem(KITE_BACKEND_URL_KEY) || '';
 }
 
+function getActiveProfileDisplayLabel() {
+  const p = getActiveProfile();
+  if (p === 'wife') return 'Deepthi';
+  if (p === 'custom') return getCustomProfileLabel();
+  return 'Satish';
+}
+
+function renderActiveProfileBadge() {
+  const el = document.getElementById('active-profile-badge');
+  if (!el) return;
+  const profLabel = getActiveProfileDisplayLabel();
+  const brokerLabel = getActiveBroker() === 'groww' ? 'Groww' : 'Kite';
+  el.textContent = `${profLabel} · ${brokerLabel}`;
+}
+
 function updateStatusBar() {
+  renderActiveProfileBadge();
   if (!newsData || !newsData.fetchedAt) {
     if (refreshStatus) refreshStatus.textContent = '';
     if (datelineStatus) {
@@ -1636,6 +1653,7 @@ function saveSettings() {
   Store.setStocks(parsed);
   const cached = Store.getCache();
   newsData = cached && cached.results ? cached : null;
+  renderActiveProfileBadge();
   closeSettings();
   renderContent();
   renderPortfolioAnalytics();
