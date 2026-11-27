@@ -481,6 +481,43 @@ function init() {
     $('#install-banner').classList.remove('show');
   });
 
+  const resetFiltersBtn = $('#reset-filters-btn');
+  if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener('click', () => {
+      currentFilter = 'all';
+      currentSentiment = 'all';
+      currentTrend = 'all';
+      currentListQuery = '';
+
+      const fSel = $('#filter-select');
+      if (fSel) fSel.value = 'all';
+      const sSel = $('#sentiment-select');
+      if (sSel) sSel.value = 'all';
+      const lSearch = $('#holdings-list-search');
+      if (lSearch) lSearch.value = '';
+      const lClear = $('#holdings-list-search-clear');
+      if (lClear) lClear.classList.remove('visible');
+
+      document.querySelectorAll('.chip[data-trend]').forEach(c => {
+        c.classList.toggle('active', c.dataset.trend === 'all');
+      });
+      document.querySelectorAll('.chip[data-filter]').forEach(c => {
+        c.classList.toggle('active', c.dataset.filter === 'all');
+      });
+      document.querySelectorAll('.chip[data-sentiment]').forEach(c => {
+        c.classList.toggle('active', c.dataset.sentiment === 'all');
+      });
+
+      const fHint = document.getElementById('filterHint');
+      if (fHint) { fHint.textContent = ''; fHint.style.display = 'none'; }
+      const tHint = document.getElementById('trendHint');
+      if (tHint) { tHint.textContent = ''; tHint.style.display = 'none'; }
+
+      renderContent();
+      if (typeof renderPortfolioAnalytics === 'function') renderPortfolioAnalytics();
+    });
+  }
+
   const bulkGarpBtn = $('#bulk-garp-btn');
   if (bulkGarpBtn) bulkGarpBtn.addEventListener('click', runBulkGarpAudit);
 
@@ -3076,9 +3113,12 @@ function renderContent() {
     });
   }
 
+  const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all' || Boolean(currentListQuery);
+  const resetBtnEl = document.getElementById('reset-filters-btn');
+  if (resetBtnEl) resetBtnEl.style.display = isFiltered ? 'inline-flex' : 'none';
+
   const countBar = document.getElementById('filterCountBar');
   if (countBar) {
-    const isFiltered = currentFilter !== 'all' || currentSentiment !== 'all' || currentTrend !== 'all' || Boolean(currentListQuery);
     if (isFiltered) {
       const labels = {
         'strong-cash': '💰 Strong Cash (≥70%)',
@@ -3624,6 +3664,18 @@ function computeAutoGarpForStock(ticker, fundamentals) {
   for (let k in inputs) {
     score += parseInt(inputs[k], 10) || 0;
   }
+
+  // CFO / EBITDA Cash Conversion reality check (3-Yr Cumulative CFO / EBITDA)
+  // High cash conversion (>= 70%) supports score; weak cash conversion (< 50%) trims score unless capex-heavy expansion
+  if (fundamentals && fundamentals.cfo_to_ebitda != null) {
+    const cfoRatio = Number(fundamentals.cfo_to_ebitda);
+    if (cfoRatio >= 0.70) {
+      score += 2;
+    } else if (cfoRatio < 0.50) {
+      score -= fundamentals.is_capex_heavy ? 2 : 5;
+    }
+  }
+
   score = Math.max(20, Math.min(100, Math.round(score)));
 
   let status = 'PRUNE_GTT_EXIT';
