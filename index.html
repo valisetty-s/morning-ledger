@@ -1285,16 +1285,81 @@
     filter: brightness(1.15);
   }
 
-  /* 3 Compact Pastel Mini-Metric Tiles */
+  /* Separated Action Radar & Portfolio Analysis Sections */
+  .radar-section-card {
+    margin: 8px 0 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 13px 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .radar-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .radar-section-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .radar-min-btn {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-soft);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .radar-min-btn:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: var(--teal-soft);
+  }
+  .radar-body {
+    margin-top: 10px;
+  }
+  .radar-body .radar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    height: auto;
+  }
+  @media (min-width: 768px) {
+    .radar-body .radar-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .radar-body .radar-tile {
+    padding: 10px 10px;
+    border-radius: 12px;
+  }
+  .radar-body .radar-num {
+    font-size: 21px;
+  }
+  .radar-body .radar-lbl {
+    font-size: 11px;
+  }
+  .analytics-charts-card {
+    margin: 10px 0 14px;
+  }
+
+  /* 4 Compact Pastel Mini-Metric Tiles (PEG, PAT(2Q), REV(2Q), CFO/EBITDA) */
   .mini-tiles-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
   }
   .mini-tile {
     min-width: 0;
-    border-radius: 10px;
-    padding: 7px 9px;
+    border-radius: 8px;
+    padding: 5px 6px;
     border: 1px solid var(--border);
     background: var(--surface-soft);
     display: flex;
@@ -1307,15 +1372,18 @@
   .mini-tile.tile-info { background: var(--indigo-bg); border-color: var(--indigo-border); }
 
   .mini-tile-lbl {
-    font-size: 9.5px;
+    font-size: 8.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.25px;
     color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mini-tile-val {
     font-family: 'SF Mono', monospace;
-    font-size: 13.5px;
+    font-size: 11.5px;
     font-weight: 800;
     color: var(--ink);
     margin-top: 2px;
@@ -1787,7 +1855,7 @@
           <h1>The Morning Ledger</h1>
           <div class="brand-sub">
             <span id="dateline-date">—</span>
-            <span class="build-tag">v75 · Dark Bento</span>
+            <span class="build-tag">v76 · Dark Bento</span>
           </div>
         </div>
       </div>
@@ -1855,8 +1923,11 @@
   <!-- Moneycontrol Market-Open Sector/Stock Reaction Summary (2 lines, maintained all day) -->
   <div id="mc-market-open-summary" class="mc-open-strip" style="display: none;"></div>
 
-  <!-- Design 2: Asymmetric Bento Portfolio Overview + Action Radar -->
-  <div id="portfolio-analytics-container" style="display: block;"></div>
+  <!-- Action Radar for Today (Open by default, minimizable) -->
+  <div id="action-radar-container" style="display: block;"></div>
+
+  <!-- Portfolio Analysis Charts (Closed by default, toggle via 📊 Analysis Charts) -->
+  <div id="portfolio-analytics-container" style="display: none;"></div>
   <div id="portfolio-drilldown-container" style="display: none; margin: 0 0 16px;"></div>
 
   <!-- Compact Filter & Sort Rail (Line 1: Sort & Filters, Line 2: Trend Chips) -->

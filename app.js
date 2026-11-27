@@ -240,7 +240,7 @@ function init() {
 
   const analyticsChip = $('#analytics-toggle-chip');
   if (analyticsChip) {
-    analyticsChip.classList.add('active');
+    analyticsChip.classList.remove('active');
     analyticsChip.addEventListener('click', () => {
       const isHidden = analyticsContainer.style.display === 'none';
       if (!isHidden) {
@@ -494,13 +494,18 @@ function init() {
 /* ==========================================================================
    PORTFOLIO PIE CHART, SEGREGATED P&L STATS & DRILLDOWN ENGINE
    ========================================================================== */
+let isActionRadarMinimized = localStorage.getItem('ml_radar_minimized') === 'true';
+
 function renderPortfolioAnalytics() {
-  const container = document.getElementById('portfolio-analytics-container');
-  if (!container) return;
+  const analyticsEl = document.getElementById('portfolio-analytics-container');
+  const radarEl = document.getElementById('action-radar-container');
 
   const stocks = Store.getStocks();
   if (!stocks || stocks.length === 0) {
-    container.innerHTML = `<div class="bento-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
+    if (radarEl) radarEl.innerHTML = '';
+    if (analyticsEl) {
+      analyticsEl.innerHTML = `<div class="bento-card analytics-charts-card"><div class="quiet">No holdings loaded. Import or add stocks in Settings.</div></div>`;
+    }
     return;
   }
 
@@ -561,6 +566,155 @@ function renderPortfolioAnalytics() {
       if (f.cwip_ratio != null && f.cwip_ratio >= 0.15) activeCwipCount++;
     }
   });
+
+  // 1. Render Action Radar for Today (Open by default, minimizable)
+  if (radarEl) {
+    const urgentSellItems = [];
+    const urgentBuyItems = [];
+    radarSource.forEach(s => {
+      const u = getNewsUrgentAction(s, savedScores);
+      if (!u) return;
+      if (u.action === 'sell') urgentSellItems.push(u);
+      else if (u.action === 'buy') urgentBuyItems.push(u);
+    });
+
+    function renderUrgentChips(items, emptyMsg, expandId) {
+      if (!items.length) {
+        return `<span class="urgent-empty-note">${emptyMsg}</span>`;
+      }
+      const visibleCount = 8;
+      const primary = items.slice(0, visibleCount);
+      const remaining = items.slice(visibleCount);
+
+      const primaryHtml = primary.map(item =>
+        `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+      ).join('');
+
+      if (!remaining.length) return primaryHtml;
+
+      const remainingHtml = remaining.map(item =>
+        `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
+      ).join('');
+
+      return `
+        ${primaryHtml}
+        <span id="${expandId}-extra" class="urgent-extra-chips" style="display:none;">${remainingHtml}</span>
+        <button type="button" class="urgent-toggle-btn" data-expand-target="${expandId}-extra" data-count="${remaining.length}">+${remaining.length} more</button>
+      `;
+    }
+
+    const sellChipsHtml = renderUrgentChips(urgentSellItems, 'No negative news shocks detected', 'urgent-sell');
+    const buyChipsHtml = renderUrgentChips(urgentBuyItems, 'No fresh positive catalysts detected', 'urgent-buy');
+
+    radarEl.innerHTML = `
+      <div class="radar-section-card">
+        <div class="radar-section-head">
+          <span class="bento-eyebrow">Action Radar for Today</span>
+          <div class="radar-section-right">
+            <span style="font-size:11px; color:var(--ink-muted); font-weight:600;" title="Stocks with cached Screener fundamentals on this device">${cachedFundCount}/${radarSource.length} audited</span>
+            <button type="button" class="radar-min-btn" id="btn-toggle-radar-min" aria-expanded="${!isActionRadarMinimized}">${isActionRadarMinimized ? '▾ Expand' : '▴ Minimize'}</button>
+          </div>
+        </div>
+        <div class="radar-body" id="action-radar-body" style="display:${isActionRadarMinimized ? 'none' : 'block'};">
+          <div class="radar-grid">
+            <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
+              <div class="radar-num">${buysCount}</div>
+              <div class="radar-lbl">💎 Buys</div>
+            </div>
+            <div class="radar-tile radar-rose ${currentTrend === 'actionable-exits' ? 'active' : ''}" id="radar-exits" title="GARP < 65 and trading below 200-DMA">
+              <div class="radar-num">${exitsCount}</div>
+              <div class="radar-lbl">✂️ Trim/Exits</div>
+            </div>
+            <div class="radar-tile radar-amber ${currentFilter === 'weak-cash' ? 'active' : ''}" id="radar-weak-cash" title="3-Yr Cumulative CFO / EBITDA < 50%">
+              <div class="radar-num">${weakCashCount}</div>
+              <div class="radar-lbl">⚠️ Weak Cash</div>
+            </div>
+            <div class="radar-tile radar-violet ${currentFilter === 'active-cwip' ? 'active' : ''}" id="radar-cwip" title="Capital Work in Progress (CWIP) ≥ 15% of Fixed Assets">
+              <div class="radar-num">${activeCwipCount}</div>
+              <div class="radar-lbl">🏭 Active CWIP</div>
+            </div>
+          </div>
+          <div class="urgent-radar-stack">
+            <div class="urgent-box urgent-sell">
+              <div class="urgent-box-head">
+                <span>🚨 Urgent Action - Sell/Trim</span>
+                <span>${urgentSellItems.length}</span>
+              </div>
+              <div class="urgent-pill-list">${sellChipsHtml}</div>
+            </div>
+            <div class="urgent-box urgent-buy">
+              <div class="urgent-box-head">
+                <span>🟢 Urgent Action - Buy</span>
+                <span>${urgentBuyItems.length}</span>
+              </div>
+              <div class="urgent-pill-list">${buyChipsHtml}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const minBtn = document.getElementById('btn-toggle-radar-min');
+    if (minBtn) {
+      minBtn.addEventListener('click', () => {
+        isActionRadarMinimized = !isActionRadarMinimized;
+        localStorage.setItem('ml_radar_minimized', isActionRadarMinimized ? 'true' : 'false');
+        renderPortfolioAnalytics();
+      });
+    }
+
+    const triggerTrend = (trendKey) => {
+      const next = currentTrend === trendKey ? 'all' : trendKey;
+      const chip = document.querySelector(`.chip[data-trend="${next}"]`);
+      if (chip) chip.click();
+      renderPortfolioAnalytics();
+    };
+    const triggerHoldingFilter = (filterKey) => {
+      const next = currentFilter === filterKey ? 'all' : filterKey;
+      const sel = document.getElementById('filter-select');
+      if (sel) {
+        sel.value = next;
+        sel.dispatchEvent(new Event('change'));
+      }
+      renderPortfolioAnalytics();
+    };
+
+    const rBuys = document.getElementById('radar-buys');
+    if (rBuys) rBuys.addEventListener('click', () => triggerTrend('actionable-buys'));
+    const rExits = document.getElementById('radar-exits');
+    if (rExits) rExits.addEventListener('click', () => triggerTrend('actionable-exits'));
+    const rWeak = document.getElementById('radar-weak-cash');
+    if (rWeak) rWeak.addEventListener('click', () => triggerHoldingFilter('weak-cash'));
+    const rCwip = document.getElementById('radar-cwip');
+    if (rCwip) rCwip.addEventListener('click', () => triggerHoldingFilter('active-cwip'));
+
+    radarEl.querySelectorAll('[data-expand-target]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const targetId = btn.dataset.expandTarget;
+        const count = btn.dataset.count;
+        const extraEl = document.getElementById(targetId);
+        if (!extraEl) return;
+        const isHidden = extraEl.style.display === 'none';
+        extraEl.style.display = isHidden ? 'contents' : 'none';
+        btn.textContent = isHidden ? 'Show less' : `+${count} more`;
+        btn.classList.toggle('expanded', isHidden);
+      });
+    });
+
+    radarEl.querySelectorAll('[data-urgent-ticker]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = (btn.dataset.urgentTicker || '').trim();
+        if (!t) return;
+        const match = stocks.find(([sym]) => sym.toUpperCase() === t.toUpperCase());
+        runSingleStockLookup(t, match ? match[1] : t, true);
+        if (lookupResult) lookupResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+  }
+
+  // 2. Render Portfolio Analysis Charts (Closed by default, opens when toggled)
+  if (!analyticsEl || analyticsEl.style.display === 'none') return;
 
   const totalPnL = totalCurrentVal - totalInvested;
   const totalPnLPct = totalInvested > 0 ? ((totalPnL / totalInvested) * 100).toFixed(2) : '0.00';
@@ -763,7 +917,6 @@ function renderPortfolioAnalytics() {
     ];
   }
 
-  // Build either Horizontal Stacked Bar OR Interactive SVG Donut Chart
   let allocationVisualHtml = '';
   if (currentChartStyle === 'bar') {
     const segsHtml = slices
@@ -863,144 +1016,68 @@ function renderPortfolioAnalytics() {
     `;
   }).join('');
 
-  container.innerHTML = `
-    <div class="bento-top-grid">
-      <!-- Left Hero Portfolio Card -->
-      <div class="bento-card hero-card">
-        <div class="bento-card-head">
-          <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button class="style-switch-btn ${isPrivacyMasked ? 'active' : ''}" id="btn-privacy-toggle" title="${isPrivacyMasked ? 'Show portfolio amounts' : 'Hide amounts (mask in zeroes)'}">
-              ${isPrivacyMasked ? '🔒 Masked' : '👁️ Hide ₹'}
-            </button>
-            <div class="chart-style-switch" role="group" aria-label="Chart display style">
-              <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
-              <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
-            </div>
+  analyticsEl.innerHTML = `
+    <div class="bento-card hero-card analytics-charts-card">
+      <div class="bento-card-head">
+        <span class="bento-eyebrow">Portfolio Allocation &amp; P&amp;L</span>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button class="style-switch-btn ${isPrivacyMasked ? 'active' : ''}" id="btn-privacy-toggle" title="${isPrivacyMasked ? 'Show portfolio amounts' : 'Hide amounts (mask in zeroes)'}">
+            ${isPrivacyMasked ? '🔒 Masked' : '👁️ Hide ₹'}
+          </button>
+          <div class="chart-style-switch" role="group" aria-label="Chart display style">
+            <button class="style-switch-btn ${currentChartStyle === 'bar' ? 'active' : ''}" id="btn-style-bar">▬ Bar</button>
+            <button class="style-switch-btn ${currentChartStyle === 'pie' ? 'active' : ''}" id="btn-style-pie">◔ Pie</button>
           </div>
+          <button type="button" class="radar-min-btn" id="btn-close-analytics-charts">✕ Hide</button>
         </div>
+      </div>
 
-        <div class="hero-kpi-row">
+      <div class="hero-kpi-row">
+        <div>
+          <div class="hero-val-lbl">Portfolio Value</div>
+          <div class="hero-val-main">${maskAmt(totalCurrentVal)}</div>
+        </div>
+        <div class="hero-sub-metrics">
           <div>
-            <div class="hero-val-lbl">Portfolio Value</div>
-            <div class="hero-val-main">${maskAmt(totalCurrentVal)}</div>
+            <div class="hero-val-lbl">Total Invested</div>
+            <div class="hero-sub-val">${maskAmt(totalInvested)}</div>
           </div>
-          <div class="hero-sub-metrics">
-            <div>
-              <div class="hero-val-lbl">Total Invested</div>
-              <div class="hero-sub-val">${maskAmt(totalInvested)}</div>
-            </div>
-            <div>
-              <div class="hero-val-lbl">Overall P&amp;L</div>
-              <div class="pnl-hero-pill ${pnlClass}">${isPrivacyMasked ? '±₹0,00,000 (0.00%)' : `${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)`}</div>
-            </div>
+          <div>
+            <div class="hero-val-lbl">Overall P&amp;L</div>
+            <div class="pnl-hero-pill ${pnlClass}">${isPrivacyMasked ? '±₹0,00,000 (0.00%)' : `${pnlSign}₹${Math.abs(Math.round(totalPnL)).toLocaleString('en-IN')} (${pnlSign}${totalPnLPct}%)`}</div>
           </div>
         </div>
-
-        <div class="analytics-toggle-group">
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top50' ? 'active' : ''}" id="btn-chart-top50">Top 50</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20gainers' ? 'active' : ''}" id="btn-chart-top20gainers">Top 20 Gainers</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20losers' ? 'active' : ''}" id="btn-chart-top20losers">Top 20 Losers</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'sub12' ? 'active' : ''}" id="btn-chart-sub12">Sub-12% Growth</button>
-          <button class="chart-toggle-btn ${currentAnalyticsMode === 'super18' ? 'active' : ''}" id="btn-chart-super18">Super &gt;18%</button>
-        </div>
-
-        ${allocationVisualHtml}
-
-        <details class="pnl-breakdown-details" open>
-          <summary>📊 Segregated P&amp;L Contribution (tap any slice to inspect stocks)</summary>
-          <div class="pnl-stats-grid">${pnlCardsHtml}</div>
-        </details>
       </div>
 
-      <!-- Right Action Radar for Today Card -->
-      <div class="bento-card">
-        <div class="bento-card-head" style="margin-bottom:10px;">
-          <span class="bento-eyebrow">Action Radar for Today</span>
-          <span style="font-size:11px; color:var(--ink-muted); font-weight:600;" title="Stocks with cached Screener fundamentals on this device">${cachedFundCount}/${radarSource.length} audited</span>
-        </div>
-        <div class="radar-grid" style="height:auto;">
-          <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
-            <div class="radar-num">${buysCount}</div>
-            <div class="radar-lbl">💎 Buys</div>
-          </div>
-          <div class="radar-tile radar-rose ${currentTrend === 'actionable-exits' ? 'active' : ''}" id="radar-exits" title="GARP < 65 and trading below 200-DMA">
-            <div class="radar-num">${exitsCount}</div>
-            <div class="radar-lbl">✂️ Trim/Exits</div>
-          </div>
-          <div class="radar-tile radar-amber ${currentFilter === 'weak-cash' ? 'active' : ''}" id="radar-weak-cash" title="3-Yr Cumulative CFO / EBITDA < 50%">
-            <div class="radar-num">${weakCashCount}</div>
-            <div class="radar-lbl">⚠️ Weak Cash</div>
-          </div>
-          <div class="radar-tile radar-violet ${currentFilter === 'active-cwip' ? 'active' : ''}" id="radar-cwip" title="Capital Work in Progress (CWIP) ≥ 15% of Fixed Assets">
-            <div class="radar-num">${activeCwipCount}</div>
-            <div class="radar-lbl">🏭 Active CWIP</div>
-          </div>
-        </div>
-        ${(() => {
-          const urgentSellItems = [];
-          const urgentBuyItems = [];
-          radarSource.forEach(s => {
-            const u = getNewsUrgentAction(s, savedScores);
-            if (!u) return;
-            if (u.action === 'sell') urgentSellItems.push(u);
-            else if (u.action === 'buy') urgentBuyItems.push(u);
-          });
-
-          function renderUrgentChips(items, emptyMsg, expandId) {
-            if (!items.length) {
-              return `<span class="urgent-empty-note">${emptyMsg}</span>`;
-            }
-            const visibleCount = 8;
-            const primary = items.slice(0, visibleCount);
-            const remaining = items.slice(visibleCount);
-
-            const primaryHtml = primary.map(item =>
-              `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
-            ).join('');
-
-            if (!remaining.length) return primaryHtml;
-
-            const remainingHtml = remaining.map(item =>
-              `<button type="button" class="urgent-stock-chip" data-urgent-ticker="${escapeHtml(item.ticker || '')}" title="${escapeHtml(item.reason)}">${escapeHtml(item.label)}</button>`
-            ).join('');
-
-            return `
-              ${primaryHtml}
-              <span id="${expandId}-extra" class="urgent-extra-chips" style="display:none;">${remainingHtml}</span>
-              <button type="button" class="urgent-toggle-btn" data-expand-target="${expandId}-extra" data-count="${remaining.length}">+${remaining.length} more</button>
-            `;
-          }
-
-          const sellChipsHtml = renderUrgentChips(urgentSellItems, 'No negative news shocks detected', 'urgent-sell');
-          const buyChipsHtml = renderUrgentChips(urgentBuyItems, 'No fresh positive catalysts detected', 'urgent-buy');
-
-          return `
-            <div class="urgent-radar-stack">
-              <div class="urgent-box urgent-sell">
-                <div class="urgent-box-head">
-                  <span>🚨 Urgent Action - Sell/Trim</span>
-                  <span>${urgentSellItems.length}</span>
-                </div>
-                <div class="urgent-pill-list">${sellChipsHtml}</div>
-              </div>
-              <div class="urgent-box urgent-buy">
-                <div class="urgent-box-head">
-                  <span>🟢 Urgent Action - Buy</span>
-                  <span>${urgentBuyItems.length}</span>
-                </div>
-                <div class="urgent-pill-list">${buyChipsHtml}</div>
-              </div>
-            </div>
-          `;
-        })()}
+      <div class="analytics-toggle-group">
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'tier' ? 'active' : ''}" id="btn-chart-tier">By Tier</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'sector' ? 'active' : ''}" id="btn-chart-sector">By Sector</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'top50' ? 'active' : ''}" id="btn-chart-top50">Top 50</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20gainers' ? 'active' : ''}" id="btn-chart-top20gainers">Top 20 Gainers</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'top20losers' ? 'active' : ''}" id="btn-chart-top20losers">Top 20 Losers</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'sub12' ? 'active' : ''}" id="btn-chart-sub12">Sub-12% Growth</button>
+        <button class="chart-toggle-btn ${currentAnalyticsMode === 'super18' ? 'active' : ''}" id="btn-chart-super18">Super &gt;18%</button>
       </div>
+
+      ${allocationVisualHtml}
+
+      <details class="pnl-breakdown-details" open>
+        <summary>📊 Segregated P&amp;L Contribution (tap any slice to inspect stocks)</summary>
+        <div class="pnl-stats-grid">${pnlCardsHtml}</div>
+      </details>
     </div>
   `;
 
-  // Chart Style Switcher (Bar vs Pie)
+  const closeChartsBtn = document.getElementById('btn-close-analytics-charts');
+  if (closeChartsBtn) {
+    closeChartsBtn.addEventListener('click', () => {
+      analyticsEl.style.display = 'none';
+      if (drilldownContainer) drilldownContainer.style.display = 'none';
+      const chip = document.getElementById('analytics-toggle-chip');
+      if (chip) chip.classList.remove('active');
+    });
+  }
+
   const btnBar = document.getElementById('btn-style-bar');
   const btnPie = document.getElementById('btn-style-pie');
   if (btnBar) btnBar.addEventListener('click', () => {
@@ -1021,7 +1098,6 @@ function renderPortfolioAnalytics() {
     renderPortfolioAnalytics();
   });
 
-  // Analytics Mode Buttons
   const bindMode = (id, mode) => {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', () => {
@@ -1039,63 +1115,13 @@ function renderPortfolioAnalytics() {
   bindMode('btn-chart-sub12', 'sub12');
   bindMode('btn-chart-super18', 'super18');
 
-  // Action Radar Quick-Filter Triggers
-  const triggerTrend = (trendKey) => {
-    const next = currentTrend === trendKey ? 'all' : trendKey;
-    const chip = document.querySelector(`.chip[data-trend="${next}"]`);
-    if (chip) chip.click();
-    renderPortfolioAnalytics();
-  };
-  const triggerHoldingFilter = (filterKey) => {
-    const next = currentFilter === filterKey ? 'all' : filterKey;
-    const sel = document.getElementById('filter-select');
-    if (sel) {
-      sel.value = next;
-      sel.dispatchEvent(new Event('change'));
-    }
-    renderPortfolioAnalytics();
-  };
-
-  const rBuys = document.getElementById('radar-buys');
-  if (rBuys) rBuys.addEventListener('click', () => triggerTrend('actionable-buys'));
-  const rExits = document.getElementById('radar-exits');
-  if (rExits) rExits.addEventListener('click', () => triggerTrend('actionable-exits'));
-  const rWeak = document.getElementById('radar-weak-cash');
-  if (rWeak) rWeak.addEventListener('click', () => triggerHoldingFilter('weak-cash'));
-  const rCwip = document.getElementById('radar-cwip');
-  if (rCwip) rCwip.addEventListener('click', () => triggerHoldingFilter('active-cwip'));
-
-  // Drilldown triggers on Bar segments, Bar pills, Pie circles, Pie legend rows, and P&L cards
   const handleSliceClick = (key) => {
     const foundSlice = slices.find(s => s.key === key);
     if (!foundSlice) return;
     renderDrilldownTable(foundSlice);
   };
-  container.querySelectorAll('[data-slice-key]').forEach(el => {
+  analyticsEl.querySelectorAll('[data-slice-key]').forEach(el => {
     el.addEventListener('click', () => handleSliceClick(el.dataset.sliceKey));
-  });
-  container.querySelectorAll('[data-expand-target]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const targetId = btn.dataset.expandTarget;
-      const count = btn.dataset.count;
-      const extraEl = document.getElementById(targetId);
-      if (!extraEl) return;
-      const isHidden = extraEl.style.display === 'none';
-      extraEl.style.display = isHidden ? 'contents' : 'none';
-      btn.textContent = isHidden ? 'Show less' : `+${count} more`;
-      btn.classList.toggle('expanded', isHidden);
-    });
-  });
-
-  container.querySelectorAll('[data-urgent-ticker]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const t = (btn.dataset.urgentTicker || '').trim();
-      if (!t) return;
-      const match = stocks.find(([sym]) => sym.toUpperCase() === t.toUpperCase());
-      runSingleStockLookup(t, match ? match[1] : t, true);
-      if (lookupResult) lookupResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
   });
 
   if (selectedSliceKey) {
@@ -1103,6 +1129,7 @@ function renderPortfolioAnalytics() {
     if (currentSlice) renderDrilldownTable(currentSlice);
   }
 }
+
 function renderDrilldownTable(slice) {
   selectedSliceKey = slice.key;
   if (!drilldownContainer) return;
@@ -2114,62 +2141,116 @@ function renderSuggestions(query) {
 }
 
 
-const MC_DAILY_OPEN_KEY = 'ml_mc_open_brief_v1';
+const MC_DAILY_OPEN_KEY = 'ml_mc_open_brief_v2';
 
 function todayDateKey() {
-  return new Date().toISOString().slice(0, 10);
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+  } catch (e) {
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    return new Date(Date.now() + istOffsetMs).toISOString().slice(0, 10);
+  }
 }
 
 function deriveMoneycontrolReactionLines(cues, stocksList) {
+  const headlines = Array.isArray(cues && cues.global_headlines) ? cues.global_headlines : [];
   const headlineText = [
-    ...(cues && Array.isArray(cues.global_headlines) ? cues.global_headlines : []),
+    ...headlines,
     cues && cues.indian_impact ? cues.indian_impact : '',
     cues && cues.usa_market ? cues.usa_market : '',
     cues && cues.china_market ? cues.china_market : ''
   ].join(' ').toLowerCase();
 
-  const sectorWatch = [];
-  if (/ai|chip|nasdaq|tech|gpu|cloud|semiconductor/.test(headlineText)) {
-    sectorWatch.push('IT, AI & Data Center');
-  }
-  if (/oil|crude|brent|energy|gas|middle east/.test(headlineText)) {
-    sectorWatch.push('Oil/Gas & Chemicals');
-  }
-  if (/gold|silver|bullion|metal|steel|copper/.test(headlineText)) {
-    sectorWatch.push('Metals & Jewellery');
-  }
-  if (/defense|defence|order|infra|power|grid/.test(headlineText)) {
-    sectorWatch.push('Defense & Power Grid');
-  }
-  if (/fii|dii|rate|fed|bank|nifty|sensex/.test(headlineText)) {
-    sectorWatch.push('Banks & Financials');
+  const sectorRules = [
+    { label: 'IT, AI & Data Center', re: /\b(ai|chip|chips|nasdaq|semiconductor|gpu|cloud|data center|it stocks|software)\b/ },
+    { label: 'Oil/Gas & Chemicals', re: /\b(oil|crude|brent|wti|opec|gas|lng|chemical|chemicals|petchem)\b/ },
+    { label: 'Metals & Mining', re: /\b(gold|silver|bullion|metal|metals|steel|copper|aluminum|aluminium|zinc|mining)\b/ },
+    { label: 'Defense & Power Grid', re: /\b(defense|defence|missile|aerospace|power|grid|transmission|transformer|renewable|solar|bess)\b/ },
+    { label: 'Banks & Financials', re: /\b(fii|dii|fed|rate|rates|yield|treasury|bank|banks|nbfc|nifty|sensex|rupee)\b/ }
+  ];
+
+  const sectorWatch = sectorRules
+    .filter(r => r.re.test(headlineText))
+    .map(r => r.label);
+
+  const genericFirstWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'of', 'for', 'in', 'on', 'to', 'ltd', 'limited',
+    'india', 'indian', 'national', 'bank', 'finance', 'financial', 'services',
+    'technologies', 'technology', 'industries', 'industry', 'solutions', 'systems',
+    'enterprises', 'products', 'chemicals', 'chemical', 'engineering', 'power',
+    'energy', 'health', 'healthcare', 'hospital', 'hospitals', 'motors', 'auto'
+  ]);
+
+  const scoredMatches = [];
+  const watchlist = Array.isArray(stocksList) ? stocksList : Store.getStocks();
+  const seenSyms = new Set();
+
+  for (const row of watchlist) {
+    const sym = String(row[0] || '').trim().toUpperCase();
+    if (!sym || seenSyms.has(sym)) continue;
+    const comp = String(row[1] || '').toLowerCase();
+    const cleanSym = getCleanTicker(sym).toLowerCase();
+    const sec = String(SECTOR_MAP[getCleanTicker(sym)] || SECTOR_MAP[sym] || '').toLowerCase();
+
+    let relevance = 0;
+
+    // Direct ticker or distinct company name match in headlines
+    if (cleanSym.length >= 3 && new RegExp(`\b${cleanSym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\b`).test(headlineText)) {
+      relevance += 4;
+    }
+    const compTokens = comp
+      .replace(/[^a-z0-9&\s]/g, ' ')
+      .split(/\s+/)
+      .filter(tok => tok.length >= 4 && !genericFirstWords.has(tok));
+    if (compTokens.some(tok => new RegExp(`\b${tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\b`).test(headlineText))) {
+      relevance += 3;
+    }
+
+    // Specific thematic / sector overlap with today's cues
+    if (/\b(ai|chip|chips|nasdaq|semiconductor|gpu|data center)\b/.test(headlineText) && (sec.includes('ai') || sec.includes('ems'))) {
+      relevance += 2;
+    }
+    if (/\b(oil|crude|brent|opec|gas|chemical|chemicals)\b/.test(headlineText) && (sec.includes('chemical') || sec.includes('energy'))) {
+      relevance += 2;
+    }
+    if (/\b(gold|silver|bullion|metal|metals|steel|copper)\b/.test(headlineText) && (sec.includes('capital') || sec.includes('jewellery') || sec.includes('commodity'))) {
+      relevance += 2;
+    }
+    if (/\b(defense|defence|aerospace|power|grid|transmission|bess)\b/.test(headlineText) && (sec.includes('defense') || sec.includes('capital') || sec.includes('clean energy'))) {
+      relevance += 2;
+    }
+    if (/\b(fii|dii|fed|rate|rates|bank|banks|nbfc)\b/.test(headlineText) && sec.includes('financial')) {
+      relevance += 2;
+    }
+
+    if (relevance > 0) {
+      seenSyms.add(sym);
+      scoredMatches.push({ sym, relevance });
+    }
   }
 
-  const matchedTickers = [];
-  const watchlist = Array.isArray(stocksList) ? stocksList : Store.getStocks();
-  for (const row of watchlist) {
-    const sym = String(row[0] || '').toUpperCase();
-    const comp = String(row[1] || '').toLowerCase();
-    const sec = String(SECTOR_MAP[getCleanTicker(sym)] || SECTOR_MAP[sym] || '').toLowerCase();
-    const hitBySector =
-      (sec.includes('ai') && /ai|tech|nasdaq|cloud/.test(headlineText)) ||
-      (sec.includes('chemical') && /oil|crude|chemical|commodity/.test(headlineText)) ||
-      (sec.includes('capital') && /steel|metal|power|infra|grid/.test(headlineText)) ||
-      (sec.includes('defense') && /defense|defence|order/.test(headlineText)) ||
-      (sec.includes('financial') && /fii|bank|rate|market/.test(headlineText));
-    const hitByName = comp && comp.length > 3 && headlineText.includes(comp.split(' ')[0]);
-    if ((hitBySector || hitByName) && !matchedTickers.includes(sym)) {
-      matchedTickers.push(sym);
-    }
-    if (matchedTickers.length >= 6) break;
-  }
+  // Sort by strongest cue relevance, with a deterministic daily rotation tie-breaker
+  const daySeed = todayDateKey().split('-').reduce((acc, n) => acc + Number(n || 0), 0);
+  scoredMatches.sort((a, b) => {
+    if (b.relevance !== a.relevance) return b.relevance - a.relevance;
+    const ha = (a.sym.charCodeAt(0) + daySeed) % 17;
+    const hb = (b.sym.charCodeAt(0) + daySeed) % 17;
+    return ha - hb;
+  });
+
+  const matchedTickers = scoredMatches.slice(0, 6).map(m => m.sym);
 
   const line1 = cues && cues.indian_impact
     ? cues.indian_impact
     : 'Moneycontrol cues point to selective opening moves across global and domestic triggers.';
 
   const sectorsText = sectorWatch.length ? sectorWatch.slice(0, 3).join(', ') : 'Broad Market & Cyclicals';
-  const stocksText = matchedTickers.length ? matchedTickers.join(', ') : 'Portfolio Movers';
+  const stocksText = matchedTickers.length ? matchedTickers.join(', ') : 'Select Sector Movers';
   const line2 = `Likely early reaction on open: Sectors — ${sectorsText}; Stocks to watch — ${stocksText}.`;
 
   return { line1, line2 };
@@ -2185,8 +2266,12 @@ function renderMaintainedMarketOpenStrip(linesObj) {
 async function pullDailyGlobalCuesOnce() {
   const todayKey = todayDateKey();
   const savedDaily = JSON.parse(localStorage.getItem(MC_DAILY_OPEN_KEY) || 'null');
+  const backendUrl = getBackendUrl();
+
   if (savedDaily && savedDaily.dateKey === todayKey && savedDaily.lines) {
-    renderMaintainedMarketOpenStrip(savedDaily.lines);
+    // Re-derive lines against current watchlist/cues so updates take effect immediately
+    const freshLines = savedDaily.cues ? deriveMoneycontrolReactionLines(savedDaily.cues, Store.getStocks()) : savedDaily.lines;
+    renderMaintainedMarketOpenStrip(freshLines);
     if (savedDaily.cues) {
       const cuesContainer = document.getElementById('global-cues-container');
       if (cuesContainer && cuesContainer.innerHTML.trim() === '') {
@@ -2194,10 +2279,11 @@ async function pullDailyGlobalCuesOnce() {
         cuesContainer.style.display = 'none';
       }
     }
-    return;
+    // If the earlier pull today had no global headlines yet, try once more in background
+    const hadHeadlines = savedDaily.cues && Array.isArray(savedDaily.cues.global_headlines) && savedDaily.cues.global_headlines.length > 0;
+    if (hadHeadlines || !backendUrl) return;
   }
 
-  const backendUrl = getBackendUrl();
   if (!backendUrl) return;
 
   try {
@@ -3178,7 +3264,20 @@ function renderEntry(stock) {
       else patClass = 'tile-bad';
     }
 
-    // Tile 3: CFO / EBITDA with Progress Bar
+    // Tile 3: REV(2Q)
+    const revRaw = cachedFund.revenue_growth != null ? cachedFund.revenue_growth : cachedFund.revenueGrowth;
+    let revClass = '';
+    let revDisplay = '—';
+    let revTitle = 'Last 2Q YoY Revenue Growth';
+    if (revRaw != null) {
+      revDisplay = fmtGrowth(revRaw);
+      revTitle = `Last 2Q YoY Revenue Growth: ${(Number(revRaw) * 100).toFixed(1)}%`;
+      if (revRaw >= 0.15) revClass = 'tile-good';
+      else if (revRaw >= 0) revClass = 'tile-warn';
+      else revClass = 'tile-bad';
+    }
+
+    // Tile 4: CFO / EBITDA with Progress Bar
     const cfoRaw = cachedFund.cfo_to_ebitda;
     let cfoClass = '';
     let cfoDisplay = '—';
@@ -3203,6 +3302,10 @@ function renderEntry(stock) {
           <span class="mini-tile-lbl">PAT (2Q)</span>
           <span class="mini-tile-val">${patDisplay}</span>
         </div>
+        <div class="mini-tile ${revClass}" title="${escapeHtml(revTitle)}">
+          <span class="mini-tile-lbl">REV (2Q)</span>
+          <span class="mini-tile-val">${revDisplay}</span>
+        </div>
         <div class="mini-tile ${cfoClass}" title="3-Yr Cumulative CFO / EBITDA Cash Conversion">
           <span class="mini-tile-lbl">CFO/EBITDA</span>
           <span class="mini-tile-val">${cfoDisplay}</span>
@@ -3211,7 +3314,7 @@ function renderEntry(stock) {
       </div>
     `;
   } else {
-    miniTilesHtml = `<div id="ribbon-data-${escapeHtml(stock.ticker)}"><button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Load Fundamentals (PEG, PAT, CFO)</button></div>`;
+    miniTilesHtml = `<div id="ribbon-data-${escapeHtml(stock.ticker)}"><button class="ribbon-fund-btn" data-fund-ticker="${escapeHtml(cleanTickerForFund)}" data-fund-target="ribbon-data-${escapeHtml(stock.ticker)}">📊 Load Fundamentals (PEG, PAT, REV, CFO)</button></div>`;
   }
 
   // 3-Pill DMA Trend Ladder (Always Visible on Card)
