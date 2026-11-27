@@ -3382,23 +3382,31 @@ function computeAutoGarpForStock(ticker, fundamentals) {
     const earnGrowth = fundamentals.earningsGrowth != null ? Number(fundamentals.earningsGrowth) : (fundamentals.earnings_growth != null ? Number(fundamentals.earnings_growth) : null);
     if (revGrowth == null && earnGrowth == null) missingFields.push('Growth');
 
-    // 1. RoCE / ROE Gate
+    // 1. Stepped ROCE Gate (>=18% -> 10 pts; 15-18% -> 7 pts; 12-15% -> 4 pts; 10-12% -> 2 pts; <10% -> 0 pts)
     const roceVal = fundamentals.roce != null ? fundamentals.roce : (cachedRoceObj ? cachedRoceObj.roce : null);
     const returnMetric = roceVal != null ? roceVal : (fundamentals.return_on_equity || 0);
-    const returnPct = returnMetric * 100;
-    if (returnPct >= 18) { score += 10; inputs['garp-g1'] = "10"; }
-    else if (returnPct >= 12) { score += 5; inputs['garp-g1'] = "5"; }
+    const returnPct = Number(returnMetric) * 100;
+    let rocePts = 0;
+    if (returnPct >= 18) rocePts = 10;
+    else if (returnPct >= 15) rocePts = 7;
+    else if (returnPct >= 12) rocePts = 4;
+    else if (returnPct >= 10) rocePts = 2;
+    else rocePts = 0;
+    score += rocePts;
+    inputs['garp-g1'] = String(rocePts);
 
-    // 2. OPM / Margin Floor Gate
-    const opm = fundamentals.operating_margin != null ? fundamentals.operating_margin * 100 : null;
-    const npm = fundamentals.profit_margin != null ? fundamentals.profit_margin * 100 : 0;
-    if (opm != null) {
-      if (opm >= 18) { score += 10; inputs['garp-g2'] = "10"; }
-      else if (opm >= 10) { score += 5; inputs['garp-g2'] = "5"; }
-    } else {
-      if (npm >= 12) { score += 10; inputs['garp-g2'] = "10"; }
-      else if (npm >= 6) { score += 5; inputs['garp-g2'] = "5"; }
-    }
+    // 2. Stepped OPM Gate (>=18% -> 10 pts; 15-18% -> 7 pts; 12-15% -> 5 pts; 8-12% -> 3 pts; <8% -> 0 pts; NPM fallback)
+    const opm = fundamentals.operating_margin != null ? Number(fundamentals.operating_margin) * 100 : null;
+    const npm = fundamentals.profit_margin != null ? Number(fundamentals.profit_margin) * 100 : 0;
+    const marginPct = opm != null ? opm : npm;
+    let opmPts = 0;
+    if (marginPct >= 18) opmPts = 10;
+    else if (marginPct >= 15) opmPts = 7;
+    else if (marginPct >= 12) opmPts = 5;
+    else if (marginPct >= 8) opmPts = 3;
+    else opmPts = 0;
+    score += opmPts;
+    inputs['garp-g2'] = String(opmPts);
 
     // 3. D/E Solvency Gate
     const deRaw = fundamentals.debt_to_equity;
@@ -3478,6 +3486,7 @@ function computeAutoGarpForStock(ticker, fundamentals) {
 
   return { score, status, inputs, isSub12, isSuper18, missingFields };
 }
+
 async function runSingleStockGarpAutoAudit(ticker, btnEl = null) {
   const cleanT = getCleanTicker(ticker);
   const backendUrl = getBackendUrl();
