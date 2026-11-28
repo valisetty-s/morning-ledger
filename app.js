@@ -1494,7 +1494,7 @@ function getBackendUrl() {
 
 function getActiveProfileDisplayLabel() {
   const p = getActiveProfile();
-  if (p === 'wife') return 'Deepthi';
+  if (p === 'wife') return 'She';
   if (p === 'custom') return getCustomProfileLabel();
   return 'Satish';
 }
