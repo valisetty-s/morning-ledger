@@ -1052,7 +1052,7 @@ function renderPortfolioAnalytics() {
   if (currentChartStyle === 'bar') {
     const segsHtml = slices
       .filter(s => s.pct > 0)
-      .map(s => `<div class="stacked-seg" data-slice-key="${escapeHtml(s.key)}" style="width:${Math.max(s.pct, 1.5).toFixed(2)}%; background:${s.color};" title="${escapeHtml(s.name)}: ₹${Math.round(s.val).toLocaleString('en-IN')} (${s.pct.toFixed(1)}%) — Tap to drill down"></div>`)
+      .map(s => `<div class="stacked-seg" data-slice-key="${escapeHtml(s.key)}" data-target-width="${Math.max(s.pct, 1.5).toFixed(2)}%" style="width:0%; background:${s.color};" title="${escapeHtml(s.name)}: ₹${Math.round(s.val).toLocaleString('en-IN')} (${s.pct.toFixed(1)}%) — Tap to drill down"></div>`)
       .join('');
 
     const pillsHtml = slices.map(s => `
@@ -1199,6 +1199,13 @@ function renderPortfolioAnalytics() {
     </div>
   `;
 
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      analyticsEl.querySelectorAll('.stacked-seg[data-target-width]').forEach(seg => {
+        seg.style.width = seg.dataset.targetWidth;
+      });
+    });
+  });
   const closeChartsBtn = document.getElementById('btn-close-analytics-charts');
   if (closeChartsBtn) {
     closeChartsBtn.addEventListener('click', () => {
@@ -3451,6 +3458,16 @@ function renderContent() {
 
   const sortedFiltered = applySorting(filtered, currentSort);
   contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.garp-arc-fill[data-target-dash]').forEach(p => {
+        p.setAttribute('stroke-dasharray', p.dataset.targetDash);
+      });
+      document.querySelectorAll('.cfo-bar-fill[data-target-width]').forEach(b => {
+        b.style.width = b.dataset.targetWidth;
+      });
+    });
+  });
   if (analyticsContainer && analyticsContainer.style.display !== 'none') {
     const rBuys = document.getElementById('radar-buys');
     const rExits = document.getElementById('radar-exits');
@@ -3493,8 +3510,8 @@ function renderGarpArcSvg(score, ticker, missingFields = []) {
           </linearGradient>
         </defs>
         <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="var(--border)" stroke-width="6.5" stroke-linecap="round"/>
-        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="url(#${gradId})" stroke-width="6.5" stroke-linecap="round"
-          stroke-dasharray="${fillLen.toFixed(1)} ${arcLen.toFixed(1)}"/>
+        <path class="garp-arc-fill" data-target-dash="${fillLen.toFixed(1)} ${arcLen.toFixed(1)}" d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="url(#${gradId})" stroke-width="6.5" stroke-linecap="round"
+          stroke-dasharray="0 ${arcLen.toFixed(1)}"/>
       </svg>
       <div class="garp-gauge-val" style="color:${textColor};">${hasScore ? clamped : '—'}</div>
       <div class="garp-gauge-lbl">GARP</div>
@@ -3644,7 +3661,7 @@ function renderEntry(stock) {
         <div class="mini-tile ${cfoClass}" title="3-Yr Cumulative CFO / EBITDA Cash Conversion">
           <span class="mini-tile-lbl">CFO/EBITDA</span>
           <span class="mini-tile-val">${cfoDisplay}</span>
-          ${cfoRaw != null ? `<div class="cfo-bar-track"><div class="cfo-bar-fill" style="width:${cfoFillPct}%; background:${cfoBarColor};"></div></div>` : ''}
+          ${cfoRaw != null ? `<div class="cfo-bar-track"><div class="cfo-bar-fill" data-target-width="${cfoFillPct}%" style="width:0%; background:${cfoBarColor};"></div></div>` : ''}
         </div>
       </div>
     `;
