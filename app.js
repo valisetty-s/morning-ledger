@@ -2372,10 +2372,18 @@ async function fetchAllNews() {
 
 function applyFetchedQuotes(quotes) {
   const stocks = Store.getStocks();
+  const tickChanges = {};
+
   if (newsData && newsData.results) {
     for (const r of newsData.results) {
       const q = quotes[r.ticker];
-      if (q && !q.error) r.quote = q;
+      if (q && !q.error) {
+        const prevPrice = r.quote && r.quote.last_price != null ? r.quote.last_price : null;
+        if (prevPrice != null && q.last_price != null && prevPrice !== q.last_price) {
+          tickChanges[r.ticker] = q.last_price > prevPrice ? 'up' : 'down';
+        }
+        r.quote = q;
+      }
     }
     Store.setCache(newsData);
   } else {
@@ -2389,6 +2397,30 @@ function applyFetchedQuotes(quotes) {
   updateStatusBar();
   renderContent();
   renderPortfolioAnalytics();
+
+  // Flash updated price pills if a price ticked up or down
+  if (Object.keys(tickChanges).length > 0) {
+    requestAnimationFrame(() => {
+      for (const [ticker, dir] of Object.entries(tickChanges)) {
+        const cleanT = getCleanTicker(ticker);
+        const card = document.querySelector(`.entry .ribbon-code`);
+        const el = document.querySelectorAll('.entry');
+        el.forEach(c => {
+          const codeEl = c.querySelector('.ribbon-code');
+          if (codeEl && (codeEl.textContent.trim() === ticker || codeEl.textContent.trim() === cleanT)) {
+            const pill = c.querySelector('.chg-pill');
+            if (pill) {
+              const cls = dir === 'up' ? 'price-tick-up' : 'price-tick-down';
+              pill.classList.remove('price-tick-up', 'price-tick-down');
+              void pill.offsetWidth; // trigger reflow
+              pill.classList.add(cls);
+              setTimeout(() => pill.classList.remove(cls), 1000);
+            }
+          }
+        });
+      }
+    });
+  }
 }
 
 function getStockSuggestions(query) {
@@ -4038,6 +4070,15 @@ async function runBulkGarpAudit() {
     if (progText) progText.textContent = `Auditing ${cleanT} (${i + 1} of ${stocks.length})…`;
     if (progPct) progPct.textContent = `${pctDone}%`;
 
+    // Highlight active card in DOM during audit
+    document.querySelectorAll('.entry.is-auditing').forEach(el => el.classList.remove('is-auditing'));
+    document.querySelectorAll('.entry').forEach(el => {
+      const c = el.querySelector('.ribbon-code');
+      if (c && (c.textContent.trim() === ticker || c.textContent.trim() === cleanT)) {
+        el.classList.add('is-auditing');
+      }
+    });
+
     let fundamentals = getCachedFundamentals(cleanT);
     if (!fundamentals) {
       try {
@@ -4097,6 +4138,7 @@ async function runBulkGarpAudit() {
     if (progFill) progFill.style.width = '100%';
     setTimeout(() => { progWrap.style.display = 'none'; }, 1200);
   }
+  document.querySelectorAll('.entry.is-auditing').forEach(el => el.classList.remove('is-auditing'));
   isBulkGarpRunning = false;
   renderContent();
   renderPortfolioAnalytics();

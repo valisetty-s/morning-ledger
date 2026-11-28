@@ -1840,6 +1840,192 @@
 
   .price-up   { color: var(--emerald) !important; font-weight: 800 !important; }
   .price-down { color: var(--rose) !important; font-weight: 800 !important; }
+
+  /* ==========================================================================
+     SUPER-RICH UI ANIMATIONS & MICRO-INTERACTIONS
+     ========================================================================== */
+
+  /* 1. Staggered Entry Entrance Animation */
+  @keyframes bentoCardIn {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.99);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .section .entry {
+    animation: bentoCardIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .section .entry:nth-child(1)  { animation-delay: 0.02s; }
+  .section .entry:nth-child(2)  { animation-delay: 0.04s; }
+  .section .entry:nth-child(3)  { animation-delay: 0.06s; }
+  .section .entry:nth-child(4)  { animation-delay: 0.08s; }
+  .section .entry:nth-child(5)  { animation-delay: 0.10s; }
+  .section .entry:nth-child(6)  { animation-delay: 0.12s; }
+  .section .entry:nth-child(7)  { animation-delay: 0.14s; }
+  .section .entry:nth-child(8)  { animation-delay: 0.16s; }
+  .section .entry:nth-child(9)  { animation-delay: 0.18s; }
+  .section .entry:nth-child(10) { animation-delay: 0.20s; }
+  .section .entry:nth-child(11) { animation-delay: 0.22s; }
+  .section .entry:nth-child(12) { animation-delay: 0.24s; }
+
+  /* 2. GARP Speedometer Sweep Animation */
+  .garp-gauge-wrap svg path:last-of-type {
+    transition: stroke-dasharray 0.75s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.4s ease;
+  }
+  .garp-gauge-val {
+    transition: color 0.4s ease, transform 0.25s ease;
+  }
+  .garp-gauge-wrap:hover .garp-gauge-val {
+    transform: scale(1.08);
+  }
+
+  /* 3. Urgent Risk Ambient Attention Glow (Calm & Elegant 3.2s Cycle) */
+  @keyframes urgentGlow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+      border-color: var(--rose-border);
+    }
+    50% {
+      box-shadow: 0 0 10px 1px rgba(244, 63, 94, 0.28);
+      border-color: rgba(244, 63, 94, 0.65);
+    }
+  }
+
+  .urgent-box.urgent-sell {
+    animation: urgentGlow 3.2s ease-in-out infinite;
+  }
+
+  @keyframes missingPillGlow {
+    0%, 100% {
+      border-color: var(--amber-border);
+      opacity: 0.92;
+    }
+    50% {
+      border-color: rgba(245, 158, 11, 0.85);
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.35);
+      opacity: 1;
+    }
+  }
+
+  .garp-missing-pill {
+    animation: missingPillGlow 3.5s ease-in-out infinite;
+  }
+
+  /* 4. Live Price Tick Highlight Flashes (Triggered upon price update) */
+  @keyframes priceTickUp {
+    0% {
+      background-color: rgba(52, 211, 153, 0.45);
+      transform: scale(1.05);
+    }
+    100% {
+      background-color: var(--emerald-bg);
+      transform: scale(1);
+    }
+  }
+
+  @keyframes priceTickDown {
+    0% {
+      background-color: rgba(251, 113, 133, 0.45);
+      transform: scale(1.05);
+    }
+    100% {
+      background-color: var(--rose-bg);
+      transform: scale(1);
+    }
+  }
+
+  .price-tick-up {
+    animation: priceTickUp 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .price-tick-down {
+    animation: priceTickDown 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* 5. Smooth Mini-Metric & Stacked Bar Width Transitions */
+  .cfo-bar-fill {
+    transition: width 0.65s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s ease;
+  }
+
+  .stacked-seg {
+    transition: width 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, filter 0.2s ease;
+  }
+  .stacked-bar-track:hover .stacked-seg:not(:hover) {
+    opacity: 0.45;
+    filter: grayscale(0.2);
+  }
+  .stacked-bar-track .stacked-seg:hover {
+    opacity: 1;
+    filter: brightness(1.15);
+  }
+
+  /* 6. Smooth Expandable Drawer Accordion Fade-In */
+  .card-details-body {
+    animation: drawerReveal 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes drawerReveal {
+    0% {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 7. Global Cues & AI Briefing Smooth Slide-in */
+  .global-cues-card, .ai-briefing-card {
+    animation: cardFadeSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes cardFadeSlide {
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 8. Active Stock In Bulk GARP Audit Spotlight Pulse */
+  @keyframes auditPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+    }
+    50% {
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.35);
+    }
+  }
+  .entry.is-auditing {
+    animation: auditPulse 1.2s ease-in-out infinite;
+    border-color: var(--teal) !important;
+  }
+
+  /* Accessibility: Respect Users Requesting Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .section .entry,
+    .urgent-box.urgent-sell,
+    .garp-missing-pill,
+    .price-tick-up,
+    .price-tick-down,
+    .card-details-body,
+    .global-cues-card,
+    .ai-briefing-card,
+    .entry.is-auditing {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
 </style>
 </head>
 <body>
