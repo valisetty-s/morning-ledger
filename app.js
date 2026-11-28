@@ -3460,8 +3460,11 @@ function renderContent() {
   contentEl.innerHTML = `<div class="section">${sortedFiltered.map(renderEntry).join('')}</div>`;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      document.querySelectorAll('.garp-arc-fill[data-target-dash]').forEach(p => {
-        p.setAttribute('stroke-dasharray', p.dataset.targetDash);
+      document.querySelectorAll('.garp-arc-fill[data-target-dash]').forEach((p, idx) => {
+        const delayMs = Math.min(idx * 45, 450);
+        setTimeout(() => {
+          p.setAttribute('stroke-dasharray', p.dataset.targetDash);
+        }, delayMs);
       });
       document.querySelectorAll('.cfo-bar-fill[data-target-width]').forEach(b => {
         b.style.width = b.dataset.targetWidth;
