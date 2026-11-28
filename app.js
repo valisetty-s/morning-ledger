@@ -745,6 +745,7 @@ function renderPortfolioAnalytics() {
           </div>
         </div>
         <div class="radar-body" id="action-radar-body" style="display:${isActionRadarMinimized ? 'none' : 'block'};">
+          <div id="movers-summary"></div>
           <div class="radar-grid">
             <div class="radar-tile radar-mint ${currentTrend === 'actionable-buys' ? 'active' : ''}" id="radar-buys" title="GARP ≥ 75, PEG ≤ 1.8 in healthy pullback or near 200-DMA">
               <div class="radar-num">${buysCount}</div>
@@ -783,6 +784,7 @@ function renderPortfolioAnalytics() {
       </div>
     `;
 
+    renderMoversSummary();
     const minBtn = document.getElementById('btn-toggle-radar-min');
     if (minBtn) {
       minBtn.addEventListener('click', () => {
@@ -3516,8 +3518,7 @@ function renderEntry(stock) {
           : '<span class="entry-badge fresh">News</span>')
     : '';
 
-  // Compact inline P&L + full holdings row for drawer
-  let inlinePnlHtml = '';
+  // Full holdings row for expandable Details, Holdings & Actions drawer
   let fullHoldingsHtml = '';
   if (stock.qty && stock.qty > 0) {
     const invested = stock.qty * (stock.avgPrice || 0);
@@ -3526,10 +3527,8 @@ function renderEntry(stock) {
       const pnl = currentVal - invested;
       const pnlSign = pnl >= 0 ? '+' : '';
       const pnlClass = pnl >= 0 ? 'price-up' : 'price-down';
-      inlinePnlHtml = `<span class="card-pnl-inline">Qty ${stock.qty} · <span class="${pnlClass}">${pnlSign}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</span></span>`;
       fullHoldingsHtml = `<div class="spec-line">💼 Qty: <strong>${stock.qty}</strong> <span class="spec-sep">·</span> Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} <span class="spec-sep">·</span> Inv: ₹${Math.round(invested).toLocaleString('en-IN')} <span class="spec-sep">·</span> Val: ₹${Math.round(currentVal).toLocaleString('en-IN')} (<span class="${pnlClass}">${pnlSign}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</span>)</div>`;
     } else {
-      inlinePnlHtml = `<span class="card-pnl-inline">Qty ${stock.qty} · Inv ₹${Math.round(invested).toLocaleString('en-IN')}</span>`;
       fullHoldingsHtml = `<div class="spec-line">💼 Qty: <strong>${stock.qty}</strong> <span class="spec-sep">·</span> Avg: ₹${Number(stock.avgPrice || 0).toFixed(2)} <span class="spec-sep">·</span> Inv: ₹${Math.round(invested).toLocaleString('en-IN')}</div>`;
     }
   }
@@ -3640,13 +3639,12 @@ function renderEntry(stock) {
     if (stock.quote.near_52wk_flag === 'near-high') pills.push(`<span class="dma-pill flag">52W HIGH</span>`);
     else if (stock.quote.near_52wk_flag === 'near-low') pills.push(`<span class="dma-pill flag">52W LOW</span>`);
 
-    if (pills.length || inlinePnlHtml) {
+    if (pills.length) {
       dmaLadderHtml = `
         <div class="dma-ladder-row">
           <div class="dma-pills">
-            ${pills.length ? '<span class="dma-lbl">DMA</span>' + pills.join('') : ''}
+            <span class="dma-lbl">DMA</span>${pills.join('')}
           </div>
-          ${inlinePnlHtml}
         </div>
       `;
     }
@@ -3735,14 +3733,14 @@ function renderEntry(stock) {
       ${renderGarpArcSvg(garpScore, stock.ticker, scoreData ? scoreData.missingFields : [])}
     </div>
 
-    ${miniTilesHtml}
-    ${dmaLadderHtml}
     ${leadHeadlineHtml}
+    ${miniTilesHtml}
 
     <details class="card-details">
       <summary><span>Details, Holdings &amp; Actions${extraCountLabel}</span></summary>
       <div class="card-details-body">
         ${fundLineHtml}
+        ${dmaLadderHtml}
         ${dmaFullLineHtml}
         ${fullHoldingsHtml}
         ${moreNewsHtml}
